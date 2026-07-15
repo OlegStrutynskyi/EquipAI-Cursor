@@ -128,7 +128,7 @@ public class InvoicesPage : BasePage
                 await editBtn.ClickAsync();
 
                 var editInvoicePage = new EditInvoicePage(Page);
-                await editInvoicePage.GetTitleAsync();
+                await editInvoicePage.WaitForLoadedAsync();
                 return editInvoicePage;
             }
 

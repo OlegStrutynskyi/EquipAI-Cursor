@@ -30,7 +30,7 @@ public class ViewInvoiceTests : BaseTest
         await invoicesPage.OpenAsync();
         var viewInvoicePage = await invoicesPage.ClickViewBtnAsync(invoiceNumber);
 
-        //  Top section
+        // Top section
         (await viewInvoicePage.IsBackBtnVisibleAsync()).Should().BeTrue();
         (await viewInvoicePage.GetTitleAsync()).Should().Be(expectedTitle);
         (await viewInvoicePage.GetStatusAsync()).Should().Be(expectedStatus);
