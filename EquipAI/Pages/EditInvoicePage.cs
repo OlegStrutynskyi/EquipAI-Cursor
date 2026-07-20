@@ -13,23 +13,37 @@ public class EditInvoicePage : BasePage
     private ILocator RejectBtn => Page.Locator("//button[normalize-space()='Reject']");
     private ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     private ILocator SaveAsDraftBtn => Page.Locator("//button[normalize-space()='Save as Draft']");
+    private ILocator DraftSavedMessage => Page.Locator("//p[@class='invoice-create__success' and normalize-space()='Draft saved successfully.']");
     private ILocator HeaderSection => Page.Locator("//section[@aria-labelledby='invoice-header-heading']");
     private ILocator InvoiceNumberInput => Page.Locator("//input[@id='invoice-number']");
+    private ILocator InvoiceNumberError => Page.Locator("//input[@id='invoice-number']/following-sibling::span");
     private ILocator CompanyNameInput => Page.Locator("//input[@id='company-name']");
+    private ILocator CompanyNameError => Page.Locator("//input[@id='company-name']/following-sibling::span");
     private ILocator AddressInput => Page.Locator("//input[@id='address']");
+    private ILocator AddressError => Page.Locator("//input[@id='address']/following-sibling::span");
     private ILocator ProjectDropdown => Page.Locator("//select[@id='invoice-project']");
     private ILocator InvoiceDateInput => Page.Locator("//input[@id='invoice-date']");
     private ILocator InvoiceCategoryDropdown => Page.Locator("//select[@id='invoice-category']");
     private ILocator TotalCostInput => Page.Locator("//input[@id='total-cost']");
+    private ILocator TotalCostError => Page.Locator("//input[@id='total-cost']/following-sibling::span");
     private ILocator CurrencyDropdown => Page.Locator("//select[@id='currency-code']");
     private ILocator LineItemsSection => Page.Locator("//section[@aria-labelledby='invoice-lines-heading']");
     private ILocator AddRowBtn => Page.Locator("//button[normalize-space()='Add row']");
     private ILocator Description1Input => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'line-description')]");
+    private ILocator Description1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'line-description')]/following-sibling::span");
     private ILocator Quantity1Input => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'quantity')]");
+    private ILocator Quantity1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'quantity')]/following-sibling::span");
     private ILocator UnitPrice1Input => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'unit-price')]");
+    private ILocator UnitPrice1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'unit-price')]/following-sibling::span");
     private ILocator Cost1Input => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'cost')]");
     private ILocator EmissionType1Dropdown => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'emission-type')]");
     private ILocator Unit1Dropdown => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'unit-of-measure')]");
+    private ILocator Description2Input => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//input[contains(@id,'line-description')]");
+    private ILocator Quantity2Input => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//input[contains(@id,'quantity')]");
+    private ILocator UnitPrice2Input => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//input[contains(@id,'unit-price')]");
+    private ILocator EmissionType2Dropdown => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//select[contains(@id,'emission-type')]");
+    private ILocator Unit2Dropdown => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//select[contains(@id,'unit-of-measure')]");
+    private ILocator LineNumber => Page.Locator("//legend[@class='invoice-create__line-legend']");
     private ILocator Toolbar => Page.Locator("//nav[contains(@class,'invoice-edit-toolbar')]");
 
     private ILocator RemoveRowBtn(int lineNumber) =>
@@ -61,6 +75,121 @@ public class EditInvoicePage : BasePage
         await InvoiceNumberInput.WaitForAsync();
         return (await InvoiceNumberInput.InputValueAsync()).Trim();
     }
+
+    public async Task FillInvoiceNumberAsync(string invoiceNumber)
+    {
+        await InvoiceNumberInput.FillAsync(invoiceNumber);
+    }
+
+    public async Task FillCompanyNameAsync(string companyName)
+    {
+        await CompanyNameInput.FillAsync(companyName);
+    }
+
+    public async Task FillAddressAsync(string address)
+    {
+        await AddressInput.FillAsync(address);
+    }
+
+    public async Task FillDescriptionAsync(string description)
+    {
+        await Description1Input.FillAsync(description);
+    }
+
+    public async Task FillTotalCostAsync(string totalCost)
+    {
+        await TotalCostInput.FillAsync(totalCost);
+    }
+
+    public async Task FillInvoiceDateAsync(string invoiceDate)
+    {
+        await InvoiceDateInput.FillAsync(invoiceDate);
+    }
+
+    public async Task FillQuantity1Async(string quantity)
+    {
+        await Quantity1Input.FillAsync(quantity);
+    }
+
+    public async Task FillUnitPrice1Async(string unitPrice)
+    {
+        await UnitPrice1Input.FillAsync(unitPrice);
+    }
+
+    public async Task SelectProjectAsync(string project) =>
+        await SelectOptionByTextAsync(ProjectDropdown, project);
+
+    public async Task SelectCurrencyAsync(string currency) =>
+        await SelectOptionByTextAsync(CurrencyDropdown, currency);
+
+    public async Task SelectEmissionType1Async(string emissionType) =>
+        await SelectOptionByTextAsync(EmissionType1Dropdown, emissionType);
+
+    public async Task SelectUnit1Async(string unitOfMeasure) =>
+        await SelectOptionByTextAsync(Unit1Dropdown, unitOfMeasure);
+
+    public async Task ClickAddRowBtnAsync()
+    {
+        var currentLineCount = await LineNumber.CountAsync();
+        await AddRowBtn.ClickAsync();
+        await Page.Locator($"//legend[normalize-space()='Line {currentLineCount + 1}']").WaitForAsync();
+    }
+
+    public async Task FillDescription2Async(string description)
+    {
+        await Description2Input.FillAsync(description);
+    }
+
+    public async Task FillQuantity2Async(string quantity)
+    {
+        await Quantity2Input.FillAsync(quantity);
+    }
+
+    public async Task FillUnitPrice2Async(string unitPrice)
+    {
+        await UnitPrice2Input.FillAsync(unitPrice);
+    }
+
+    public async Task SelectEmissionType2Async(string emissionType) =>
+        await SelectOptionByTextAsync(EmissionType2Dropdown, emissionType);
+
+    public async Task SelectUnit2Async(string unitOfMeasure) =>
+        await SelectOptionByTextAsync(Unit2Dropdown, unitOfMeasure);
+
+    public async Task ClearInvoiceNumberAsync() => await InvoiceNumberInput.FillAsync(string.Empty);
+
+    public async Task ClearCompanyNameAsync() => await CompanyNameInput.FillAsync(string.Empty);
+
+    public async Task ClearAddressAsync() => await AddressInput.FillAsync(string.Empty);
+
+    public async Task ClearTotalCostAsync() => await TotalCostInput.FillAsync(string.Empty);
+
+    public async Task ClearDescription1Async() => await Description1Input.FillAsync(string.Empty);
+
+    public async Task ClearQuantity1Async() => await Quantity1Input.FillAsync(string.Empty);
+
+    public async Task ClearUnitPrice1Async() => await UnitPrice1Input.FillAsync(string.Empty);
+
+    public async Task ClickSaveAsDraftBtnAsync()
+    {
+        await SaveAsDraftBtn.ClickAsync();
+        await DraftSavedMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    public async Task<ViewInvoicePage> SaveAsDraftAsync(string invoiceNumber)
+    {
+        await ClickSaveAsDraftBtnAsync();
+        var invoicesPage = await ClickBackBtnAsync();
+        return await invoicesPage.ClickViewBtnAsync(invoiceNumber);
+    }
+
+    public async Task<string> GetInvoiceNumberErrorAsync() => await GetErrorTextAsync(InvoiceNumberError);
+    public async Task<string> GetCompanyNameErrorAsync() => await GetErrorTextAsync(CompanyNameError);
+    public async Task<string> GetAddressErrorAsync() => await GetErrorTextAsync(AddressError);
+    public async Task<string> GetTotalCostErrorAsync() => await GetErrorTextAsync(TotalCostError);
+    public async Task<string> GetDescription1ErrorAsync() => await GetErrorTextAsync(Description1Error);
+    public async Task<string> GetQuantity1ErrorAsync() => await GetErrorTextAsync(Quantity1Error);
+    public async Task<string> GetUnitPrice1ErrorAsync() => await GetErrorTextAsync(UnitPrice1Error);
 
     public async Task<string> GetCompanyNameAsync()
     {
@@ -166,6 +295,20 @@ public class EditInvoicePage : BasePage
         return invoicesPage;
     }
 
+    public async Task<InvoicesPage> ClickCancelBtnAsync()
+    {
+        await CancelBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url => url.Contains("/invoices", StringComparison.OrdinalIgnoreCase)
+                   && !url.Contains("/invoices/new", StringComparison.OrdinalIgnoreCase)
+                   && !url.Contains("/edit", StringComparison.OrdinalIgnoreCase),
+            new PageWaitForURLOptions { Timeout = 60_000 });
+
+        var invoicesPage = new InvoicesPage(Page);
+        await invoicesPage.OpenAsync();
+        return invoicesPage;
+    }
+
     private static async Task<string> GetSelectedOptionTextAsync(ILocator dropdown)
     {
         await dropdown.WaitForAsync();
@@ -182,5 +325,17 @@ public class EditInvoicePage : BasePage
             return (await optionByValue.First.TextContentAsync())?.Trim() ?? string.Empty;
 
         return string.Empty;
+    }
+
+    private static async Task SelectOptionByTextAsync(ILocator dropdown, string optionText)
+    {
+        await dropdown.WaitForAsync();
+        await dropdown.SelectOptionAsync(new SelectOptionValue { Label = optionText });
+    }
+
+    private static async Task<string> GetErrorTextAsync(ILocator errorLocator)
+    {
+        await errorLocator.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return (await errorLocator.TextContentAsync())?.Trim() ?? string.Empty;
     }
 }

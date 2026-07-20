@@ -25,6 +25,12 @@ public class ViewInvoicePage : BasePage
     private ILocator Cost1 => Page.Locator("//td[normalize-space()='1']/following-sibling::td[4]");
     private ILocator EmissionType1 => Page.Locator("//td[normalize-space()='1']/following-sibling::td[5]");
     private ILocator Unit1 => Page.Locator("//td[normalize-space()='1']/following-sibling::td[6]");
+    private ILocator Description2 => Page.Locator("//td[normalize-space()='2']/following-sibling::td[1]");
+    private ILocator Quantity2 => Page.Locator("//td[normalize-space()='2']/following-sibling::td[2]");
+    private ILocator UnitPrice2 => Page.Locator("//td[normalize-space()='2']/following-sibling::td[3]");
+    private ILocator Cost2 => Page.Locator("//td[normalize-space()='2']/following-sibling::td[4]");
+    private ILocator EmissionType2 => Page.Locator("//td[normalize-space()='2']/following-sibling::td[5]");
+    private ILocator Unit2 => Page.Locator("//td[normalize-space()='2']/following-sibling::td[6]");
     private ILocator LineItemRows => Page.Locator("//h2[@id='invoice-detail-lines-heading']/..//tbody/tr");
 
     public async Task<string> GetTitleAsync()
@@ -117,6 +123,42 @@ public class ViewInvoicePage : BasePage
         return (await Unit1.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
+    public async Task<string> GetDescription2Async()
+    {
+        await Description2.WaitForAsync();
+        return (await Description2.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> GetQuantity2Async()
+    {
+        await Quantity2.WaitForAsync();
+        return (await Quantity2.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> GetUnitPrice2Async()
+    {
+        await UnitPrice2.WaitForAsync();
+        return (await UnitPrice2.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> GetCost2Async()
+    {
+        await Cost2.WaitForAsync();
+        return (await Cost2.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> GetEmissionType2Async()
+    {
+        await EmissionType2.WaitForAsync();
+        return (await EmissionType2.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> GetUnit2Async()
+    {
+        await Unit2.WaitForAsync();
+        return (await Unit2.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
     public async Task<int> GetLineItemRowCountAsync()
     {
         await LineItemsSection.WaitForAsync();
@@ -129,6 +171,22 @@ public class ViewInvoicePage : BasePage
         var editInvoicePage = new EditInvoicePage(Page);
         await editInvoicePage.WaitForLoadedAsync();
         return editInvoicePage;
+    }
+
+    public async Task<InvoicesPage> ClickBackBtnAsync()
+    {
+        await BackBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url =>
+            {
+                var path = new Uri(url).AbsolutePath.TrimEnd('/');
+                return path.Equals("/invoices", StringComparison.OrdinalIgnoreCase);
+            },
+            new PageWaitForURLOptions { Timeout = 60_000 });
+
+        var invoicesPage = new InvoicesPage(Page);
+        await invoicesPage.OpenAsync();
+        return invoicesPage;
     }
 
     public Task<bool> IsBackBtnVisibleAsync() => BackBtn.IsVisibleAsync();

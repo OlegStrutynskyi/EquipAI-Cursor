@@ -225,6 +225,77 @@ public static class SqlHelper
         return approvedAt;
     }
 
+    public static async Task<object> GetInvoiceIdByInvoiceNumberAsync(string invoiceNumber)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "SELECT [Id] FROM [invoices].[Invoice] WHERE [InvoiceNumber] = @invoiceNumber",
+            connection);
+        command.Parameters.AddWithValue("@invoiceNumber", invoiceNumber);
+
+        var result = await command.ExecuteScalarAsync();
+        if (result is null or DBNull)
+            throw new InvalidOperationException($"Invoice '{invoiceNumber}' was not found.");
+
+        return result;
+    }
+
+    public static async Task RestoreSetupManualInvoiceAsync(object invoiceId, string addedLineDescription)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var updateInvoiceCommand = new SqlCommand(
+            """
+            UPDATE [invoices].[Invoice]
+            SET Status = 'Draft',
+                TotalCost = '1562.99',
+                InvoiceDate = '2026-06-02',
+                InvoiceNumber = @invoiceNumber,
+                CompanyName = @companyName,
+                Address = @address,
+                CurrencyCode = 'USD',
+                ProjectId = (SELECT [Id] FROM [projects].[Project] WHERE Name = @projectName)
+            WHERE Id = @invoiceId
+            """,
+            connection);
+        updateInvoiceCommand.Parameters.AddWithValue("@invoiceNumber", Config.SetupInvoiceNumber1);
+        updateInvoiceCommand.Parameters.AddWithValue("@companyName", Config.SetupCompanyName1);
+        updateInvoiceCommand.Parameters.AddWithValue("@address", Config.SetupInvoiceAddress1);
+        updateInvoiceCommand.Parameters.AddWithValue("@projectName", Config.SetupProjectName1);
+        updateInvoiceCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+        await updateInvoiceCommand.ExecuteNonQueryAsync();
+
+        await using var deleteLineItemCommand = new SqlCommand(
+            """
+            DELETE FROM [invoices].[InvoiceLineItem]
+            WHERE InvoiceId = @invoiceId
+              AND LineDescription = @lineDescription
+            """,
+            connection);
+        deleteLineItemCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+        deleteLineItemCommand.Parameters.AddWithValue("@lineDescription", addedLineDescription);
+        await deleteLineItemCommand.ExecuteNonQueryAsync();
+
+        await using var updateLineItemCommand = new SqlCommand(
+            """
+            UPDATE [invoices].[InvoiceLineItem]
+            SET LineDescription = @lineDescription,
+                Quantity = '421.2900',
+                UnitPrice = '3.710000',
+                Cost = '1562.99',
+                EmissionTypeId = 4,
+                UnitOfMeasureId = 1
+            WHERE InvoiceId = @invoiceId
+            """,
+            connection);
+        updateLineItemCommand.Parameters.AddWithValue("@lineDescription", Config.SetupInvoiceLineDescription1);
+        updateLineItemCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+        await updateLineItemCommand.ExecuteNonQueryAsync();
+    }
+
     public static async Task DeleteInvoiceByInvoiceNumberAsync(string invoiceNumber)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
