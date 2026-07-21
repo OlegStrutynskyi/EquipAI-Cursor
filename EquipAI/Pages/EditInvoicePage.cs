@@ -45,6 +45,12 @@ public class EditInvoicePage : BasePage
     private ILocator Unit2Dropdown => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//select[contains(@id,'unit-of-measure')]");
     private ILocator LineNumber => Page.Locator("//legend[@class='invoice-create__line-legend']");
     private ILocator Toolbar => Page.Locator("//nav[contains(@class,'invoice-edit-toolbar')]");
+    private ILocator RejectDialog => Page.Locator("//div[@role='dialog']");
+    private ILocator RejectDialogTitle => Page.Locator("//h2[@id='invoice-reject-dialog-title']");
+    private ILocator RejectDialogLabel => Page.Locator("//label[@class='invoice-reject-dialog__label']");
+    private ILocator RejectionReasonInput => Page.Locator("//textarea[@id='invoice-rejection-reason']");
+    private ILocator RejectDialogCancelBtn => RejectDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" });
+    private ILocator RejectDialogConfirmBtn => RejectDialog.GetByRole(AriaRole.Button, new() { Name = "Confirm" });
 
     private ILocator RemoveRowBtn(int lineNumber) =>
         Page.Locator($"//legend[normalize-space()='Line {lineNumber}']/following-sibling::div//button[normalize-space()='Remove row']");
@@ -181,6 +187,72 @@ public class EditInvoicePage : BasePage
         await ClickSaveAsDraftBtnAsync();
         var invoicesPage = await ClickBackBtnAsync();
         return await invoicesPage.ClickViewBtnAsync(invoiceNumber);
+    }
+
+    public async Task<ViewInvoicePage> ClickApproveBtnAsync()
+    {
+        await ApproveBtn.ClickAsync();
+        var viewInvoicePage = new ViewInvoicePage(Page);
+        await viewInvoicePage.GetTitleAsync();
+        return viewInvoicePage;
+    }
+
+    public async Task ClickRejectBtnAsync()
+    {
+        await RejectBtn.ClickAsync();
+        await RejectDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    public async Task<string> GetRejectDialogTitleAsync()
+    {
+        await RejectDialogTitle.WaitForAsync();
+        return (await RejectDialogTitle.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> GetRejectDialogLabelAsync()
+    {
+        await RejectDialogLabel.WaitForAsync();
+        return (await RejectDialogLabel.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public Task<bool> IsRejectDialogVisibleAsync() => RejectDialog.IsVisibleAsync();
+    public Task<bool> IsRejectionReasonInputVisibleAsync() => RejectionReasonInput.IsVisibleAsync();
+    public Task<bool> IsRejectDialogCancelBtnVisibleAsync() => RejectDialogCancelBtn.IsVisibleAsync();
+    public Task<bool> IsRejectDialogConfirmBtnVisibleAsync() => RejectDialogConfirmBtn.IsVisibleAsync();
+
+    public async Task<bool> IsRejectDialogConfirmBtnDisabledAsync()
+    {
+        if (await RejectDialogConfirmBtn.GetAttributeAsync("disabled") is not null)
+            return true;
+
+        return !await RejectDialogConfirmBtn.IsEnabledAsync();
+    }
+
+    public async Task<bool> IsRejectDialogConfirmBtnEnabledAsync()
+    {
+        if (await RejectDialogConfirmBtn.GetAttributeAsync("disabled") is not null)
+            return false;
+
+        return await RejectDialogConfirmBtn.IsEnabledAsync();
+    }
+
+    public async Task FillRejectionReasonAsync(string reason)
+    {
+        await RejectionReasonInput.FillAsync(reason);
+    }
+
+    public async Task ClickRejectDialogCancelBtnAsync()
+    {
+        await RejectDialogCancelBtn.ClickAsync();
+        await RejectDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+    }
+
+    public async Task<ViewInvoicePage> ClickRejectDialogConfirmBtnAsync()
+    {
+        await RejectDialogConfirmBtn.ClickAsync();
+        var viewInvoicePage = new ViewInvoicePage(Page);
+        await viewInvoicePage.GetTitleAsync();
+        return viewInvoicePage;
     }
 
     public async Task<string> GetInvoiceNumberErrorAsync() => await GetErrorTextAsync(InvoiceNumberError);

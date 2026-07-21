@@ -289,4 +289,69 @@ public class EditInvoiceTests : BaseTest
                 await SqlHelper.RestoreSetupManualInvoiceAsync(invoiceId, addedDescription2);
         }
     }
+
+    [Test]
+    public async Task T10_EditInvoice_ClickApproveBtn()
+    {
+        const string invoiceNumber = Config.SetupInvoiceNumber1;
+        const string expectedStatus = "Approved";
+
+        try
+        {
+            var invoicesPage = new InvoicesPage(Fixture.Page);
+            await invoicesPage.OpenAsync();
+            var editInvoicePage = await invoicesPage.ClickEditBtnAsync(invoiceNumber);
+            var viewInvoicePage = await editInvoicePage.ClickApproveBtnAsync();
+
+            (await viewInvoicePage.GetStatusAsync()).Should().Be(expectedStatus);
+        }
+        finally
+        {
+            await SqlHelper.SetInvoiceDraftAsync(invoiceNumber);
+        }
+    }
+
+    [Test]
+    public async Task T11_EditInvoice_ClickRejectBtn()
+    {
+        const string invoiceNumber = Config.SetupInvoiceNumber1;
+        const string expectedDialogTitle = "Confirm rejection";
+        const string expectedDialogLabel = "Rejection reason";
+        const string rejectionReason = "Rejected by Autotests";
+        const string expectedStatus = "Rejected";
+
+        try
+        {
+            var invoicesPage = new InvoicesPage(Fixture.Page);
+            await invoicesPage.OpenAsync();
+            var editInvoicePage = await invoicesPage.ClickEditBtnAsync(invoiceNumber);
+
+            await editInvoicePage.ClickRejectBtnAsync();
+            (await editInvoicePage.IsRejectDialogVisibleAsync()).Should().BeTrue();
+            (await editInvoicePage.GetRejectDialogTitleAsync()).Should().Be(expectedDialogTitle);
+            (await editInvoicePage.GetRejectDialogLabelAsync()).Should().Be(expectedDialogLabel);
+            (await editInvoicePage.IsRejectionReasonInputVisibleAsync()).Should().BeTrue();
+            (await editInvoicePage.IsRejectDialogCancelBtnVisibleAsync()).Should().BeTrue();
+            (await editInvoicePage.IsRejectDialogConfirmBtnVisibleAsync()).Should().BeTrue();
+            (await editInvoicePage.IsRejectDialogConfirmBtnDisabledAsync()).Should().BeTrue();
+
+            await editInvoicePage.FillRejectionReasonAsync(rejectionReason);
+            (await editInvoicePage.IsRejectDialogConfirmBtnEnabledAsync()).Should().BeTrue();
+
+            await editInvoicePage.ClickRejectDialogCancelBtnAsync();
+            (await editInvoicePage.IsRejectDialogVisibleAsync()).Should().BeFalse();
+            (await editInvoicePage.IsApproveBtnVisibleAsync()).Should().BeTrue();
+            (await editInvoicePage.IsRejectBtnVisibleAsync()).Should().BeTrue();
+
+            await editInvoicePage.ClickRejectBtnAsync();
+            await editInvoicePage.FillRejectionReasonAsync(rejectionReason);
+            var viewInvoicePage = await editInvoicePage.ClickRejectDialogConfirmBtnAsync();
+
+            (await viewInvoicePage.GetStatusAsync()).Should().Be(expectedStatus);
+        }
+        finally
+        {
+            await SqlHelper.SetInvoiceDraftAsync(invoiceNumber);
+        }
+    }
 }
