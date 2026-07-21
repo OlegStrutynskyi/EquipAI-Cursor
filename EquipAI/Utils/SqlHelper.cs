@@ -286,7 +286,7 @@ public static class SqlHelper
                 Quantity = '421.2900',
                 UnitPrice = '3.710000',
                 Cost = '1562.99',
-                EmissionTypeId = 4,
+                EmissionTypeId = 1,
                 UnitOfMeasureId = 1
             WHERE InvoiceId = @invoiceId
             """,

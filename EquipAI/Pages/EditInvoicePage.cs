@@ -179,8 +179,14 @@ public class EditInvoicePage : BasePage
     public async Task ClickSaveAsDraftBtnAsync()
     {
         await SaveAsDraftBtn.ClickAsync();
+    }
+
+    public async Task WaitForDraftSavedMessageAsync()
+    {
         await DraftSavedMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
+
+    public Task<bool> IsDraftSavedMessageVisibleAsync() => DraftSavedMessage.IsVisibleAsync();
 
     public async Task<ViewInvoicePage> SaveAsDraftAsync(string invoiceNumber)
     {
