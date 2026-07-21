@@ -10,6 +10,14 @@ public abstract class BasePage
     {
         Page = page;
     }
+
+    private ILocator PageTitle => Page.Locator("//h1[contains(@id,'title')]");
+
+    public async Task<string> GetPageTitleAsync()
+    {
+        await PageTitle.WaitForAsync();
+        return (await PageTitle.TextContentAsync())?.Trim() ?? string.Empty;
+    }
 }
 
 public sealed class FilledInvoiceFormData
