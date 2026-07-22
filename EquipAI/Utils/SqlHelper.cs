@@ -313,4 +313,16 @@ public static class SqlHelper
         deleteInvoiceCommand.Parameters.AddWithValue("@invoiceNumber", invoiceNumber);
         await deleteInvoiceCommand.ExecuteNonQueryAsync();
     }
+
+    public static async Task DeleteUnitOfMeasureByCodeAsync(string code)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "DELETE FROM [emissions].[UnitOfMeasure] WHERE Code = @code",
+            connection);
+        command.Parameters.AddWithValue("@code", code);
+        await command.ExecuteNonQueryAsync();
+    }
 }

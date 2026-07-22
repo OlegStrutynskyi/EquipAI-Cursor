@@ -19,6 +19,8 @@ public static class Config
     public const string SetupCompanyName1 = "DONT-DELETE-Company-1";
     public const string SetupInvoiceAddress1 = "DONT-DELETE-Address-1";
     public const string SetupInvoiceLineDescription1 = "DONT-DELETE-Description-1";
+    public const string SetupCode = "DONTDELETECODE";
+    public const string SetupUnitName = "DONT DELETE UNIT";
 
     public static bool Headless =>
         bool.TryParse(Environment.GetEnvironmentVariable("HEADLESS"), out var headless) && headless;

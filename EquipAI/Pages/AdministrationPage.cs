@@ -55,10 +55,13 @@ public class AdministrationPage : BasePage
         await Page.WaitForURLAsync("**/admin/projects**");
     }
 
-    public async Task ClickUnitsTabAsync()
+    public async Task<UnitsPage> ClickUnitsTabAsync()
     {
         await UnitsTab.ClickAsync();
         await Page.WaitForURLAsync("**/admin/units**");
+        var unitsPage = new UnitsPage(Page);
+        await unitsPage.WaitForLoadedAsync();
+        return unitsPage;
     }
 
     public async Task ClickEmissionTypesTabAsync()

@@ -83,4 +83,25 @@ public class _01_Setup_Data : BaseTest
         (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber)).Should().BeTrue();
         Console.WriteLine("Invoice created.");
     }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T03_Setup_CreateUnit()
+    {
+        const string code = Config.SetupCode;
+        const string displayName = Config.SetupUnitName;
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+
+        if (await unitsPage.IsCodeInGridAsync(code))
+            Assert.Pass("Unit already exists.");
+
+        var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
+        await addUnitPage.FillCodeAsync(code);
+        await addUnitPage.FillDisplayNameAsync(displayName);
+        unitsPage = await addUnitPage.CreateUnitAsync();
+
+        (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
 }
