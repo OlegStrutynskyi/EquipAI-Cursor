@@ -49,6 +49,16 @@ public class UnitsPage : BasePage
         return displayNames.Any(name => name.Trim().Equals(displayName, StringComparison.Ordinal));
     }
 
+    public async Task<(string Code, string DisplayName)> GetCodeAndDisplayNameAsync(string code)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var row = Page.Locator($"//table[@class='admin-units__table']//tr[td[1][normalize-space()='{code}']]");
+        await row.WaitForAsync();
+        var codeText = (await row.Locator("td").Nth(0).InnerTextAsync()).Trim();
+        var displayName = (await row.Locator("td").Nth(1).InnerTextAsync()).Trim();
+        return (codeText, displayName);
+    }
+
     public async Task<AddUnitPage> ClickAddUnitBtnAsync()
     {
         await AddUnitBtn.ClickAsync();
@@ -56,5 +66,15 @@ public class UnitsPage : BasePage
             .Filter(new LocatorFilterOptions { HasTextString = "Add unit" })
             .WaitForAsync();
         return new AddUnitPage(Page);
+    }
+
+    public async Task<EditUnitPage> ClickEditBtnAsync(string code)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var row = Page.Locator($"//table[@class='admin-units__table']//tr[td[1][normalize-space()='{code}']]");
+        await row.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+        var editUnitPage = new EditUnitPage(Page);
+        await editUnitPage.WaitForLoadedAsync();
+        return editUnitPage;
     }
 }

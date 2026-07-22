@@ -325,4 +325,35 @@ public static class SqlHelper
         command.Parameters.AddWithValue("@code", code);
         await command.ExecuteNonQueryAsync();
     }
+
+    public static async Task<object> GetUnitOfMeasureIdByCodeAsync(string code)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "SELECT [Id] FROM [emissions].[UnitOfMeasure] WHERE Code = @code",
+            connection);
+        command.Parameters.AddWithValue("@code", code);
+
+        var result = await command.ExecuteScalarAsync();
+        if (result is null or DBNull)
+            throw new InvalidOperationException($"Unit of measure '{code}' was not found.");
+
+        return result;
+    }
+
+    public static async Task RestoreUnitOfMeasureAsync(object id, string code, string displayName)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "UPDATE [emissions].[UnitOfMeasure] SET Code = @code, DisplayName = @displayName WHERE Id = @id",
+            connection);
+        command.Parameters.AddWithValue("@code", code);
+        command.Parameters.AddWithValue("@displayName", displayName);
+        command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync();
+    }
 }

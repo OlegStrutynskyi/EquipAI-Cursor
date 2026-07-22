@@ -86,16 +86,38 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T03_Setup_CreateUnit()
+    public async Task T03_Setup_CreateUnit1()
     {
-        const string code = Config.SetupCode;
-        const string displayName = Config.SetupUnitName;
+        const string code = Config.SetupCode1;
+        const string displayName = Config.SetupUnitName1;
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
 
         if (await unitsPage.IsCodeInGridAsync(code))
-            Assert.Pass("Unit already exists.");
+            Assert.Pass("Unit 1 already exists.");
+
+        var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
+        await addUnitPage.FillCodeAsync(code);
+        await addUnitPage.FillDisplayNameAsync(displayName);
+        unitsPage = await addUnitPage.CreateUnitAsync();
+
+        (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
+
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T04_Setup_CreateUnit2()
+    {
+        const string code = Config.SetupCode2;
+        const string displayName = Config.SetupUnitName2;
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+
+        if (await unitsPage.IsCodeInGridAsync(code))
+            Assert.Pass("Unit 2 already exists.");
 
         var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
         await addUnitPage.FillCodeAsync(code);

@@ -68,7 +68,7 @@ public class UnitsTests : BaseTest
     [Test]
     public async Task T05_Units_AddUnit_ExistingCode()
     {
-        const string code = Config.SetupCode;
+        const string code = Config.SetupCode1;
         const string expectedAlertMessage = "Code should be unique.";
         var displayName = $"Unit{DateTime.Now:yyyyMMddHHmmss}";
 
@@ -125,6 +125,120 @@ public class UnitsTests : BaseTest
         finally
         {
             await SqlHelper.DeleteUnitOfMeasureByCodeAsync(code);
+        }
+    }
+
+    [Test]
+    public async Task T08_Units_ClickEditBtn()
+    {
+        const string expectedPageTitle = "Edit unit";
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
+
+        (await editUnitPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+    }
+
+    [Test]
+    public async Task T09_Units_Edit_DefaultView()
+    {
+        const string expectedPageTitle = "Edit unit";
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var (code, displayName) = await unitsPage.GetCodeAndDisplayNameAsync(Config.SetupCode1);
+        var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
+
+        (await editUnitPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await editUnitPage.GetSubtitleAsync()).Should().Be(code);
+        (await editUnitPage.GetCodeAsync()).Should().Be(code);
+        (await editUnitPage.GetDisplayNameAsync()).Should().Be(displayName);
+        (await editUnitPage.IsSaveUnitBtnVisibleAsync()).Should().BeTrue();
+        (await editUnitPage.IsSaveUnitBtnEnabledAsync()).Should().BeTrue();
+        (await editUnitPage.IsCancelBtnVisibleAsync()).Should().BeTrue();
+        (await editUnitPage.IsCancelBtnEnabledAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T10_Units_Edit_EmptyFields()
+    {
+        const string expectedCodeError = "Code is required.";
+        const string expectedDisplayNameError = "Display name is required.";
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
+        await editUnitPage.ClearCodeAsync();
+        await editUnitPage.ClearDisplayNameAsync();
+        await editUnitPage.ClickSaveUnitBtnAsync();
+
+        (await editUnitPage.GetCodeErrorAsync()).Should().Be(expectedCodeError);
+        (await editUnitPage.GetDisplayNameErrorAsync()).Should().Be(expectedDisplayNameError);
+    }
+
+    [Test]
+    public async Task T11_Units_Edit_ExistingCode()
+    {
+        const string expectedAlertMessage = "Code should be unique.";
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
+        await editUnitPage.FillCodeAsync(Config.SetupCode2);
+        await editUnitPage.ClickSaveUnitBtnAsync();
+
+        (await editUnitPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+    }
+
+    [Test]
+    public async Task T12_Units_Edit_ClickCancel()
+    {
+        const string expectedPageTitle = "Units";
+        var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+        var code = $"Code{stamp}";
+        var displayName = $"Unit{stamp}";
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
+        await editUnitPage.FillCodeAsync(code);
+        await editUnitPage.FillDisplayNameAsync(displayName);
+        unitsPage = await editUnitPage.ClickCancelBtnAsync();
+
+        (await unitsPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await unitsPage.IsCodeInGridAsync(Config.SetupCode1)).Should().BeTrue();
+        (await unitsPage.IsDisplayNameInGridAsync(Config.SetupUnitName1)).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T13_Units_Edit_Success()
+    {
+        const string expectedPageTitle = "Units";
+        var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+        var code = $"Code{stamp}";
+        var displayName = $"Unit{stamp}";
+        object? unitId = null;
+
+        try
+        {
+            unitId = await SqlHelper.GetUnitOfMeasureIdByCodeAsync(Config.SetupCode1);
+
+            var unitsPage = new UnitsPage(Fixture.Page);
+            await unitsPage.OpenAsync();
+            var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
+            await editUnitPage.FillCodeAsync(code);
+            await editUnitPage.FillDisplayNameAsync(displayName);
+            unitsPage = await editUnitPage.SaveUnitAsync();
+
+            (await unitsPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+            (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
+            (await unitsPage.IsDisplayNameInGridAsync(displayName)).Should().BeTrue();
+        }
+        finally
+        {
+            if (unitId is not null)
+                await SqlHelper.RestoreUnitOfMeasureAsync(unitId, Config.SetupCode1, Config.SetupUnitName1);
         }
     }
 }
