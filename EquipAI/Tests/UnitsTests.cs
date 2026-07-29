@@ -83,7 +83,37 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T06_Units_AddUnit_ClickCancel()
+    public async Task T06_Units_AddUnit_CodeTooLong()
+    {
+        const string expectedCodeError = "Code must be at most 32 characters.";
+        var randomCode = GenerateRandomString(33);
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
+        await addUnitPage.FillCodeAsync(randomCode);
+        await addUnitPage.ClickCreateUnitBtnAsync();
+
+        (await addUnitPage.GetCodeErrorAsync()).Should().Be(expectedCodeError);
+    }
+
+    [Test]
+    public async Task T07_Units_AddUnit_DisplayNameTooLong()
+    {
+        const string expectedDisplayNameError = "Display name must be at most 128 characters.";
+        var randomDisplayName = GenerateRandomString(129);
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
+        await addUnitPage.FillDisplayNameAsync(randomDisplayName);
+        await addUnitPage.ClickCreateUnitBtnAsync();
+
+        (await addUnitPage.GetDisplayNameErrorAsync()).Should().Be(expectedDisplayNameError);
+    }
+
+    [Test]
+    public async Task T08_Units_AddUnit_ClickCancel()
     {
         const string expectedPageTitle = "Units";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -102,12 +132,14 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T07_Units_AddUnit_Success()
+    public async Task T09_Units_AddUnit_Success()
     {
         const string expectedPageTitle = "Units";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
-        var code = $"Code{stamp}";
-        var displayName = $"Unit{stamp}";
+        var codePrefix = $"Code{stamp}";
+        var displayNamePrefix = $"Unit{stamp}";
+        var code = codePrefix + GenerateRandomString(32 - codePrefix.Length);
+        var displayName = displayNamePrefix + GenerateRandomString(128 - displayNamePrefix.Length);
 
         try
         {
@@ -129,7 +161,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T08_Units_ClickEditBtn()
+    public async Task T10_Units_ClickEditBtn()
     {
         const string expectedPageTitle = "Edit unit";
 
@@ -141,7 +173,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T09_Units_Edit_DefaultView()
+    public async Task T11_Units_Edit_DefaultView()
     {
         const string expectedPageTitle = "Edit unit";
 
@@ -161,7 +193,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T10_Units_Edit_EmptyFields()
+    public async Task T12_Units_Edit_EmptyFields()
     {
         const string expectedCodeError = "Code is required.";
         const string expectedDisplayNameError = "Display name is required.";
@@ -178,7 +210,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T11_Units_Edit_ExistingCode()
+    public async Task T13_Units_Edit_ExistingCode()
     {
         const string expectedAlertMessage = "Code should be unique.";
 
@@ -192,7 +224,37 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T12_Units_Edit_ClickCancel()
+    public async Task T14_Units_Edit_CodeTooLong()
+    {
+        const string expectedCodeError = "Code must be at most 32 characters.";
+        var randomCode = GenerateRandomString(33);
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
+        await editUnitPage.FillCodeAsync(randomCode);
+        await editUnitPage.ClickSaveUnitBtnAsync();
+
+        (await editUnitPage.GetCodeErrorAsync()).Should().Be(expectedCodeError);
+    }
+
+    [Test]
+    public async Task T15_Units_Edit_DisplayNameTooLong()
+    {
+        const string expectedDisplayNameError = "Display name must be at most 128 characters.";
+        var randomDisplayName = GenerateRandomString(129);
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
+        await editUnitPage.FillDisplayNameAsync(randomDisplayName);
+        await editUnitPage.ClickSaveUnitBtnAsync();
+
+        (await editUnitPage.GetDisplayNameErrorAsync()).Should().Be(expectedDisplayNameError);
+    }
+
+    [Test]
+    public async Task T16_Units_Edit_ClickCancel()
     {
         const string expectedPageTitle = "Units";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -212,12 +274,14 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T13_Units_Edit_Success()
+    public async Task T17_Units_Edit_Success()
     {
         const string expectedPageTitle = "Units";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
-        var code = $"Code{stamp}";
-        var displayName = $"Unit{stamp}";
+        var codePrefix = $"Code{stamp}";
+        var displayNamePrefix = $"Unit{stamp}";
+        var code = codePrefix + GenerateRandomString(32 - codePrefix.Length);
+        var displayName = displayNamePrefix + GenerateRandomString(128 - displayNamePrefix.Length);
         object? unitId = null;
 
         try
@@ -239,6 +303,54 @@ public class UnitsTests : BaseTest
         {
             if (unitId is not null)
                 await SqlHelper.RestoreUnitOfMeasureAsync(unitId, Config.SetupCode1, Config.SetupUnitName1);
+        }
+    }
+
+    [Test]
+    public async Task T18_Units_Deactivate_Click()
+    {
+        const string expectedTitle = "Deactivate unit";
+        var expectedMessage = $"Deactivate unit {Config.SetupCode1}? It will no longer be available for new imports.";
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        await unitsPage.ClickDeactivateBtnAsync(Config.SetupCode1);
+
+        (await unitsPage.IsDeactivateDialogVisibleAsync()).Should().BeTrue();
+        (await unitsPage.GetDeactivateDialogTitleAsync()).Should().Be(expectedTitle);
+        (await unitsPage.GetDeactivateDialogMessageAsync()).Should().Be(expectedMessage);
+        (await unitsPage.IsDeactivateDialogCancelBtnVisibleAsync()).Should().BeTrue();
+        (await unitsPage.IsDeactivateDialogConfirmBtnVisibleAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T19_Units_Deactivate_Cancel()
+    {
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        await unitsPage.ClickDeactivateBtnAsync(Config.SetupCode1);
+        await unitsPage.ClickDeactivateDialogCancelBtnAsync();
+
+        (await unitsPage.IsDeactivateDialogVisibleAsync()).Should().BeFalse();
+        (await unitsPage.IsCodeInGridAsync(Config.SetupCode1)).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T20_Units_Deactivate_Success()
+    {
+        try
+        {
+            var unitsPage = new UnitsPage(Fixture.Page);
+            await unitsPage.OpenAsync();
+            await unitsPage.ClickDeactivateBtnAsync(Config.SetupCode1);
+            await unitsPage.ClickDeactivateDialogConfirmBtnAsync(Config.SetupCode1);
+
+            (await unitsPage.IsDeactivateDialogVisibleAsync()).Should().BeFalse();
+            (await unitsPage.IsCodeInGridAsync(Config.SetupCode1)).Should().BeFalse();
+        }
+        finally
+        {
+            await SqlHelper.RestoreUnitOfMeasureByCodeAsync(Config.SetupCode1);
         }
     }
 }

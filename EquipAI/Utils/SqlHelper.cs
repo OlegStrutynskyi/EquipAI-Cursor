@@ -356,4 +356,16 @@ public static class SqlHelper
         command.Parameters.AddWithValue("@id", id);
         await command.ExecuteNonQueryAsync();
     }
+
+    public static async Task RestoreUnitOfMeasureByCodeAsync(string code)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "UPDATE [emissions].[UnitOfMeasure] SET IsDeleted = 0 WHERE Code = @code",
+            connection);
+        command.Parameters.AddWithValue("@code", code);
+        await command.ExecuteNonQueryAsync();
+    }
 }
