@@ -23,6 +23,8 @@ public static class Config
     public const string SetupCode2 = "DONTDELETECODE2";
     public const string SetupUnitName1 = "DONT DELETE UNIT 1";
     public const string SetupUnitName2 = "DONT DELETE UNIT2";
+    public const string SetupEmissionTypeName1 = "DONT DELETE EMISSION TYPE 1";
+    public const string SetupEmissionTypeName2 = "DONT DELETE EMISSION TYPE 2";
 
     public static bool Headless =>
         bool.TryParse(Environment.GetEnvironmentVariable("HEADLESS"), out var headless) && headless;

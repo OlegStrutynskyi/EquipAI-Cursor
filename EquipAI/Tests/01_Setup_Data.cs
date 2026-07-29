@@ -126,4 +126,48 @@ public class _01_Setup_Data : BaseTest
 
         (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
     }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T05_Setup_CreateEmissionType1()
+    {
+        const string code = Config.SetupCode1;
+        const string displayName = Config.SetupEmissionTypeName1;
+
+        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
+        await emissionTypesPage.OpenAsync();
+
+        if (await emissionTypesPage.IsCodeInGridAsync(code))
+            Assert.Pass("Emission type 1 already exists.");
+
+        var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
+        await addEmissionTypePage.FillCodeAsync(code);
+        await addEmissionTypePage.FillDisplayNameAsync(displayName);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+        emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
+
+        (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T06_Setup_CreateEmissionType2()
+    {
+        const string code = Config.SetupCode2;
+        const string displayName = Config.SetupEmissionTypeName2;
+
+        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
+        await emissionTypesPage.OpenAsync();
+
+        if (await emissionTypesPage.IsCodeInGridAsync(code))
+            Assert.Pass("Emission type 2 already exists.");
+
+        var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
+        await addEmissionTypePage.FillCodeAsync(code);
+        await addEmissionTypePage.FillDisplayNameAsync(displayName);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+        emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
+
+        (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
 }

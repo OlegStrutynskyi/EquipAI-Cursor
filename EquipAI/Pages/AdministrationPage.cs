@@ -64,10 +64,13 @@ public class AdministrationPage : BasePage
         return unitsPage;
     }
 
-    public async Task ClickEmissionTypesTabAsync()
+    public async Task<EmissionTypesPage> ClickEmissionTypesTabAsync()
     {
         await EmissionTypesTab.ClickAsync();
         await Page.WaitForURLAsync("**/admin/emission-types**");
+        var emissionTypesPage = new EmissionTypesPage(Page);
+        await emissionTypesPage.WaitForLoadedAsync();
+        return emissionTypesPage;
     }
 
     public async Task ClickAliasesTabAsync()

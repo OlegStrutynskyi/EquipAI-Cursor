@@ -368,4 +368,66 @@ public static class SqlHelper
         command.Parameters.AddWithValue("@code", code);
         await command.ExecuteNonQueryAsync();
     }
+
+    public static async Task DeleteEmissionTypeByCodeAsync(string code)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "DELETE FROM [emissions].[EmissionType] WHERE Code = @code",
+            connection);
+        command.Parameters.AddWithValue("@code", code);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task<object> GetEmissionTypeIdByCodeAsync(string code)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "SELECT [Id] FROM [emissions].[EmissionType] WHERE Code = @code",
+            connection);
+        command.Parameters.AddWithValue("@code", code);
+
+        var result = await command.ExecuteScalarAsync();
+        if (result is null or DBNull)
+            throw new InvalidOperationException($"Emission type '{code}' was not found.");
+
+        return result;
+    }
+
+    public static async Task RestoreEmissionTypeAsync(object id, string code, string displayName, string defaultUnitCode)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [emissions].[EmissionType]
+            SET Code = @code,
+                DisplayName = @displayName,
+                DefaultUnitOfMeasureId = (SELECT [Id] FROM [emissions].[UnitOfMeasure] WHERE Code = @defaultUnitCode)
+            WHERE Id = @id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@code", code);
+        command.Parameters.AddWithValue("@displayName", displayName);
+        command.Parameters.AddWithValue("@defaultUnitCode", defaultUnitCode);
+        command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task RestoreEmissionTypeByCodeAsync(string code)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "UPDATE [emissions].[EmissionType] SET IsDeleted = 0 WHERE Code = @code",
+            connection);
+        command.Parameters.AddWithValue("@code", code);
+        await command.ExecuteNonQueryAsync();
+    }
 }
