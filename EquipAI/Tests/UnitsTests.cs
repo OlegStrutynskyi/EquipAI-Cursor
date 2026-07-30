@@ -342,15 +342,36 @@ public class UnitsTests : BaseTest
         {
             var unitsPage = new UnitsPage(Fixture.Page);
             await unitsPage.OpenAsync();
-            await unitsPage.ClickDeactivateBtnAsync(Config.SetupCode1);
-            await unitsPage.ClickDeactivateDialogConfirmBtnAsync(Config.SetupCode1);
+            await unitsPage.ClickDeactivateBtnAsync(Config.SetupCode2);
+            await unitsPage.ClickDeactivateDialogConfirmBtnAsync(Config.SetupCode2);
 
             (await unitsPage.IsDeactivateDialogVisibleAsync()).Should().BeFalse();
-            (await unitsPage.IsCodeInGridAsync(Config.SetupCode1)).Should().BeFalse();
+            (await unitsPage.IsCodeInGridAsync(Config.SetupCode2)).Should().BeFalse();
         }
         finally
         {
-            await SqlHelper.RestoreUnitOfMeasureByCodeAsync(Config.SetupCode1);
+            await SqlHelper.RestoreUnitOfMeasureByCodeAsync(Config.SetupCode2);
         }
+    }
+
+    [Test]
+    public async Task T21_Units_Deactivate_UsedInEmissionType()
+    {
+        const string expectedAlertMessage =
+            "Cannot deactivate a unit of measure that is an emission type's default unit.";
+        var expectedDefaultUnit = $"{Config.SetupCode1} — {Config.SetupUnitName1}";
+
+        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
+        await emissionTypesPage.OpenAsync();
+
+        if (!await emissionTypesPage.IsDefaultUnitInGridAsync(expectedDefaultUnit))
+            Assert.Fail("Setup is not complete. Run test 'T05_Setup_CreateEmissionType1'.");
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        await unitsPage.ClickDeactivateBtnAsync(Config.SetupCode1);
+        await unitsPage.ClickDeactivateDialogConfirmBtnExpectingErrorAsync();
+
+        (await unitsPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
     }
 }

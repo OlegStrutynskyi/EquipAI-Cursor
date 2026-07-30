@@ -16,6 +16,7 @@ public class UnitsPage : BasePage
     private ILocator DeactivateDialogMessage => Page.Locator("//div[@role='alertdialog']//p[@id='confirm-dialog-message']");
     private ILocator DeactivateDialogCancelBtn => Page.Locator("//div[@role='alertdialog']//button[normalize-space()='Cancel']");
     private ILocator DeactivateDialogConfirmBtn => Page.Locator("//div[@role='alertdialog']//button[normalize-space()='Deactivate']");
+    private ILocator AlertMessage => Page.Locator("//p[@role='alert']");
 
     public async Task OpenAsync()
     {
@@ -119,5 +120,17 @@ public class UnitsPage : BasePage
         await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
         var row = Page.Locator($"//table[@class='admin-units__table']//tr[td[1][normalize-space()='{code}']]");
         await row.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
+    }
+
+    public async Task ClickDeactivateDialogConfirmBtnExpectingErrorAsync()
+    {
+        await DeactivateDialogConfirmBtn.ClickAsync();
+        await AlertMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    public async Task<string> GetAlertMessageAsync()
+    {
+        await AlertMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return (await AlertMessage.TextContentAsync())?.Trim() ?? string.Empty;
     }
 }
