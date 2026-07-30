@@ -73,9 +73,12 @@ public class AdministrationPage : BasePage
         return emissionTypesPage;
     }
 
-    public async Task ClickAliasesTabAsync()
+    public async Task<AliasesPage> ClickAliasesTabAsync()
     {
         await AliasesTab.ClickAsync();
         await Page.WaitForURLAsync("**/admin/aliases**");
+        var aliasesPage = new AliasesPage(Page);
+        await aliasesPage.WaitForLoadedAsync();
+        return aliasesPage;
     }
 }

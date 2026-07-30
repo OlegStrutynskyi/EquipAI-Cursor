@@ -11,6 +11,7 @@ public abstract class EmissionTypeFormPage : BasePage
     protected ILocator DisplayNameInput => Page.Locator("//input[@id='emission-type-display-name']");
     protected ILocator DisplayNameError => Page.Locator("//input[@id='emission-type-display-name']/following-sibling::span");
     protected ILocator DefaultUnitDropdown => Page.Locator("//select[@id='emission-type-default-unit']");
+    protected ILocator DefaultUnitOptions => Page.Locator("//select[@id='emission-type-default-unit']/option");
     protected ILocator DefaultUnitError => Page.Locator("//select[@id='emission-type-default-unit']/following-sibling::span");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     protected ILocator AlertMessage => Page.Locator("//p[@role='alert']");
@@ -62,6 +63,16 @@ public abstract class EmissionTypeFormPage : BasePage
         }
 
         throw new InvalidOperationException($"Default unit option containing '{code}' was not found.");
+    }
+
+    public async Task<IReadOnlyList<string>> GetDefaultUnitOptionsAsync()
+    {
+        await DefaultUnitDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var options = await DefaultUnitOptions.AllInnerTextsAsync();
+        return options
+            .Select(option => option.Trim())
+            .Where(option => !string.IsNullOrEmpty(option) && !option.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     public async Task ClearCodeAsync() => await CodeInput.FillAsync(string.Empty);

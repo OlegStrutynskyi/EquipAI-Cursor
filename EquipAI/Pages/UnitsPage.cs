@@ -65,6 +65,17 @@ public class UnitsPage : BasePage
         return (codeText, displayName);
     }
 
+    public async Task<IReadOnlyList<(string Code, string DisplayName)>> GetAllCodesAndDisplayNamesAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var codes = await CodeCells.AllInnerTextsAsync();
+        var displayNames = await DisplayNameCells.AllInnerTextsAsync();
+        return codes
+            .Select((code, index) => (Code: code.Trim(), DisplayName: displayNames[index].Trim()))
+            .Where(row => !string.IsNullOrEmpty(row.Code))
+            .ToList();
+    }
+
     public async Task<AddUnitPage> ClickAddUnitBtnAsync()
     {
         await AddUnitBtn.ClickAsync();

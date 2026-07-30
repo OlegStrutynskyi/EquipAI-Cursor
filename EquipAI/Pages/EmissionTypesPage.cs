@@ -65,9 +65,15 @@ public class EmissionTypesPage : BasePage
     public async Task<string> GetDefaultUnitByCodeAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='admin-emission-types__table']//tr[td[1][normalize-space()='{code}']]");
-        await row.WaitForAsync();
-        return (await row.Locator("td").Nth(2).InnerTextAsync()).Trim();
+        var codes = await CodeCells.AllInnerTextsAsync();
+        var defaultUnits = await DefaultUnitCells.AllInnerTextsAsync();
+        for (var i = 0; i < codes.Count; i++)
+        {
+            if (codes[i].Trim().Equals(code, StringComparison.Ordinal))
+                return defaultUnits[i].Trim();
+        }
+
+        throw new InvalidOperationException($"Code '{code}' was not found in the emission types grid.");
     }
 
     public async Task<(string Code, string DisplayName)> GetCodeAndDisplayNameAsync(string code)
