@@ -35,9 +35,28 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T03_Units_AddUnit_DefaultView()
+    public async Task T03_Units_GridColumns()
+    {
+        var expectedColumns = new[]
+        {
+            "Code",
+            "Display name",
+            "Dimension",
+            "Scale",
+        };
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+
+        (await unitsPage.GetGridColumnHeadersAsync()).Should().Equal(expectedColumns);
+    }
+
+    [Test]
+    public async Task T04_Units_AddUnit_DefaultView()
     {
         const string expectedPageTitle = "Add unit";
+        const string expectedScaleHelpMessage =
+            "Multiply CO₂e intensity per this unit by Scale to get intensity per the same-dimension canonical (Volume→US_GAL, Mass→T, Energy→KWH). Leave blank when not convertible. Other requires blank scale.";
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -46,12 +65,28 @@ public class UnitsTests : BaseTest
         (await addUnitPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
         (await addUnitPage.IsCodeInputVisibleAsync()).Should().BeTrue();
         (await addUnitPage.IsDisplayNameInputVisibleAsync()).Should().BeTrue();
+        (await addUnitPage.IsDimensionDropdownVisibleAsync()).Should().BeTrue();
+        (await addUnitPage.IsScaleInputVisibleAsync()).Should().BeTrue();
+        (await addUnitPage.GetScaleHelpMessageAsync()).Should().Be(expectedScaleHelpMessage);
         (await addUnitPage.IsCreateUnitBtnVisibleAsync()).Should().BeTrue();
         (await addUnitPage.IsCancelBtnVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
-    public async Task T04_Units_AddUnit_EmptyFields()
+    public async Task T05_Units_AddUnit_DimensionDropdown()
+    {
+        var expectedOptions = new[] { "Volume", "Mass", "Energy", "Other" };
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+        var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
+
+        var dimensionOptions = await addUnitPage.GetDimensionOptionsAsync();
+        dimensionOptions.Should().Equal(expectedOptions);
+    }
+
+    [Test]
+    public async Task T06_Units_AddUnit_EmptyFields()
     {
         const string expectedCodeError = "Code is required.";
         const string expectedDisplayNameError = "Display name is required.";
@@ -66,7 +101,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T05_Units_AddUnit_ExistingCode()
+    public async Task T07_Units_AddUnit_ExistingCode()
     {
         const string code = Config.SetupCode1;
         const string expectedAlertMessage = "Code should be unique.";
@@ -83,7 +118,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T06_Units_AddUnit_CodeTooLong()
+    public async Task T08_Units_AddUnit_CodeTooLong()
     {
         const string expectedCodeError = "Code must be at most 32 characters.";
         var randomCode = GenerateRandomString(33);
@@ -98,7 +133,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T07_Units_AddUnit_DisplayNameTooLong()
+    public async Task T09_Units_AddUnit_DisplayNameTooLong()
     {
         const string expectedDisplayNameError = "Display name must be at most 128 characters.";
         var randomDisplayName = GenerateRandomString(129);
@@ -113,7 +148,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T08_Units_AddUnit_ClickCancel()
+    public async Task T10_Units_AddUnit_ClickCancel()
     {
         const string expectedPageTitle = "Units";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -132,9 +167,11 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T09_Units_AddUnit_Success()
+    public async Task T11_Units_AddUnit_Success()
     {
         const string expectedPageTitle = "Units";
+        const string expectedDimension = "Volume";
+        const string expectedScale = "1.15";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var codePrefix = $"Code{stamp}";
         var displayNamePrefix = $"Unit{stamp}";
@@ -148,11 +185,16 @@ public class UnitsTests : BaseTest
             var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
             await addUnitPage.FillCodeAsync(code);
             await addUnitPage.FillDisplayNameAsync(displayName);
+            await addUnitPage.SelectDimensionAsync(expectedDimension);
+            await addUnitPage.FillScaleAsync(expectedScale);
             unitsPage = await addUnitPage.CreateUnitAsync();
 
             (await unitsPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
             (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
             (await unitsPage.IsDisplayNameInGridAsync(displayName)).Should().BeTrue();
+            var (dimension, scale) = await unitsPage.GetDimensionAndScaleByCodeAsync(code);
+            dimension.Should().Be(expectedDimension);
+            scale.Should().Be(expectedScale);
         }
         finally
         {
@@ -161,7 +203,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T10_Units_ClickEditBtn()
+    public async Task T12_Units_ClickEditBtn()
     {
         const string expectedPageTitle = "Edit unit";
 
@@ -173,7 +215,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T11_Units_Edit_DefaultView()
+    public async Task T13_Units_Edit_DefaultView()
     {
         const string expectedPageTitle = "Edit unit";
 
@@ -193,7 +235,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T12_Units_Edit_EmptyFields()
+    public async Task T14_Units_Edit_EmptyFields()
     {
         const string expectedCodeError = "Code is required.";
         const string expectedDisplayNameError = "Display name is required.";
@@ -210,7 +252,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T13_Units_Edit_ExistingCode()
+    public async Task T15_Units_Edit_ExistingCode()
     {
         const string expectedAlertMessage = "Code should be unique.";
 
@@ -224,7 +266,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T14_Units_Edit_CodeTooLong()
+    public async Task T16_Units_Edit_CodeTooLong()
     {
         const string expectedCodeError = "Code must be at most 32 characters.";
         var randomCode = GenerateRandomString(33);
@@ -239,7 +281,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T15_Units_Edit_DisplayNameTooLong()
+    public async Task T17_Units_Edit_DisplayNameTooLong()
     {
         const string expectedDisplayNameError = "Display name must be at most 128 characters.";
         var randomDisplayName = GenerateRandomString(129);
@@ -254,7 +296,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T16_Units_Edit_ClickCancel()
+    public async Task T18_Units_Edit_ClickCancel()
     {
         const string expectedPageTitle = "Units";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -274,7 +316,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T17_Units_Edit_Success()
+    public async Task T19_Units_Edit_Success()
     {
         const string expectedPageTitle = "Units";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -307,7 +349,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T18_Units_Deactivate_Click()
+    public async Task T20_Units_Deactivate_Click()
     {
         const string expectedTitle = "Deactivate unit";
         var expectedMessage = $"Deactivate unit {Config.SetupCode1}? It will no longer be available for new imports.";
@@ -324,7 +366,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T19_Units_Deactivate_Cancel()
+    public async Task T21_Units_Deactivate_Cancel()
     {
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -336,7 +378,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T20_Units_Deactivate_Success()
+    public async Task T22_Units_Deactivate_Success()
     {
         try
         {
@@ -355,7 +397,7 @@ public class UnitsTests : BaseTest
     }
 
     [Test]
-    public async Task T21_Units_Deactivate_UsedInEmissionType()
+    public async Task T23_Units_Deactivate_UsedInEmissionType()
     {
         const string expectedAlertMessage =
             "Cannot deactivate a unit of measure that is an emission type's default unit.";

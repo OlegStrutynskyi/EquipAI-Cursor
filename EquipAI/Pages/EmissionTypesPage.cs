@@ -41,6 +41,17 @@ public class EmissionTypesPage : BasePage
     public Task<bool> IsAddEmissionTypeBtnEnabledAsync() => AddEmissionTypeBtn.IsEnabledAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
 
+    public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var headers = await Grid.Locator("thead th").AllInnerTextsAsync();
+        return headers
+            .Select(header => header.Trim())
+            .Where(header => !string.IsNullOrWhiteSpace(header)
+                             && !header.Equals("Actions", StringComparison.Ordinal))
+            .ToList();
+    }
+
     public async Task<bool> IsCodeInGridAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });

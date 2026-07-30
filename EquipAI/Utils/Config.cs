@@ -22,7 +22,7 @@ public static class Config
     public const string SetupCode1 = "DONTDELETECODE1";
     public const string SetupCode2 = "DONTDELETECODE2";
     public const string SetupUnitName1 = "DONT DELETE UNIT 1";
-    public const string SetupUnitName2 = "DONT DELETE UNIT2";
+    public const string SetupUnitName2 = "DONT DELETE UNIT 2";
     public const string SetupEmissionTypeName1 = "DONT DELETE EMISSION TYPE 1";
     public const string SetupEmissionTypeName2 = "DONT DELETE EMISSION TYPE 2";
 

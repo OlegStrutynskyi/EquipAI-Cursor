@@ -11,6 +11,8 @@ public class UnitsPage : BasePage
     private ILocator Grid => Page.Locator("//table[@class='admin-units__table']");
     private ILocator CodeCells => Page.Locator("//table[@class='admin-units__table']//tr/td[1]");
     private ILocator DisplayNameCells => Page.Locator("//table[@class='admin-units__table']//tr/td[2]");
+    private ILocator DimensionCells => Page.Locator("//table[@class='admin-units__table']//tr/td[3]");
+    private ILocator ScaleCells => Page.Locator("//table[@class='admin-units__table']//tr/td[4]");
     private ILocator DeactivateDialog => Page.Locator("//div[@role='alertdialog']");
     private ILocator DeactivateDialogTitle => Page.Locator("//div[@role='alertdialog']//h2");
     private ILocator DeactivateDialogMessage => Page.Locator("//div[@role='alertdialog']//p[@id='confirm-dialog-message']");
@@ -41,6 +43,17 @@ public class UnitsPage : BasePage
     public Task<bool> IsAddUnitBtnEnabledAsync() => AddUnitBtn.IsEnabledAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
 
+    public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var headers = await Grid.Locator("thead th").AllInnerTextsAsync();
+        return headers
+            .Select(header => header.Trim())
+            .Where(header => !string.IsNullOrWhiteSpace(header)
+                             && !header.Equals("Actions", StringComparison.Ordinal))
+            .ToList();
+    }
+
     public async Task<bool> IsCodeInGridAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -63,6 +76,21 @@ public class UnitsPage : BasePage
         var codeText = (await row.Locator("td").Nth(0).InnerTextAsync()).Trim();
         var displayName = (await row.Locator("td").Nth(1).InnerTextAsync()).Trim();
         return (codeText, displayName);
+    }
+
+    public async Task<(string Dimension, string Scale)> GetDimensionAndScaleByCodeAsync(string code)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var codes = await CodeCells.AllInnerTextsAsync();
+        var dimensions = await DimensionCells.AllInnerTextsAsync();
+        var scales = await ScaleCells.AllInnerTextsAsync();
+        for (var i = 0; i < codes.Count; i++)
+        {
+            if (codes[i].Trim().Equals(code, StringComparison.Ordinal))
+                return (dimensions[i].Trim(), scales[i].Trim());
+        }
+
+        throw new InvalidOperationException($"Code '{code}' was not found in the units grid.");
     }
 
     public async Task<IReadOnlyList<(string Code, string DisplayName)>> GetAllCodesAndDisplayNamesAsync()

@@ -10,11 +10,18 @@ public abstract class UnitFormPage : BasePage
     protected ILocator CodeError => Page.Locator("//input[@id='unit-code']/following-sibling::span");
     protected ILocator DisplayNameInput => Page.Locator("//input[@id='unit-display-name']");
     protected ILocator DisplayNameError => Page.Locator("//input[@id='unit-display-name']/following-sibling::span");
+    protected ILocator DimensionDropdown => Page.Locator("//select[@id='unit-dimension']");
+    protected ILocator DimensionOptions => Page.Locator("//select[@id='unit-dimension']/option");
+    protected ILocator ScaleInput => Page.Locator("//input[@id='unit-scale']");
+    protected ILocator ScaleHelpMessage => Page.Locator("//input[@id='unit-scale']/following-sibling::p");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     protected ILocator AlertMessage => Page.Locator("//p[@role='alert']");
 
     public Task<bool> IsCodeInputVisibleAsync() => CodeInput.IsVisibleAsync();
     public Task<bool> IsDisplayNameInputVisibleAsync() => DisplayNameInput.IsVisibleAsync();
+    public Task<bool> IsDimensionDropdownVisibleAsync() => DimensionDropdown.IsVisibleAsync();
+    public Task<bool> IsScaleInputVisibleAsync() => ScaleInput.IsVisibleAsync();
+    public Task<bool> IsScaleHelpMessageVisibleAsync() => ScaleHelpMessage.IsVisibleAsync();
     public Task<bool> IsCancelBtnVisibleAsync() => CancelBtn.IsVisibleAsync();
     public Task<bool> IsCancelBtnEnabledAsync() => CancelBtn.IsEnabledAsync();
 
@@ -30,6 +37,22 @@ public abstract class UnitFormPage : BasePage
         return (await DisplayNameInput.InputValueAsync()).Trim();
     }
 
+    public async Task<string> GetScaleHelpMessageAsync()
+    {
+        await ScaleHelpMessage.WaitForAsync();
+        return (await ScaleHelpMessage.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<IReadOnlyList<string>> GetDimensionOptionsAsync()
+    {
+        await DimensionDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var options = await DimensionOptions.AllInnerTextsAsync();
+        return options
+            .Select(option => option.Trim())
+            .Where(option => !string.IsNullOrEmpty(option) && !option.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
     public async Task FillCodeAsync(string code)
     {
         await CodeInput.FillAsync(code);
@@ -38,6 +61,17 @@ public abstract class UnitFormPage : BasePage
     public async Task FillDisplayNameAsync(string displayName)
     {
         await DisplayNameInput.FillAsync(displayName);
+    }
+
+    public async Task SelectDimensionAsync(string optionText)
+    {
+        await DimensionDropdown.WaitForAsync();
+        await DimensionDropdown.SelectOptionAsync(new SelectOptionValue { Label = optionText });
+    }
+
+    public async Task FillScaleAsync(string scale)
+    {
+        await ScaleInput.FillAsync(scale);
     }
 
     public async Task ClearCodeAsync() => await CodeInput.FillAsync(string.Empty);
