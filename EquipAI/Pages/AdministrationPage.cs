@@ -13,6 +13,7 @@ public class AdministrationPage : BasePage
     private ILocator UnitsTab => Page.Locator("//span[normalize-space()='Units']");
     private ILocator EmissionTypesTab => Page.Locator("//span[normalize-space()='Emission types']");
     private ILocator AliasesTab => Page.Locator("//span[normalize-space()='Aliases']");
+    private ILocator FactorImportTab => Page.Locator("//span[normalize-space()='Factor import']");
 
     public async Task OpenAsync()
     {
@@ -42,6 +43,7 @@ public class AdministrationPage : BasePage
     public Task<bool> IsUnitsTabVisibleAsync() => UnitsTab.IsVisibleAsync();
     public Task<bool> IsEmissionTypesTabVisibleAsync() => EmissionTypesTab.IsVisibleAsync();
     public Task<bool> IsAliasesTabVisibleAsync() => AliasesTab.IsVisibleAsync();
+    public Task<bool> IsFactorImportTabVisibleAsync() => FactorImportTab.IsVisibleAsync();
 
     public async Task ClickUsersTabAsync()
     {
@@ -80,5 +82,14 @@ public class AdministrationPage : BasePage
         var aliasesPage = new AliasesPage(Page);
         await aliasesPage.WaitForLoadedAsync();
         return aliasesPage;
+    }
+
+    public async Task ClickFactorImportTabAsync()
+    {
+        await FactorImportTab.ClickAsync();
+        await Page.WaitForURLAsync("**/admin/factor-import**");
+        await Page.Locator("//h1[contains(@id,'title')]")
+            .Filter(new LocatorFilterOptions { HasTextString = "Factor import" })
+            .WaitForAsync();
     }
 }

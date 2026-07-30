@@ -21,6 +21,7 @@ public class AdministrationTests : BaseTest
         (await administrationPage.IsUnitsTabVisibleAsync()).Should().BeTrue();
         (await administrationPage.IsEmissionTypesTabVisibleAsync()).Should().BeTrue();
         (await administrationPage.IsAliasesTabVisibleAsync()).Should().BeTrue();
+        (await administrationPage.IsFactorImportTabVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
@@ -79,6 +80,18 @@ public class AdministrationTests : BaseTest
         var administrationPage = new AdministrationPage(Fixture.Page);
         await administrationPage.OpenAsync();
         await administrationPage.ClickAliasesTabAsync();
+
+        (await administrationPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+    }
+
+    [Test]
+    public async Task T07_Admin_ClickFactorImportTab()
+    {
+        const string expectedPageTitle = "Factor import";
+
+        var administrationPage = new AdministrationPage(Fixture.Page);
+        await administrationPage.OpenAsync();
+        await administrationPage.ClickFactorImportTabAsync();
 
         (await administrationPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
     }
