@@ -8,6 +8,8 @@ public class AliasesPage : BasePage
 
     private ILocator Message => Page.Locator("//p[@class='admin-aliases__lead']");
     private ILocator AddAliasBtn => Page.Locator("//button[normalize-space()='Add alias']");
+    private ILocator UnitsOfMeasureTab => Page.Locator("//button[normalize-space()='Units of measure']");
+    private ILocator EmissionTypesTab => Page.Locator("//button[normalize-space()='Emission types']");
     private ILocator Grid => Page.Locator("//table[@class='admin-aliases__table']");
 
     public async Task OpenAsync()
@@ -32,6 +34,27 @@ public class AliasesPage : BasePage
     public Task<bool> IsAddAliasBtnVisibleAsync() => AddAliasBtn.IsVisibleAsync();
     public Task<bool> IsAddAliasBtnEnabledAsync() => AddAliasBtn.IsEnabledAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
+
+    public async Task ClickUnitsOfMeasureTabAsync()
+    {
+        await UnitsOfMeasureTab.ClickAsync();
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Grid.Locator("thead th")
+            .Filter(new LocatorFilterOptions { HasTextString = "Resolves to" })
+            .WaitForAsync();
+        await Grid.Locator("thead th")
+            .Filter(new LocatorFilterOptions { HasTextString = "Factor source" })
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
+    }
+
+    public async Task ClickEmissionTypesTabAsync()
+    {
+        await EmissionTypesTab.ClickAsync();
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Grid.Locator("thead th")
+            .Filter(new LocatorFilterOptions { HasTextString = "Factor source" })
+            .WaitForAsync();
+    }
 
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {

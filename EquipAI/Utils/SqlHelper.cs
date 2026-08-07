@@ -343,16 +343,49 @@ public static class SqlHelper
         return result;
     }
 
-    public static async Task RestoreUnitOfMeasureAsync(object id, string code, string displayName)
+    public static async Task<(int? Dimension, decimal? ScaleToCanonical)> GetUnitOfMeasureDimensionAndScaleAsync(object id)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
         await connection.OpenAsync();
 
         await using var command = new SqlCommand(
-            "UPDATE [emissions].[UnitOfMeasure] SET Code = @code, DisplayName = @displayName WHERE Id = @id",
+            "SELECT [Dimension], [ScaleToCanonical] FROM [emissions].[UnitOfMeasure] WHERE Id = @id",
+            connection);
+        command.Parameters.AddWithValue("@id", id);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            throw new InvalidOperationException($"Unit of measure id '{id}' was not found.");
+
+        int? dimension = reader.IsDBNull(0) ? null : reader.GetInt32(0);
+        decimal? scaleToCanonical = reader.IsDBNull(1) ? null : reader.GetDecimal(1);
+        return (dimension, scaleToCanonical);
+    }
+
+    public static async Task RestoreUnitOfMeasureAsync(
+        object id,
+        string code,
+        string displayName,
+        int? dimension = null,
+        decimal? scaleToCanonical = null)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [emissions].[UnitOfMeasure]
+            SET Code = @code,
+                DisplayName = @displayName,
+                Dimension = @dimension,
+                ScaleToCanonical = @scaleToCanonical
+            WHERE Id = @id
+            """,
             connection);
         command.Parameters.AddWithValue("@code", code);
         command.Parameters.AddWithValue("@displayName", displayName);
+        command.Parameters.AddWithValue("@dimension", dimension is null ? DBNull.Value : dimension);
+        command.Parameters.AddWithValue("@scaleToCanonical", scaleToCanonical is null ? DBNull.Value : scaleToCanonical);
         command.Parameters.AddWithValue("@id", id);
         await command.ExecuteNonQueryAsync();
     }

@@ -35,25 +35,42 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T03_Aliases_GridColumns()
+    public async Task T03_Aliases_GridColumns_Units()
+    {
+        var expectedColumns = new[]
+        {
+            "Context",
+            "Alias text",
+            "Resolves to",
+        };
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+
+        (await aliasesPage.GetGridColumnHeadersAsync()).Should().Equal(expectedColumns);
+    }
+
+    [Test]
+    public async Task T04_Aliases_GridColumns_EmissionTypes()
     {
         var expectedColumns = new[]
         {
             "Context",
             "Alias text",
             "Factor source",
-            "Target kind",
             "Resolves to",
         };
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
 
         (await aliasesPage.GetGridColumnHeadersAsync()).Should().Equal(expectedColumns);
     }
 
     [Test]
-    public async Task T04_Aliases_Add_DefaultView()
+    public async Task T05_Aliases_Add_DefaultView()
     {
         const string expectedPageTitle = "Add alias";
 
@@ -71,7 +88,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T05_Aliases_Add_ContextDropdown()
+    public async Task T06_Aliases_Add_ContextDropdown()
     {
         const string dataIngestionOption = "Data ingestion";
         const string catalogFactorMappingOption = "Catalog factor mapping";
@@ -96,7 +113,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T06_Aliases_FieldsList()
+    public async Task T07_Aliases_Add_FieldsList()
     {
         const string dataIngestionOption = "Data ingestion";
         const string catalogFactorMappingOption = "Catalog factor mapping";
@@ -127,7 +144,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T07_Aliases_Add_AliasTextTooLong()
+    public async Task T08_Aliases_Add_AliasTextTooLong()
     {
         const string expectedAliasTextError = "Alias text must be at most 256 characters.";
         var randomAliasText = GenerateRandomString(257);
@@ -142,7 +159,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T08_Aliases_Add_TargetKind()
+    public async Task T09_Aliases_Add_TargetKind()
     {
         const string unitOfMeasureOption = "Unit of measure";
         const string emissionTypeOption = "Emission type";
@@ -165,7 +182,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T09_Aliases_Add_UnitOfMeasure()
+    public async Task T10_Aliases_Add_UnitOfMeasure()
     {
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -185,7 +202,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T10_Aliases_Add_EmptyFields()
+    public async Task T11_Aliases_Add_EmptyFields()
     {
         const string dataIngestionOption = "Data ingestion";
         const string catalogFactorMappingOption = "Catalog factor mapping";

@@ -319,32 +319,47 @@ public class UnitsTests : BaseTest
     public async Task T19_Units_Edit_Success()
     {
         const string expectedPageTitle = "Units";
+        const string expectedDimension = "Mass";
+        const string expectedScale = "2";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var codePrefix = $"Code{stamp}";
         var displayNamePrefix = $"Unit{stamp}";
         var code = codePrefix + GenerateRandomString(32 - codePrefix.Length);
         var displayName = displayNamePrefix + GenerateRandomString(128 - displayNamePrefix.Length);
         object? unitId = null;
+        int? originalDimension = null;
+        decimal? originalScale = null;
 
         try
         {
             unitId = await SqlHelper.GetUnitOfMeasureIdByCodeAsync(Config.SetupCode1);
+            (originalDimension, originalScale) = await SqlHelper.GetUnitOfMeasureDimensionAndScaleAsync(unitId);
 
             var unitsPage = new UnitsPage(Fixture.Page);
             await unitsPage.OpenAsync();
             var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
             await editUnitPage.FillCodeAsync(code);
             await editUnitPage.FillDisplayNameAsync(displayName);
+            await editUnitPage.SelectDimensionAsync(expectedDimension);
+            await editUnitPage.FillScaleAsync(expectedScale);
             unitsPage = await editUnitPage.SaveUnitAsync();
 
             (await unitsPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
             (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
             (await unitsPage.IsDisplayNameInGridAsync(displayName)).Should().BeTrue();
+            var (dimension, scale) = await unitsPage.GetDimensionAndScaleByCodeAsync(code);
+            dimension.Should().Be(expectedDimension);
+            scale.Should().Be(expectedScale);
         }
         finally
         {
             if (unitId is not null)
-                await SqlHelper.RestoreUnitOfMeasureAsync(unitId, Config.SetupCode1, Config.SetupUnitName1);
+                await SqlHelper.RestoreUnitOfMeasureAsync(
+                    unitId,
+                    Config.SetupCode1,
+                    Config.SetupUnitName1,
+                    originalDimension,
+                    originalScale);
         }
     }
 
