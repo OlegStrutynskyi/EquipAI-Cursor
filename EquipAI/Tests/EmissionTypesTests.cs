@@ -39,9 +39,10 @@ public class EmissionTypesTests : BaseTest
     {
         var expectedColumns = new[]
         {
-            "Code",
-            "Display name",
-            "Default unit",
+            "CODE",
+            "DISPLAY NAME",
+            "DEFAULT UNIT",
+            "ACTIONS",
         };
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
@@ -49,9 +50,26 @@ public class EmissionTypesTests : BaseTest
 
         (await emissionTypesPage.GetGridColumnHeadersAsync()).Should().Equal(expectedColumns);
     }
+    
+    [Test]
+    public async Task T04_EmissionType_Add_DefaultView()
+    {
+        const string expectedPageTitle = "Add emission type";
+
+        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
+        await emissionTypesPage.OpenAsync();
+        var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
+
+        (await addEmissionTypePage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await addEmissionTypePage.IsCodeInputVisibleAsync()).Should().BeTrue();
+        (await addEmissionTypePage.IsDisplayNameInputVisibleAsync()).Should().BeTrue();
+        (await addEmissionTypePage.IsDefaultUnitDropdownVisibleAsync()).Should().BeTrue();
+        (await addEmissionTypePage.IsCreateEmissionTypeBtnVisibleAsync()).Should().BeTrue();
+        (await addEmissionTypePage.IsCancelBtnVisibleAsync()).Should().BeTrue();
+    }
 
     [Test]
-    public async Task T04_EmissionType_Add_UnitDropdown()
+    public async Task T05_EmissionType_Add_UnitDropdown()
     {
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -66,23 +84,6 @@ public class EmissionTypesTests : BaseTest
 
         var defaultUnitOptions = await addEmissionTypePage.GetDefaultUnitOptionsAsync();
         defaultUnitOptions.Should().Contain(expectedOptions);
-    }
-
-    [Test]
-    public async Task T05_EmissionType_Add_DefaultView()
-    {
-        const string expectedPageTitle = "Add emission type";
-
-        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
-        await emissionTypesPage.OpenAsync();
-        var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
-
-        (await addEmissionTypePage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
-        (await addEmissionTypePage.IsCodeInputVisibleAsync()).Should().BeTrue();
-        (await addEmissionTypePage.IsDisplayNameInputVisibleAsync()).Should().BeTrue();
-        (await addEmissionTypePage.IsDefaultUnitDropdownVisibleAsync()).Should().BeTrue();
-        (await addEmissionTypePage.IsCreateEmissionTypeBtnVisibleAsync()).Should().BeTrue();
-        (await addEmissionTypePage.IsCancelBtnVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
@@ -387,6 +388,8 @@ public class EmissionTypesTests : BaseTest
     {
         try
         {
+            await SqlHelper.RestoreEmissionTypeByCodeAsync(Config.SetupCode1);
+
             var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
             await emissionTypesPage.OpenAsync();
             await emissionTypesPage.ClickDeactivateBtnAsync(Config.SetupCode1);

@@ -12,7 +12,7 @@ public abstract class EmissionTypeFormPage : BasePage
     protected ILocator DisplayNameError => Page.Locator("//input[@id='emission-type-display-name']/following-sibling::span");
     protected ILocator DefaultUnitDropdown => Page.Locator("//select[@id='emission-type-default-unit']");
     protected ILocator DefaultUnitOptions => Page.Locator("//select[@id='emission-type-default-unit']/option");
-    protected ILocator DefaultUnitError => Page.Locator("//select[@id='emission-type-default-unit']/following-sibling::span");
+    protected ILocator DefaultUnitError => Page.Locator("//select[@id='emission-type-default-unit']/../following-sibling::span");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     protected ILocator AlertMessage => Page.Locator("//p[@role='alert']");
 
