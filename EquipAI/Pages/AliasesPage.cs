@@ -63,8 +63,8 @@ public class AliasesPage : BasePage
         var headers = await Grid.Locator("thead th").AllInnerTextsAsync();
         return headers
             .Select(header => header.Trim())
-            .Where(header => !string.IsNullOrWhiteSpace(header)
-                             && !header.Equals("ACTIONS", StringComparison.OrdinalIgnoreCase))
+            .Where(header => !string.IsNullOrWhiteSpace(header))
+             //                && !header.Equals("ACTIONS", StringComparison.OrdinalIgnoreCase))
             .ToList();
     }
 

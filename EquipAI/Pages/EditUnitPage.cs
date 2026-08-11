@@ -6,7 +6,7 @@ public class EditUnitPage : UnitFormPage
 {
     public EditUnitPage(IPage page) : base(page) { }
 
-    private ILocator Subtitle => Page.Locator("//span[@class='admin-unit-edit__subtitle']");
+    private ILocator Subtitle => Page.Locator("//span[contains(@class,'admin-unit-edit__subtitle')]");
     private ILocator SaveUnitBtn => Page.Locator("//button[normalize-space()='Save unit']");
 
     public async Task WaitForLoadedAsync()

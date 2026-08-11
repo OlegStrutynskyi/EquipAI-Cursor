@@ -39,10 +39,11 @@ public class UnitsTests : BaseTest
     {
         var expectedColumns = new[]
         {
-            "Code",
-            "Display name",
-            "Dimension",
-            "Scale",
+            "CODE",
+            "DISPLAY NAME",
+            "DIMENSION",
+            "SCALE",
+            "ACTIONS",
         };
 
         var unitsPage = new UnitsPage(Fixture.Page);

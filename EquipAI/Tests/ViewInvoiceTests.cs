@@ -16,7 +16,7 @@ public class ViewInvoiceTests : BaseTest
         const string expectedDescription = Config.SetupInvoiceLineDescription1;
         const string expectedQty = "421.29";
         const string expectedUnitPrice = "3.71";
-        const string expectedCost = "1562.99";
+        const string expectedCost = "1,562.99";
         const string expectedEmissionType = "On-site diesel combustion";
         const string expectedUnit = "US Gallon (US_GAL)";
 

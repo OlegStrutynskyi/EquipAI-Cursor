@@ -72,7 +72,7 @@ public class UnitsPage : BasePage
     public async Task<(string Code, string DisplayName)> GetCodeAndDisplayNameAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='admin-units__table']//tr[td[1][normalize-space()='{code}']]");
+        var row = Page.Locator($"//table[@class='table admin-units__table']//tr[td[1][normalize-space()='{code}']]");
         await row.WaitForAsync();
         var codeText = (await row.Locator("td").Nth(0).InnerTextAsync()).Trim();
         var displayName = (await row.Locator("td").Nth(1).InnerTextAsync()).Trim();
@@ -117,7 +117,7 @@ public class UnitsPage : BasePage
     public async Task<EditUnitPage> ClickEditBtnAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='admin-units__table']//tr[td[1][normalize-space()='{code}']]");
+        var row = Page.Locator($"//table[@class='table admin-units__table']//tr[td[1][normalize-space()='{code}']]");
         await row.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
         var editUnitPage = new EditUnitPage(Page);
         await editUnitPage.WaitForLoadedAsync();
@@ -127,7 +127,7 @@ public class UnitsPage : BasePage
     public async Task ClickDeactivateBtnAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='admin-units__table']//tr[td[1][normalize-space()='{code}']]");
+        var row = Page.Locator($"//table[@class='table admin-units__table']//tr[td[1][normalize-space()='{code}']]");
         await row.GetByRole(AriaRole.Button, new() { Name = "Deactivate" }).ClickAsync();
         await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
@@ -158,7 +158,7 @@ public class UnitsPage : BasePage
     {
         await DeactivateDialogConfirmBtn.ClickAsync();
         await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
-        var row = Page.Locator($"//table[@class='admin-units__table']//tr[td[1][normalize-space()='{code}']]");
+        var row = Page.Locator($"//table[@class='table admin-units__table']//tr[td[1][normalize-space()='{code}']]");
         await row.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
     }
 

@@ -66,6 +66,14 @@ public class ViewInvoicePage : BasePage
     public async Task<string> GetProjectAsync()
     {
         await Project.WaitForAsync();
+        await Page.WaitForFunctionAsync(
+            """
+            el => {
+              const text = (el.textContent || '').trim();
+              return text.length > 0 && text !== '-' && text !== '\u2013' && text !== '\u2014';
+            }
+            """,
+            await Project.ElementHandleAsync());
         return (await Project.TextContentAsync())?.Trim() ?? string.Empty;
     }
 

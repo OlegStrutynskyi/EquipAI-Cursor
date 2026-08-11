@@ -42,6 +42,7 @@ public class AliasesTests : BaseTest
             "CONTEXT",
             "ALIAS TEXT",
             "RESOLVES TO",
+            "ACTIONS",
         };
 
         var aliasesPage = new AliasesPage(Fixture.Page);
@@ -60,6 +61,7 @@ public class AliasesTests : BaseTest
             "ALIAS TEXT",
             "FACTOR SOURCE",
             "RESOLVES TO",
+            "ACTIONS",
         };
 
         var aliasesPage = new AliasesPage(Fixture.Page);
