@@ -23,7 +23,7 @@ public class InvoicesPage : BasePage
     private ILocator PreviousBtn => Page.Locator("//button[normalize-space()='Previous']");
     private ILocator NextBtn => Page.Locator("//button[normalize-space()='Next']");
     private ILocator InvoiceNumberCells => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[2]");
-    private ILocator PaginationSummary => Page.Locator("//p[@class='table invoice-list__pagination-summary']");
+    private ILocator PaginationSummary => Page.Locator("//p[@class='pagination__info']");
 
     public async Task OpenAsync()
     {

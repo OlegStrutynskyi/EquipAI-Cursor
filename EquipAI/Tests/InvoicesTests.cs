@@ -48,14 +48,15 @@ public class InvoicesTests : BaseTest
     {
         var expectedColumns = new[]
         {
-            "Project",
-            "Invoice Number",
-            "Company",
-            "Invoice Date",
-            "Status",
-            "Import Date",
-            "Approve/Reject Date",
-            "Source",
+            "PROJECT",
+            "INVOICE NUMBER",
+            "COMPANY",
+            "INVOICE DATE",
+            "STATUS",
+            "IMPORT DATE",
+            "APPROVE/REJECT DATE",
+            "SOURCE",
+            "ACTIONS",
         };
 
         var invoicesPage = new InvoicesPage(Fixture.Page);

@@ -8,8 +8,8 @@ public class ViewInvoicePage : BasePage
 
     private ILocator BackBtn => Page.Locator("//a[contains(text(),'Back')]");
     private ILocator ViewTitle => Page.Locator("//h1[@id='invoice-detail-title']");
-    private ILocator Status => Page.Locator("//span[contains(@class,'invoice-detail__status-badge')]");
-    private ILocator Source => Page.Locator("//span[contains(@class,'invoice-detail__status-badge')]/following-sibling::span");
+    private ILocator Status => Page.Locator("//p[@class='invoice-detail__meta']/span[contains(@class,'pill')]");
+    private ILocator Source => Page.Locator("//p[@class='invoice-detail__meta']/span[contains(@class,'pill')]/following-sibling::span");
     private ILocator EditDraftBtn => Page.Locator("//button[normalize-space()='Edit Draft']");
     private ILocator HeaderSection => Page.Locator("//h2[@id='invoice-detail-header-heading']/..");
     private ILocator CompanyName => Page.Locator("//dt[normalize-space()='Company']/following-sibling::dd");
