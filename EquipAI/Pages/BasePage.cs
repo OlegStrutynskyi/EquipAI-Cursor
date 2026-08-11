@@ -11,7 +11,7 @@ public abstract class BasePage
         Page = page;
     }
 
-    private ILocator PageTitle => Page.Locator("//h1[contains(@id,'title')]");
+    private ILocator PageTitle => Page.Locator("//h1[@class='page-title']");
 
     public async Task<string> GetPageTitleAsync()
     {

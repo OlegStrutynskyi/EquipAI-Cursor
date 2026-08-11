@@ -14,14 +14,14 @@ public class CreateInvoicePage : InvoiceFormPage
     private ILocator ProjectError => Page.Locator("//select[@id='invoice-project']/following-sibling::span");
     private ILocator InvoiceDateError => Page.Locator("//input[@id='invoice-date']/following-sibling::span");
     private ILocator InvoiceCategoryOptions => Page.Locator("//select[@id='invoice-category']/option");
-    private ILocator InvoiceCategoryError => Page.Locator("//select[@id='invoice-category']/following-sibling::span");
-    private ILocator CurrencyError => Page.Locator("//select[@id='currency-code']/following-sibling::span");
+    private ILocator InvoiceCategoryError => Page.Locator("//select[@id='invoice-category']/../following-sibling::span");
+    private ILocator CurrencyError => Page.Locator("//select[@id='currency-code']/../following-sibling::span");
     private ILocator CurrencyOptions => Page.Locator("//select[@id='currency-code']/option");
     private ILocator Cost1Input => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'line-cost')]");
     private ILocator EmissionType1Options => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'emission-type')]/option");
-    private ILocator Emissiontype1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'emission-type')]/following-sibling::span");
+    private ILocator Emissiontype1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'emission-type')]/../following-sibling::span");
     private ILocator Unit1Options => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'unit-of-measure')]/option");
-    private ILocator Unit1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'unit-of-measure')]/following-sibling::span");
+    private ILocator Unit1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'unit-of-measure')]/../following-sibling::span");
 
     public async Task OpenAsync()
     {

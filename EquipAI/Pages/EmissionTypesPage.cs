@@ -20,9 +20,10 @@ public class EmissionTypesPage : BasePage
 
     public async Task OpenAsync()
     {
-        var administrationPage = new AdministrationPage(Page);
-        await administrationPage.OpenAsync();
-        await administrationPage.ClickEmissionTypesTabAsync();
+        var sideMenuPage = new SideMenuPage(Page);
+        await sideMenuPage.OpenAsync();
+        await sideMenuPage.ClickEmissionTypesAsync();
+        await WaitForLoadedAsync();
     }
 
     public async Task WaitForLoadedAsync()

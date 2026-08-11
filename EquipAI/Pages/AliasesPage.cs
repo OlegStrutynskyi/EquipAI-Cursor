@@ -10,13 +10,14 @@ public class AliasesPage : BasePage
     private ILocator AddAliasBtn => Page.Locator("//button[normalize-space()='Add alias']");
     private ILocator UnitsOfMeasureTab => Page.Locator("//button[normalize-space()='Units of measure']");
     private ILocator EmissionTypesTab => Page.Locator("//button[normalize-space()='Emission types']");
-    private ILocator Grid => Page.Locator("//table[@class='admin-aliases__table']");
+    private ILocator Grid => Page.Locator("//table[@class='table admin-aliases__table']");
 
     public async Task OpenAsync()
     {
-        var administrationPage = new AdministrationPage(Page);
-        await administrationPage.OpenAsync();
-        await administrationPage.ClickAliasesTabAsync();
+        var sideMenuPage = new SideMenuPage(Page);
+        await sideMenuPage.OpenAsync();
+        await sideMenuPage.ClickAliasesAsync();
+        await WaitForLoadedAsync();
     }
 
     public async Task WaitForLoadedAsync()
@@ -63,7 +64,7 @@ public class AliasesPage : BasePage
         return headers
             .Select(header => header.Trim())
             .Where(header => !string.IsNullOrWhiteSpace(header)
-                             && !header.Equals("Actions", StringComparison.Ordinal))
+                             && !header.Equals("ACTIONS", StringComparison.OrdinalIgnoreCase))
             .ToList();
     }
 

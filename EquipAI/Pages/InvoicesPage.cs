@@ -11,19 +11,19 @@ public class InvoicesPage : BasePage
     private ILocator InvoicesMessage => Page.Locator("//p[@class='invoice-list__lead']");
     private ILocator ImportBtn => Page.Locator("//a[normalize-space()='Import']");
     private ILocator CreateBtn => Page.Locator("//a[normalize-space()='Create']");
-    private ILocator InvoicesGrid => Page.Locator("//table[@class='invoice-list__table']");
-    private ILocator InvoicesGridProject => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[1]");
-    private ILocator InvoicesGridInvoiceNumber => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[2]");
-    private ILocator InvoicesGridCompany => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[3]");
-    private ILocator InvoicesGridDate => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[4]");
-    private ILocator InvoicesGridStatus => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[5]");
-    private ILocator InvoicesGridImportDate => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[6]");
-    private ILocator InvoicesGridApproveRejectDate => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[7]");
-    private ILocator InvoicesGridSource => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[8]");
+    private ILocator InvoicesGrid => Page.Locator("//table[@class='table invoice-list__table']");
+    private ILocator InvoicesGridProject => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[1]");
+    private ILocator InvoicesGridInvoiceNumber => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[2]");
+    private ILocator InvoicesGridCompany => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[3]");
+    private ILocator InvoicesGridDate => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[4]");
+    private ILocator InvoicesGridStatus => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[5]");
+    private ILocator InvoicesGridImportDate => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[6]");
+    private ILocator InvoicesGridApproveRejectDate => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[7]");
+    private ILocator InvoicesGridSource => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[8]");
     private ILocator PreviousBtn => Page.Locator("//button[normalize-space()='Previous']");
     private ILocator NextBtn => Page.Locator("//button[normalize-space()='Next']");
-    private ILocator InvoiceNumberCells => Page.Locator("//table[@class='invoice-list__table']//tbody/tr/td[2]");
-    private ILocator PaginationSummary => Page.Locator("//p[@class='invoice-list__pagination-summary']");
+    private ILocator InvoiceNumberCells => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[2]");
+    private ILocator PaginationSummary => Page.Locator("//p[@class='table invoice-list__pagination-summary']");
 
     public async Task OpenAsync()
     {
@@ -340,7 +340,7 @@ public class InvoicesPage : BasePage
 
     private async Task<ILocator?> FindInvoiceRowOnCurrentPageAsync(string invoiceNumber)
     {
-        var rows = Page.Locator("//table[@class='invoice-list__table']//tbody/tr");
+        var rows = Page.Locator("//table[@class='table invoice-list__table']//tbody/tr");
         var rowCount = await rows.CountAsync();
 
         for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)

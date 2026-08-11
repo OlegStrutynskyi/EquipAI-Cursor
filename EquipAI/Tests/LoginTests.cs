@@ -33,7 +33,7 @@ public class LoginTests : BaseTest
         var dashboardPage = new DashboardPage(Fixture.Page);
         await dashboardPage.OpenAsync();
 
-        (await dashboardPage.IsSignOutButtonVisibleAsync()).Should().BeTrue();
-        (await dashboardPage.IsSignedAsTextVisibleAsync()).Should().BeTrue();        
+        (await dashboardPage.IsLogoVisibleAsync()).Should().BeTrue();
+        (await dashboardPage.IsOpenMenuBtnVisibleAsync()).Should().BeTrue();
     }
 }

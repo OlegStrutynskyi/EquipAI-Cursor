@@ -10,6 +10,8 @@ public static class MicrosoftLoginHelper
     public static async Task LoginAsync(PlaywrightFixture fixture)
     {
         await fixture.Page.Context.ClearCookiesAsync();
+        await fixture.Page.GotoAsync(Config.BaseUrl);
+        await fixture.Page.EvaluateAsync("() => { localStorage.clear(); sessionStorage.clear(); }");
 
         var loginPage = new LoginPage(fixture.Page);
         await loginPage.OpenAsync();

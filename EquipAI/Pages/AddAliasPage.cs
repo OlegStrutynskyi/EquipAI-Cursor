@@ -7,7 +7,7 @@ public class AddAliasPage : BasePage
     public AddAliasPage(IPage page) : base(page) { }
 
     private ILocator ContextDropdown => Page.Locator("//select[@id='alias-context']");
-    private ILocator ContextHelpMessage => Page.Locator("//select[@id='alias-context']/following-sibling::p");
+    private ILocator ContextHelpMessage => Page.Locator("//select[@id='alias-context']/../following-sibling::p");
     private ILocator ContextOptions => Page.Locator("//select[@id='alias-context']/option");
     private ILocator AliasTextInput => Page.Locator("//input[@id='alias-text']");
     private ILocator AliasTextError => Page.Locator("//input[@id='alias-text']/following-sibling::span");
@@ -15,9 +15,9 @@ public class AddAliasPage : BasePage
     private ILocator TargetKindOptions => Page.Locator("//select[@id='alias-target-kind']/option");
     private ILocator UnitOfMeasureDropdown => Page.Locator("//select[@id='alias-unit']");
     private ILocator UnitOfMeasureOptions => Page.Locator("//select[@id='alias-unit']/option");
-    private ILocator UnitOfMeasureError => Page.Locator("//select[@id='alias-unit']/following-sibling::span");
+    private ILocator UnitOfMeasureError => Page.Locator("//select[@id='alias-unit']/../following-sibling::span");
     private ILocator EmissionTypeDropdown => Page.Locator("//select[@id='alias-emission-type']");
-    private ILocator EmissionTypeError => Page.Locator("//select[@id='alias-emission-type']/following-sibling::span");
+    private ILocator EmissionTypeError => Page.Locator("//select[@id='alias-emission-type']/../following-sibling::span");
     private ILocator FactorSourceTitle => Page.Locator("//legend[normalize-space()='Factor source']");
     private ILocator FactorSourceMessage => Page.Locator("//legend[normalize-space()='Factor source']/following-sibling::p");
     private ILocator FactorSourceError => Page.Locator("//legend[normalize-space()='Factor source']/following-sibling::span");

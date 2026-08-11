@@ -39,9 +39,9 @@ public class AliasesTests : BaseTest
     {
         var expectedColumns = new[]
         {
-            "Context",
-            "Alias text",
-            "Resolves to",
+            "CONTEXT",
+            "ALIAS TEXT",
+            "RESOLVES TO",
         };
 
         var aliasesPage = new AliasesPage(Fixture.Page);
@@ -56,10 +56,10 @@ public class AliasesTests : BaseTest
     {
         var expectedColumns = new[]
         {
-            "Context",
-            "Alias text",
-            "Factor source",
-            "Resolves to",
+            "CONTEXT",
+            "ALIAS TEXT",
+            "FACTOR SOURCE",
+            "RESOLVES TO",
         };
 
         var aliasesPage = new AliasesPage(Fixture.Page);

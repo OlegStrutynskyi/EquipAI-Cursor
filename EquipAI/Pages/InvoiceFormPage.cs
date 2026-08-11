@@ -6,7 +6,7 @@ public abstract class InvoiceFormPage : BasePage
 {
     protected InvoiceFormPage(IPage page) : base(page) { }
 
-    protected ILocator BackBtn => Page.Locator("//a[contains(@class,'invoice-edit-toolbar__button') and contains(normalize-space(),'Back')]");
+    protected ILocator BackBtn => Page.Locator("//a[contains(text(),'Back')]");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     protected ILocator HeaderSection => Page.Locator("//section[@aria-labelledby='invoice-header-heading']");
     protected ILocator InvoiceNumberInput => Page.Locator("//input[@id='invoice-number']");

@@ -7,11 +7,12 @@ public class DashboardPage : BasePage
 {
     public DashboardPage(IPage page) : base(page) { }
 
+    private ILocator Logo => Page.Locator("//div[@class='header-left-bar']//app-logo");
+    private ILocator OpenMenuBtn => Page.Locator("//div[@class='header-left-bar']//button[@aria-label='Open menu']");
     private ILocator Title => Page.Locator("//h1/a");
     private ILocator SignedAsText => Page.Locator("//p[@class='app-page-header__welcome']");
     private ILocator WelcomeText => Page.Locator("//p[@class='home__body']");
     private ILocator InvoicesBtn => Page.Locator("//a[normalize-space()='Invoices']");
-    private ILocator AdministrationBtn => Page.Locator("//a[normalize-space()='Administration']");
     private ILocator SignOutBtn => Page.Locator("//button[normalize-space()='Sign out']");
 
     public async Task OpenAsync()
@@ -21,7 +22,7 @@ public class DashboardPage : BasePage
             await Page.GotoAsync(Config.BaseUrl);
         }
 
-        await WelcomeText.WaitForAsync();
+        await Logo.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     private bool IsOnDashboardHome()
@@ -30,11 +31,12 @@ public class DashboardPage : BasePage
         return path.Length == 0;
     }
 
+    public Task<bool> IsLogoVisibleAsync() => Logo.IsVisibleAsync();
+    public Task<bool> IsOpenMenuBtnVisibleAsync() => OpenMenuBtn.IsVisibleAsync();
     public Task<bool> IsTitleVisibleAsync() => Title.IsVisibleAsync();
     public Task<bool> IsSignedAsTextVisibleAsync() => SignedAsText.IsVisibleAsync();
     public Task<bool> IsWelcomeTextVisibleAsync() => WelcomeText.IsVisibleAsync();
     public Task<bool> IsInvoicesBtnVisibleAsync() => InvoicesBtn.IsVisibleAsync();
-    public Task<bool> IsAdministrationBtnVisibleAsync() => AdministrationBtn.IsVisibleAsync();
     public Task<bool> IsSignOutButtonVisibleAsync() => SignOutBtn.IsVisibleAsync();
 
     public async Task<string> GetTitleAsync()
@@ -77,12 +79,5 @@ public class DashboardPage : BasePage
         await InvoicesBtn.ClickAsync();
         await Page.WaitForURLAsync("**/invoices**");
         return new InvoicesPage(Page);
-    }
-
-    public async Task<AdministrationPage> ClickAdministrationBtnAsync()
-    {
-        await AdministrationBtn.ClickAsync();
-        await Page.WaitForURLAsync("**/admin/**");
-        return new AdministrationPage(Page);
     }
 }
