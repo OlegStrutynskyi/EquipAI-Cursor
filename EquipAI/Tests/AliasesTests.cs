@@ -354,4 +354,327 @@ public class AliasesTests : BaseTest
             await SqlHelper.DeleteReferenceAliasByAliasTextAsync(aliasText);
         }
     }
+
+    [Test]
+    public async Task T16_Aliases_ClickEdit()
+    {
+        const string expectedPageTitle = "Edit alias";
+
+        var editAliasPage = await OpenEditAliasUnitPageAsync();
+
+        (await editAliasPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+    }
+
+    [Test]
+    public async Task T17_Aliases_Edit_Unit_DefaultView()
+    {
+        const string expectedPageTitle = "Edit alias";
+        const string expectedContext = "Data ingestion";
+        const string expectedTargetKind = "Unit of measure";
+
+        var editAliasPage = await OpenEditAliasUnitPageAsync();
+
+        (await editAliasPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await editAliasPage.GetSubtitleAsync()).Should().Be(Config.SetupAliasUnit);
+        (await editAliasPage.GetContextAsync()).Should().Be(expectedContext);
+        (await editAliasPage.GetAliasTextAsync()).Should().Be(Config.SetupAliasUnit);
+        (await editAliasPage.GetTargetKindAsync()).Should().Be(expectedTargetKind);
+        (await editAliasPage.GetUnitOfMeasureAsync()).Should().Match(value =>
+            value.Equals(Config.SetupCode1, StringComparison.Ordinal)
+            || value.StartsWith(Config.SetupCode1 + " —", StringComparison.Ordinal)
+            || value.StartsWith(Config.SetupCode1 + " -", StringComparison.Ordinal));
+        (await editAliasPage.IsBackToAliasesBtnVisibleAsync()).Should().BeTrue();
+        (await editAliasPage.IsSaveAliasBtnVisibleAsync()).Should().BeTrue();
+        (await editAliasPage.IsCancelBtnVisibleAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T18_Aliases_Edit_Unit_EmptyAliasText()
+    {
+        const string expectedAliasTextError = "Alias text is required.";
+
+        var editAliasPage = await OpenEditAliasUnitPageAsync();
+        await editAliasPage.ClearAliasTextAsync();
+        await editAliasPage.ClickSaveAliasBtnAsync();
+
+        (await editAliasPage.GetAliasTextErrorAsync()).Should().Be(expectedAliasTextError);
+    }
+
+    [Test]
+    public async Task T19_Aliases_Edit_Unit_ExistingAliasText()
+    {
+        const string expectedAlertMessage = "Alias text should be unique.";
+
+        var editAliasPage = await OpenEditAliasUnitPageAsync();
+        await editAliasPage.ClearAliasTextAsync();
+        await editAliasPage.FillAliasTextAsync(Config.SetupAliasEmissionType);
+        await editAliasPage.ClickSaveAliasBtnAsync();
+
+        (await editAliasPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+    }
+
+    [Test]
+    public async Task T20_Aliases_Edit_Unit_AliasTextTooLong()
+    {
+        const string expectedAliasTextError = "Alias text must be at most 256 characters.";
+        var randomAliasText = GenerateRandomString(257);
+
+        var editAliasPage = await OpenEditAliasUnitPageAsync();
+        await editAliasPage.ClearAliasTextAsync();
+        await editAliasPage.FillAliasTextAsync(randomAliasText);
+        await editAliasPage.ClickSaveAliasBtnAsync();
+
+        (await editAliasPage.GetAliasTextErrorAsync()).Should().Be(expectedAliasTextError);
+    }
+
+    [Test]
+    public async Task T21_Aliases_Edit_Unit_ClickCancel()
+    {
+        const string expectedPageTitle = "Aliases";
+        const string updatedAliasText = $"{Config.SetupAliasUnit} UPDATED";
+        const string expectedResolvesTo = $"{Config.SetupCode1} — {Config.SetupUnitName1}";
+
+        var editAliasPage = await OpenEditAliasUnitPageAsync();
+        await editAliasPage.FillAliasTextAsync(updatedAliasText);
+        await editAliasPage.SelectUnitOfMeasureAsync(Config.SetupCode2);
+        var aliasesPage = await editAliasPage.ClickCancelBtnAsync();
+
+        (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+        (await aliasesPage.IsAliasTextInGridAsync(updatedAliasText)).Should().BeFalse();
+
+        var gridRow = await aliasesPage.GetUnitAliasGridRowAsync(Config.SetupAliasUnit);
+        gridRow.Should().NotBeNull();
+        gridRow!.AliasText.Should().Be(Config.SetupAliasUnit);
+        gridRow.ResolvesTo.Should().Be(expectedResolvesTo);
+    }
+
+    [Test]
+    public async Task T22_Aliases_Edit_Unit_Success()
+    {
+        const string expectedPageTitle = "Aliases";
+        var updatedAliasText = $"{Config.SetupAliasUnit} UPDATED";
+        var expectedResolvesTo = $"{Config.SetupCode2} — {Config.SetupUnitName2}";
+        object? aliasId = null;
+
+        try
+        {
+            aliasId = await SqlHelper.GetReferenceAliasIdByAliasTextAsync(Config.SetupAliasUnit);
+
+            var editAliasPage = await OpenEditAliasUnitPageAsync();
+            await editAliasPage.FillAliasTextAsync(updatedAliasText);
+            await editAliasPage.SelectUnitOfMeasureAsync(Config.SetupCode2);
+            var aliasesPage = await editAliasPage.SaveAliasAsync();
+
+            (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+            await aliasesPage.ClickUnitsOfMeasureTabAsync();
+            (await aliasesPage.IsAliasTextInGridAsync(Config.SetupAliasUnit)).Should().BeFalse();
+
+            var gridRow = await aliasesPage.GetUnitAliasGridRowAsync(updatedAliasText);
+            gridRow.Should().NotBeNull();
+            gridRow!.AliasText.Should().Be(updatedAliasText);
+            gridRow.ResolvesTo.Should().Be(expectedResolvesTo);
+        }
+        finally
+        {
+            if (aliasId is not null)
+                await SqlHelper.RestoreReferenceAliasUnitAsync(aliasId, Config.SetupAliasUnit, Config.SetupCode1);
+        }
+    }
+
+    [Test]
+    public async Task T23_Aliases_Edit_EmissionType_DefaultView()
+    {
+        const string expectedPageTitle = "Edit alias";
+        const string expectedContext = "Data ingestion";
+        const string expectedTargetKind = "Emission type";
+
+        var editAliasPage = await OpenEditAliasEmissionTypePageAsync();
+
+        (await editAliasPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await editAliasPage.GetSubtitleAsync()).Should().Be(Config.SetupAliasEmissionType);
+        (await editAliasPage.GetContextAsync()).Should().Be(expectedContext);
+        (await editAliasPage.GetAliasTextAsync()).Should().Be(Config.SetupAliasEmissionType);
+        (await editAliasPage.GetTargetKindAsync()).Should().Be(expectedTargetKind);
+        (await editAliasPage.GetEmissionTypeAsync()).Should().Match(value =>
+            value.Equals(Config.SetupCode1, StringComparison.Ordinal)
+            || value.StartsWith(Config.SetupCode1 + " —", StringComparison.Ordinal)
+            || value.StartsWith(Config.SetupCode1 + " -", StringComparison.Ordinal));
+        (await editAliasPage.IsPreparedFactorsPreviewTextVisibleAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T24_Aliases_Edit_EmissionType_Success()
+    {
+        const string expectedPageTitle = "Aliases";
+        var updatedAliasText = $"{Config.SetupAliasEmissionType} UPDATED";
+        var expectedResolvesTo = $"{Config.SetupCode2} — {Config.SetupEmissionTypeName2}";
+        object? aliasId = null;
+
+        try
+        {
+            aliasId = await SqlHelper.GetReferenceAliasIdByAliasTextAsync(Config.SetupAliasEmissionType);
+
+            var editAliasPage = await OpenEditAliasEmissionTypePageAsync();
+            await editAliasPage.FillAliasTextAsync(updatedAliasText);
+            await editAliasPage.SelectEmissionTypeAsync(Config.SetupCode2);
+            var aliasesPage = await editAliasPage.SaveAliasAsync();
+
+            (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+            await aliasesPage.ClickEmissionTypesTabAsync();
+
+            var gridRow = await aliasesPage.GetEmissionTypeAliasGridRowAsync(updatedAliasText);
+            gridRow.Should().NotBeNull();
+            gridRow!.AliasText.Should().Be(updatedAliasText);
+            gridRow.ResolvesTo.Should().Be(expectedResolvesTo);
+            (await aliasesPage.IsAliasTextInGridAsync(Config.SetupAliasEmissionType)).Should().BeFalse();
+        }
+        finally
+        {
+            if (aliasId is not null)
+                await SqlHelper.RestoreReferenceAliasEmissionTypeAsync(
+                    aliasId,
+                    Config.SetupAliasEmissionType,
+                    Config.SetupCode1);
+        }
+    }
+
+    [Test]
+    public async Task T25_Aliases_Edit_Factor_DefaultView()
+    {
+        const string expectedPageTitle = "Edit alias";
+        const string expectedContext = "Catalog factor mapping";
+        const string expectedTargetKind = "Emission type";
+
+        var editAliasPage = await OpenEditAliasFactorPageAsync();
+
+        (await editAliasPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await editAliasPage.GetSubtitleAsync()).Should().Be(Config.SetupAliasFactor1);
+        (await editAliasPage.GetContextAsync()).Should().Be(expectedContext);
+        (await editAliasPage.GetAliasTextAsync()).Should().Be(Config.SetupAliasFactor1);
+        (await editAliasPage.GetTargetKindAsync()).Should().Be(expectedTargetKind);
+        (await editAliasPage.GetEmissionTypeAsync()).Should().Match(value =>
+            value.Equals(Config.SetupCode1, StringComparison.Ordinal)
+            || value.StartsWith(Config.SetupCode1 + " —", StringComparison.Ordinal)
+            || value.StartsWith(Config.SetupCode1 + " -", StringComparison.Ordinal));
+        (await editAliasPage.IsEpaFactorSourceSelectedAsync()).Should().BeTrue();
+        (await editAliasPage.IsPreparedFactorsPreviewTextVisibleAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T26_Aliases_Edit_Factor_Success()
+    {
+        const string expectedPageTitle = "Aliases";
+        const string expectedFactorSource = "DEFRA";
+        var updatedAliasText = $"{Config.SetupAliasFactor1} UPDATED";
+        var expectedResolvesTo = $"{Config.SetupCode2} — {Config.SetupEmissionTypeName2}";
+        object? aliasId = null;
+
+        try
+        {
+            aliasId = await SqlHelper.GetReferenceAliasIdByAliasTextAsync(Config.SetupAliasFactor1);
+
+            var editAliasPage = await OpenEditAliasFactorPageAsync();
+            await editAliasPage.FillAliasTextAsync(updatedAliasText);
+            await editAliasPage.SelectEmissionTypeAsync(Config.SetupCode2);
+            await editAliasPage.SelectDefraFactorSourceAsync();
+            var aliasesPage = await editAliasPage.SaveAliasAsync();
+
+            (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+            await aliasesPage.ClickEmissionTypesTabAsync();
+
+            var gridRow = await aliasesPage.GetEmissionTypeAliasGridRowAsync(updatedAliasText);
+            gridRow.Should().NotBeNull();
+            gridRow!.AliasText.Should().Be(updatedAliasText);
+            gridRow.FactorSource.Should().Be(expectedFactorSource);
+            gridRow.ResolvesTo.Should().Be(expectedResolvesTo);
+            (await aliasesPage.IsAliasTextInGridAsync(Config.SetupAliasFactor1)).Should().BeFalse();
+        }
+        finally
+        {
+            if (aliasId is not null)
+                await SqlHelper.RestoreReferenceAliasFactorAsync(
+                    aliasId,
+                    Config.SetupAliasFactor1,
+                    Config.SetupCode1);
+        }
+    }
+
+    [Test]
+    public async Task T27_Aliases_ClickDeactivate()
+    {
+        const string expectedTitle = "Deactivate alias";
+        var expectedMessage =
+            $"Deactivate alias \"{Config.SetupAliasUnit}\"? Imports will no longer resolve this text.";
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+        await aliasesPage.ClickDeactivateBtnAsync(Config.SetupAliasUnit);
+
+        (await aliasesPage.IsDeactivateDialogVisibleAsync()).Should().BeTrue();
+        (await aliasesPage.GetDeactivateDialogTitleAsync()).Should().Be(expectedTitle);
+        (await aliasesPage.GetDeactivateDialogMessageAsync()).Should().Be(expectedMessage);
+        (await aliasesPage.IsDeactivateDialogCancelBtnVisibleAsync()).Should().BeTrue();
+        (await aliasesPage.IsDeactivateDialogCancelBtnEnabledAsync()).Should().BeTrue();
+        (await aliasesPage.IsDeactivateDialogConfirmBtnVisibleAsync()).Should().BeTrue();
+        (await aliasesPage.IsDeactivateDialogConfirmBtnEnabledAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T28_Aliases_Deactivate_Cancel()
+    {
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+        await aliasesPage.ClickDeactivateBtnAsync(Config.SetupAliasUnit);
+        await aliasesPage.ClickDeactivateDialogCancelBtnAsync();
+
+        (await aliasesPage.IsDeactivateDialogVisibleAsync()).Should().BeFalse();
+        (await aliasesPage.IsAliasTextInGridAsync(Config.SetupAliasUnit)).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T29_Aliases_Deactivate_Success()
+    {
+        try
+        {
+            var aliasesPage = new AliasesPage(Fixture.Page);
+            await aliasesPage.OpenAsync();
+            await aliasesPage.ClickUnitsOfMeasureTabAsync();
+            await aliasesPage.ClickDeactivateBtnAsync(Config.SetupAliasUnit);
+            await aliasesPage.ClickDeactivateDialogConfirmBtnAsync(Config.SetupAliasUnit);
+
+            (await aliasesPage.IsDeactivateDialogVisibleAsync()).Should().BeFalse();
+            (await aliasesPage.IsAliasTextInGridAsync(Config.SetupAliasUnit)).Should().BeFalse();
+        }
+        finally
+        {
+            await SqlHelper.RestoreReferenceAliasByAliasTextAsync(Config.SetupAliasUnit);
+        }
+    }
+
+    private async Task<EditAliasPage> OpenEditAliasUnitPageAsync()
+    {
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+        return await aliasesPage.ClickEditBtnAsync(Config.SetupAliasUnit);
+    }
+
+    private async Task<EditAliasPage> OpenEditAliasEmissionTypePageAsync()
+    {
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+        return await aliasesPage.ClickEditBtnAsync(Config.SetupAliasEmissionType);
+    }
+
+    private async Task<EditAliasPage> OpenEditAliasFactorPageAsync()
+    {
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+        return await aliasesPage.ClickEditBtnAsync(Config.SetupAliasFactor1);
+    }
 }

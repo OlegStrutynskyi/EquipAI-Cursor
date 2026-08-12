@@ -12,6 +12,11 @@ public class AliasesPage : BasePage
     private ILocator EmissionTypesTab => Page.Locator("//button[normalize-space()='Emission types']");
     private ILocator Grid => Page.Locator("table.table.admin-aliases__table").Locator("visible=true");
     private ILocator AliasTextCells => Grid.Locator("tbody tr td:nth-child(2)");
+    private ILocator DeactivateDialog => Page.Locator("//div[@class='modal']");
+    private ILocator DeactivateDialogTitle => Page.Locator("//h2[@id='confirm-dialog-title']");
+    private ILocator DeactivateDialogMessage => Page.Locator("//p[@id='confirm-dialog-message']");
+    private ILocator DeactivateDialogCancelBtn => Page.Locator("//div[@class='modal']//button[normalize-space()='Cancel']");
+    private ILocator DeactivateDialogConfirmBtn => Page.Locator("//div[@class='modal']//button[normalize-space()='Deactivate']");
 
     public async Task OpenAsync()
     {
@@ -80,83 +85,141 @@ public class AliasesPage : BasePage
     public async Task<bool> IsAliasTextInGridAsync(string aliasText)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-
-        var nextBtn = Page.Locator("//button[normalize-space()='Next']");
-        var previousBtn = Page.Locator("//button[normalize-space()='Previous']");
-        var visitedNextPage = false;
+        await GoToFirstGridPageAsync();
 
         while (true)
         {
             var aliasTexts = await AliasTextCells.AllInnerTextsAsync();
             if (aliasTexts.Any(text => text.Trim().Equals(aliasText, StringComparison.Ordinal)))
-                return true;
-
-            if (await nextBtn.CountAsync() == 0
-                || !await nextBtn.First.IsVisibleAsync()
-                || !await nextBtn.First.IsEnabledAsync()
-                || await nextBtn.First.GetAttributeAsync("disabled") is not null)
-                break;
-
-            var firstBefore = aliasTexts.FirstOrDefault()?.Trim() ?? string.Empty;
-            visitedNextPage = true;
-            await nextBtn.First.ClickAsync();
-            await Assertions.Expect(AliasTextCells.First).Not.ToHaveTextAsync(firstBefore);
-        }
-
-        if (visitedNextPage)
-        {
-            while (await previousBtn.CountAsync() > 0
-                   && await previousBtn.First.IsVisibleAsync()
-                   && await previousBtn.First.IsEnabledAsync()
-                   && await previousBtn.First.GetAttributeAsync("disabled") is null)
             {
-                await previousBtn.First.ClickAsync();
-                await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+                await GoToFirstGridPageAsync();
+                return true;
             }
+
+            if (!await TryGoToNextGridPageAsync(aliasTexts.FirstOrDefault()?.Trim() ?? string.Empty))
+                break;
         }
 
+        await GoToFirstGridPageAsync();
         return false;
+    }
+
+    public async Task<EditAliasPage> ClickEditBtnAsync(string aliasText)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var row = await FindAliasRowOnCurrentPageAsync(aliasText);
+            if (row is not null)
+            {
+                await row.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+                var editAliasPage = new EditAliasPage(Page);
+                await editAliasPage.WaitForLoadedAsync();
+                return editAliasPage;
+            }
+
+            var aliasTexts = await AliasTextCells.AllInnerTextsAsync();
+            if (!await TryGoToNextGridPageAsync(aliasTexts.FirstOrDefault()?.Trim() ?? string.Empty))
+                break;
+        }
+
+        throw new InvalidOperationException($"Alias '{aliasText}' was not found in the grid.");
+    }
+
+    public async Task ClickDeactivateBtnAsync(string aliasText)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var row = await FindAliasRowOnCurrentPageAsync(aliasText);
+            if (row is not null)
+            {
+                await row.GetByRole(AriaRole.Button, new() { Name = "Deactivate" }).ClickAsync();
+                await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+                return;
+            }
+
+            var aliasTexts = await AliasTextCells.AllInnerTextsAsync();
+            if (!await TryGoToNextGridPageAsync(aliasTexts.FirstOrDefault()?.Trim() ?? string.Empty))
+                break;
+        }
+
+        throw new InvalidOperationException($"Alias '{aliasText}' was not found in the grid.");
+    }
+
+    public async Task<string> GetDeactivateDialogTitleAsync()
+    {
+        await DeactivateDialogTitle.WaitForAsync();
+        return (await DeactivateDialogTitle.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> GetDeactivateDialogMessageAsync()
+    {
+        await DeactivateDialogMessage.WaitForAsync();
+        return (await DeactivateDialogMessage.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public Task<bool> IsDeactivateDialogVisibleAsync() => DeactivateDialog.IsVisibleAsync();
+    public Task<bool> IsDeactivateDialogCancelBtnVisibleAsync() => DeactivateDialogCancelBtn.IsVisibleAsync();
+    public Task<bool> IsDeactivateDialogConfirmBtnVisibleAsync() => DeactivateDialogConfirmBtn.IsVisibleAsync();
+    public Task<bool> IsDeactivateDialogCancelBtnEnabledAsync() => DeactivateDialogCancelBtn.IsEnabledAsync();
+    public Task<bool> IsDeactivateDialogConfirmBtnEnabledAsync() => DeactivateDialogConfirmBtn.IsEnabledAsync();
+
+    public async Task ClickDeactivateDialogCancelBtnAsync()
+    {
+        await DeactivateDialogCancelBtn.ClickAsync();
+        await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+    }
+
+    public async Task ClickDeactivateDialogConfirmBtnAsync(string aliasText)
+    {
+        await DeactivateDialogConfirmBtn.ClickAsync();
+        await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+        var row = Page.Locator(
+            $"//table[contains(@class,'admin-aliases__table')]//tr[td[2][normalize-space()='{aliasText}']]");
+        await row.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
+    }
+
+    private async Task<ILocator?> FindAliasRowOnCurrentPageAsync(string aliasText)
+    {
+        var rows = Grid.Locator("tbody tr");
+        var rowCount = await rows.CountAsync();
+
+        for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
+        {
+            var row = rows.Nth(rowIndex);
+            var currentAliasText = (await row.Locator("td").Nth(1).TextContentAsync())?.Trim() ?? string.Empty;
+            if (currentAliasText.Equals(aliasText, StringComparison.Ordinal))
+                return row;
+        }
+
+        return null;
     }
 
     public async Task<AliasEmissionTypeGridRow?> GetEmissionTypeAliasGridRowAsync(string aliasText)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-
-        var nextBtn = Page.Locator("//button[normalize-space()='Next']");
-        var previousBtn = Page.Locator("//button[normalize-space()='Previous']");
-        var visitedNextPage = false;
+        await GoToFirstGridPageAsync();
 
         while (true)
         {
             var row = await FindEmissionTypeAliasRowOnCurrentPageAsync(aliasText);
             if (row is not null)
+            {
+                await GoToFirstGridPageAsync();
                 return row;
+            }
 
             var aliasTexts = await AliasTextCells.AllInnerTextsAsync();
-            if (await nextBtn.CountAsync() == 0
-                || !await nextBtn.First.IsVisibleAsync()
-                || !await nextBtn.First.IsEnabledAsync()
-                || await nextBtn.First.GetAttributeAsync("disabled") is not null)
+            if (!await TryGoToNextGridPageAsync(aliasTexts.FirstOrDefault()?.Trim() ?? string.Empty))
                 break;
-
-            var firstBefore = aliasTexts.FirstOrDefault()?.Trim() ?? string.Empty;
-            visitedNextPage = true;
-            await nextBtn.First.ClickAsync();
-            await Assertions.Expect(AliasTextCells.First).Not.ToHaveTextAsync(firstBefore);
         }
 
-        if (visitedNextPage)
-        {
-            while (await previousBtn.CountAsync() > 0
-                   && await previousBtn.First.IsVisibleAsync()
-                   && await previousBtn.First.IsEnabledAsync()
-                   && await previousBtn.First.GetAttributeAsync("disabled") is null)
-            {
-                await previousBtn.First.ClickAsync();
-                await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            }
-        }
-
+        await GoToFirstGridPageAsync();
         return null;
     }
 
@@ -188,43 +251,66 @@ public class AliasesPage : BasePage
     public async Task<AliasUnitGridRow?> GetUnitAliasGridRowAsync(string aliasText)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-
-        var nextBtn = Page.Locator("//button[normalize-space()='Next']");
-        var previousBtn = Page.Locator("//button[normalize-space()='Previous']");
-        var visitedNextPage = false;
+        await GoToFirstGridPageAsync();
 
         while (true)
         {
             var row = await FindUnitAliasRowOnCurrentPageAsync(aliasText);
             if (row is not null)
+            {
+                await GoToFirstGridPageAsync();
                 return row;
+            }
 
             var aliasTexts = await AliasTextCells.AllInnerTextsAsync();
-            if (await nextBtn.CountAsync() == 0
-                || !await nextBtn.First.IsVisibleAsync()
-                || !await nextBtn.First.IsEnabledAsync()
-                || await nextBtn.First.GetAttributeAsync("disabled") is not null)
+            if (!await TryGoToNextGridPageAsync(aliasTexts.FirstOrDefault()?.Trim() ?? string.Empty))
                 break;
+        }
 
-            var firstBefore = aliasTexts.FirstOrDefault()?.Trim() ?? string.Empty;
-            visitedNextPage = true;
-            await nextBtn.First.ClickAsync();
+        await GoToFirstGridPageAsync();
+        return null;
+    }
+
+    private async Task GoToFirstGridPageAsync()
+    {
+        var previousBtn = Page.Locator("//button[normalize-space()='Previous']").First;
+        for (var i = 0; i < 50; i++)
+        {
+            if (await previousBtn.CountAsync() == 0 || !await previousBtn.IsVisibleAsync())
+                return;
+            if (!await IsPagerButtonEnabledAsync(previousBtn))
+                return;
+
+            var firstBefore = (await AliasTextCells.First.InnerTextAsync()).Trim();
+            await previousBtn.ClickAsync();
             await Assertions.Expect(AliasTextCells.First).Not.ToHaveTextAsync(firstBefore);
         }
+    }
 
-        if (visitedNextPage)
-        {
-            while (await previousBtn.CountAsync() > 0
-                   && await previousBtn.First.IsVisibleAsync()
-                   && await previousBtn.First.IsEnabledAsync()
-                   && await previousBtn.First.GetAttributeAsync("disabled") is null)
-            {
-                await previousBtn.First.ClickAsync();
-                await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            }
-        }
+    private async Task<bool> TryGoToNextGridPageAsync(string firstAliasTextBefore)
+    {
+        var nextBtn = Page.Locator("//button[normalize-space()='Next']").First;
+        if (await nextBtn.CountAsync() == 0
+            || !await nextBtn.IsVisibleAsync()
+            || !await IsPagerButtonEnabledAsync(nextBtn))
+            return false;
 
-        return null;
+        await nextBtn.ClickAsync();
+        await Assertions.Expect(AliasTextCells.First).Not.ToHaveTextAsync(firstAliasTextBefore);
+        return true;
+    }
+
+    private static async Task<bool> IsPagerButtonEnabledAsync(ILocator button)
+    {
+        return await button.EvaluateAsync<bool>(
+            """
+            el => !(
+              el.disabled
+              || el.hasAttribute('disabled')
+              || el.getAttribute('aria-disabled') === 'true'
+              || el.classList.contains('disabled')
+            )
+            """);
     }
 
     private async Task<AliasUnitGridRow?> FindUnitAliasRowOnCurrentPageAsync(string aliasText)

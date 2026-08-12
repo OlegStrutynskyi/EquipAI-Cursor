@@ -475,4 +475,96 @@ public static class SqlHelper
         command.Parameters.AddWithValue("@aliasText", aliasText);
         await command.ExecuteNonQueryAsync();
     }
+
+    public static async Task<object> GetReferenceAliasIdByAliasTextAsync(string aliasText)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "SELECT [Id] FROM [emissions].[ReferenceAlias] WHERE AliasText = @aliasText",
+            connection);
+        command.Parameters.AddWithValue("@aliasText", aliasText);
+
+        var result = await command.ExecuteScalarAsync();
+        if (result is null or DBNull)
+            throw new InvalidOperationException($"Reference alias '{aliasText}' was not found.");
+
+        return result;
+    }
+
+    public static async Task RestoreReferenceAliasUnitAsync(object id, string aliasText, string unitOfMeasureCode)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [emissions].[ReferenceAlias]
+            SET AliasText = @aliasText,
+                UnitOfMeasureId = (SELECT [Id] FROM [emissions].[UnitOfMeasure] WHERE Code = @unitOfMeasureCode)
+            WHERE Id = @id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@aliasText", aliasText);
+        command.Parameters.AddWithValue("@unitOfMeasureCode", unitOfMeasureCode);
+        command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task RestoreReferenceAliasEmissionTypeAsync(object id, string aliasText, string emissionTypeCode)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [emissions].[ReferenceAlias]
+            SET AliasText = @aliasText,
+                EmissionTypeId = (SELECT [Id] FROM [emissions].[EmissionType] WHERE Code = @emissionTypeCode)
+            WHERE Id = @id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@aliasText", aliasText);
+        command.Parameters.AddWithValue("@emissionTypeCode", emissionTypeCode);
+        command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task RestoreReferenceAliasFactorAsync(
+        object id,
+        string aliasText,
+        string emissionTypeCode,
+        int factorSource = 0)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [emissions].[ReferenceAlias]
+            SET AliasText = @aliasText,
+                EmissionTypeId = (SELECT [Id] FROM [emissions].[EmissionType] WHERE Code = @emissionTypeCode),
+                FactorSource = @factorSource
+            WHERE Id = @id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@aliasText", aliasText);
+        command.Parameters.AddWithValue("@emissionTypeCode", emissionTypeCode);
+        command.Parameters.AddWithValue("@factorSource", factorSource);
+        command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task RestoreReferenceAliasByAliasTextAsync(string aliasText)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "UPDATE [emissions].[ReferenceAlias] SET IsDeleted = 0 WHERE AliasText = @aliasText",
+            connection);
+        command.Parameters.AddWithValue("@aliasText", aliasText);
+        await command.ExecuteNonQueryAsync();
+    }
 }
