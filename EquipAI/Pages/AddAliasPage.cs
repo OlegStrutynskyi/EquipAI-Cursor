@@ -46,6 +46,19 @@ public class AddAliasPage : BasePage
     public Task<bool> IsCreateAliasBtnVisibleAsync() => CreateAliasBtn.IsVisibleAsync();
     public Task<bool> IsCancelBtnVisibleAsync() => CancelBtn.IsVisibleAsync();
 
+    public async Task SelectEpaFactorSourceAsync()
+    {
+        await EpaBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var epaInput = Page.Locator("//label[normalize-space()='EPA']//input | //input[@type='radio' and (@value='EPA' or @value='Epa')]");
+        if (await epaInput.CountAsync() > 0)
+        {
+            await epaInput.First.CheckAsync();
+            return;
+        }
+
+        await EpaBtn.ClickAsync();
+    }
+
     public async Task<IReadOnlyList<string>> GetContextOptionsAsync()
     {
         var options = await ContextOptions.AllInnerTextsAsync();
@@ -91,9 +104,66 @@ public class AddAliasPage : BasePage
         await AliasTextInput.FillAsync(aliasText);
     }
 
+    public async Task<string> SelectUnitOfMeasureAsync(string code)
+    {
+        await UnitOfMeasureDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var options = await GetUnitOfMeasureOptionsAsync();
+        var option = options.FirstOrDefault(o =>
+                o.Equals(code, StringComparison.Ordinal)
+                || o.StartsWith(code + " —", StringComparison.Ordinal)
+                || o.StartsWith(code + " -", StringComparison.Ordinal))
+            ?? throw new InvalidOperationException($"Unit of measure '{code}' was not found in the dropdown.");
+
+        await UnitOfMeasureDropdown.SelectOptionAsync(new SelectOptionValue { Label = option });
+        return option;
+    }
+
+    public async Task<string> SelectEmissionTypeAsync(string code)
+    {
+        await EmissionTypeDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var options = await EmissionTypeDropdown.Locator("option").AllInnerTextsAsync();
+        var option = options
+            .Select(o => o.Trim())
+            .Where(o => !string.IsNullOrEmpty(o) && !o.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(o =>
+                o.Equals(code, StringComparison.Ordinal)
+                || o.StartsWith(code + " —", StringComparison.Ordinal)
+                || o.StartsWith(code + " -", StringComparison.Ordinal))
+            ?? throw new InvalidOperationException($"Emission type '{code}' was not found in the dropdown.");
+
+        await EmissionTypeDropdown.SelectOptionAsync(new SelectOptionValue { Label = option });
+        return option;
+    }
+
     public async Task ClickCreateAliasBtnAsync()
     {
         await CreateAliasBtn.ClickAsync();
+    }
+
+    public async Task<AliasesPage> CreateAliasAsync()
+    {
+        await CreateAliasBtn.ClickAsync();
+        await Page.WaitForURLAsync(url =>
+        {
+            var path = new Uri(url).AbsolutePath.TrimEnd('/');
+            return path.Equals("/admin/aliases", StringComparison.OrdinalIgnoreCase);
+        });
+        var aliasesPage = new AliasesPage(Page);
+        await aliasesPage.WaitForLoadedAsync();
+        return aliasesPage;
+    }
+
+    public async Task<AliasesPage> ClickCancelBtnAsync()
+    {
+        await CancelBtn.ClickAsync();
+        await Page.WaitForURLAsync(url =>
+        {
+            var path = new Uri(url).AbsolutePath.TrimEnd('/');
+            return path.Equals("/admin/aliases", StringComparison.OrdinalIgnoreCase);
+        });
+        var aliasesPage = new AliasesPage(Page);
+        await aliasesPage.WaitForLoadedAsync();
+        return aliasesPage;
     }
 
     public async Task<string> GetAliasTextErrorAsync() => await GetErrorTextAsync(AliasTextError);

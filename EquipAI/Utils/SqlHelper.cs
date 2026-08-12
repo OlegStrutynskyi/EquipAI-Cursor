@@ -463,4 +463,16 @@ public static class SqlHelper
         command.Parameters.AddWithValue("@code", code);
         await command.ExecuteNonQueryAsync();
     }
+
+    public static async Task DeleteReferenceAliasByAliasTextAsync(string aliasText)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "DELETE FROM [emissions].[ReferenceAlias] WHERE AliasText = @aliasText",
+            connection);
+        command.Parameters.AddWithValue("@aliasText", aliasText);
+        await command.ExecuteNonQueryAsync();
+    }
 }

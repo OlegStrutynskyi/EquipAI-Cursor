@@ -170,4 +170,99 @@ public class _01_Setup_Data : BaseTest
 
         (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
     }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T07_Setup_CreateEmissionType3()
+    {
+        const string code = Config.SetupCode3;
+        const string displayName = Config.SetupEmissionTypeName3;
+
+        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
+        await emissionTypesPage.OpenAsync();
+
+        if (await emissionTypesPage.IsCodeInGridAsync(code))
+            Assert.Pass("Emission type 3 already exists.");
+
+        var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
+        await addEmissionTypePage.FillCodeAsync(code);
+        await addEmissionTypePage.FillDisplayNameAsync(displayName);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+        emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
+
+        (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T08_Setup_CreateAliasUnit()
+    {
+        const string aliasText = Config.SetupAliasUnit;
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+
+        if (await aliasesPage.IsAliasTextInGridAsync(aliasText))
+            Assert.Pass("Alias already exists.");
+
+        var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+        await addAliasPage.SelectContextAsync("Data ingestion");
+        await addAliasPage.FillAliasTextAsync(aliasText);
+        await addAliasPage.SelectTargetKindAsync("Unit of measure");
+        await addAliasPage.SelectUnitOfMeasureAsync(Config.SetupCode1);
+        aliasesPage = await addAliasPage.CreateAliasAsync();
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+
+        (await aliasesPage.IsAliasTextInGridAsync(aliasText)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T09_Setup_CreateAliasEmissionType()
+    {
+        const string aliasText = Config.SetupAliasEmissionType;
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+
+        if (await aliasesPage.IsAliasTextInGridAsync(aliasText))
+            Assert.Pass("Alias already exists.");
+
+        var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+        await addAliasPage.SelectContextAsync("Data ingestion");
+        await addAliasPage.FillAliasTextAsync(aliasText);
+        await addAliasPage.SelectTargetKindAsync("Emission type");
+        await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode1);
+        aliasesPage = await addAliasPage.CreateAliasAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+
+        (await aliasesPage.IsAliasTextInGridAsync(aliasText)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T10_Setup_CreateAliasFactor1()
+    {
+        const string aliasText = Config.SetupAliasFactor1;
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+
+        if (await aliasesPage.IsAliasTextInGridAsync(aliasText))
+            Assert.Pass("Alias already exists.");
+
+        var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+        await addAliasPage.SelectContextAsync("Catalog factor mapping");
+        await addAliasPage.FillAliasTextAsync(aliasText);
+        await addAliasPage.SelectTargetKindAsync("Emission type");
+        await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode1);
+        await addAliasPage.SelectEpaFactorSourceAsync();
+        aliasesPage = await addAliasPage.CreateAliasAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+
+        (await aliasesPage.IsAliasTextInGridAsync(aliasText)).Should().BeTrue();
+    }
 }

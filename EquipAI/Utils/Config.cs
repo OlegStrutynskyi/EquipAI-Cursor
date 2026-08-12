@@ -21,10 +21,15 @@ public static class Config
     public const string SetupInvoiceLineDescription1 = "DONT-DELETE-Description-1";
     public const string SetupCode1 = "DONTDELETECODE1";
     public const string SetupCode2 = "DONTDELETECODE2";
+    public const string SetupCode3 = "DONTDELETECODE3";
     public const string SetupUnitName1 = "DONT DELETE UNIT 1";
     public const string SetupUnitName2 = "DONT DELETE UNIT 2";
     public const string SetupEmissionTypeName1 = "DONT DELETE EMISSION TYPE 1";
     public const string SetupEmissionTypeName2 = "DONT DELETE EMISSION TYPE 2";
+    public const string SetupEmissionTypeName3 = "DONT DELETE EMISSION TYPE 3";
+    public const string SetupAliasUnit = "DONT DELETE ALIAS UNIT";
+    public const string SetupAliasEmissionType = "DONT DELETE ALIAS EMISSION TYPE";
+    public const string SetupAliasFactor1 = "DONT DELETE ALIAS FACTOR1";
 
     public static bool Headless =>
         bool.TryParse(Environment.GetEnvironmentVariable("HEADLESS"), out var headless) && headless;

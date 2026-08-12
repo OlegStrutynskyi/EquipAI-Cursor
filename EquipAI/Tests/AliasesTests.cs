@@ -1,4 +1,5 @@
 using EquipAI.Pages;
+using EquipAI.Utils;
 using FluentAssertions;
 
 namespace EquipAI.Tests;
@@ -227,5 +228,130 @@ public class AliasesTests : BaseTest
         (await addAliasPage.GetAliasTextErrorAsync()).Should().Be(expectedAliasTextError);
         (await addAliasPage.GetEmissionTypeErrorAsync()).Should().Be(expectedEmissionTypeError);
         (await addAliasPage.GetFactorSourceErrorAsync()).Should().Be(expectedFactorSourceError);
+    }
+
+    [Test]
+    public async Task T12_Aliases_Add_ClickCancel()
+    {
+        const string expectedPageTitle = "Aliases";
+        var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+        var aliasText = $"Alias{stamp}";
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+        await addAliasPage.FillAliasTextAsync(aliasText);
+        await addAliasPage.SelectUnitOfMeasureAsync(Config.SetupCode1);
+        aliasesPage = await addAliasPage.ClickCancelBtnAsync();
+
+        (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await aliasesPage.IsAliasTextInGridAsync(aliasText)).Should().BeFalse();
+    }
+
+    [Test]
+    public async Task T13_Aliases_Add_Success_Unit()
+    {
+        const string expectedPageTitle = "Aliases";
+        const string expectedContext = "Data ingestion";
+        var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+        var aliasText = $"Alias{stamp}";
+
+        try
+        {
+            var aliasesPage = new AliasesPage(Fixture.Page);
+            await aliasesPage.OpenAsync();
+            var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+            await addAliasPage.SelectContextAsync(expectedContext);
+            await addAliasPage.FillAliasTextAsync(aliasText);
+            await addAliasPage.SelectTargetKindAsync("Unit of measure");
+            var expectedResolvesTo = await addAliasPage.SelectUnitOfMeasureAsync(Config.SetupCode1);
+            aliasesPage = await addAliasPage.CreateAliasAsync();
+
+            (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+            await aliasesPage.ClickUnitsOfMeasureTabAsync();
+
+            var gridRow = await aliasesPage.GetUnitAliasGridRowAsync(aliasText);
+            gridRow.Should().NotBeNull();
+            gridRow!.Context.Should().Be(expectedContext);
+            gridRow.AliasText.Should().Be(aliasText);
+            gridRow.ResolvesTo.Should().Be(expectedResolvesTo);
+        }
+        finally
+        {
+            await SqlHelper.DeleteReferenceAliasByAliasTextAsync(aliasText);
+        }
+    }
+
+    [Test]
+    public async Task T14_Aliases_Add_Success_EmissionType()
+    {
+        const string expectedPageTitle = "Aliases";
+        const string expectedContext = "Data ingestion";
+        const string expectedFactorSource = "—";
+        var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+        var aliasText = $"Alias{stamp}";
+
+        try
+        {
+            var aliasesPage = new AliasesPage(Fixture.Page);
+            await aliasesPage.OpenAsync();
+            var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+            await addAliasPage.SelectContextAsync(expectedContext);
+            await addAliasPage.FillAliasTextAsync(aliasText);
+            await addAliasPage.SelectTargetKindAsync("Emission type");
+            var expectedResolvesTo = await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode1);
+            aliasesPage = await addAliasPage.CreateAliasAsync();
+
+            (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+            await aliasesPage.ClickEmissionTypesTabAsync();
+
+            var gridRow = await aliasesPage.GetEmissionTypeAliasGridRowAsync(aliasText);
+            gridRow.Should().NotBeNull();
+            gridRow!.Context.Should().Be(expectedContext);
+            gridRow.AliasText.Should().Be(aliasText);
+            gridRow.FactorSource.Should().Be(expectedFactorSource);
+            gridRow.ResolvesTo.Should().Be(expectedResolvesTo);
+        }
+        finally
+        {
+            await SqlHelper.DeleteReferenceAliasByAliasTextAsync(aliasText);
+        }
+    }
+
+    [Test]
+    public async Task T15_Aliases_Add_Success_CatalogEmissionType()
+    {
+        const string expectedPageTitle = "Aliases";
+        const string expectedContext = "Catalog factor mapping";
+        const string expectedFactorSource = "EPA";
+        var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+        var aliasText = $"Alias{stamp}";
+
+        try
+        {
+            var aliasesPage = new AliasesPage(Fixture.Page);
+            await aliasesPage.OpenAsync();
+            var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+            await addAliasPage.SelectContextAsync(expectedContext);
+            await addAliasPage.FillAliasTextAsync(aliasText);
+            await addAliasPage.SelectTargetKindAsync("Emission type");
+            var expectedResolvesTo = await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode2);
+            await addAliasPage.SelectEpaFactorSourceAsync();
+            aliasesPage = await addAliasPage.CreateAliasAsync();
+
+            (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+            await aliasesPage.ClickEmissionTypesTabAsync();
+
+            var gridRow = await aliasesPage.GetEmissionTypeAliasGridRowAsync(aliasText);
+            gridRow.Should().NotBeNull();
+            gridRow!.Context.Should().Be(expectedContext);
+            gridRow.AliasText.Should().Be(aliasText);
+            gridRow.FactorSource.Should().Be(expectedFactorSource);
+            gridRow.ResolvesTo.Should().Be(expectedResolvesTo);
+        }
+        finally
+        {
+            await SqlHelper.DeleteReferenceAliasByAliasTextAsync(aliasText);
+        }
     }
 }
