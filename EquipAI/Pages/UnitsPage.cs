@@ -6,13 +6,13 @@ public class UnitsPage : BasePage
 {
     public UnitsPage(IPage page) : base(page) { }
 
-    private ILocator Message => Page.Locator("//p[@class='admin-units__lead']");
+    private ILocator Message => Page.Locator("//p[@class='page-header__lead']");
     private ILocator AddUnitBtn => Page.Locator("//button[normalize-space()='Add unit']");
-    private ILocator Grid => Page.Locator("//table[@class='table admin-units__table']");
-    private ILocator CodeCells => Page.Locator("//table[@class='table admin-units__table']//tr/td[1]");
-    private ILocator DisplayNameCells => Page.Locator("//table[@class='table admin-units__table']//tr/td[2]");
-    private ILocator DimensionCells => Page.Locator("//table[@class='table admin-units__table']//tr/td[3]");
-    private ILocator ScaleCells => Page.Locator("//table[@class='table admin-units__table']//tr/td[4]");
+    private ILocator Grid => Page.Locator("//table[@class='table']");
+    private ILocator CodeCells => Page.Locator("//table[@class='table']//tr/td[1]");
+    private ILocator DisplayNameCells => Page.Locator("//table[@class='table']//tr/td[2]");
+    private ILocator DimensionCells => Page.Locator("//table[@class='table']//tr/td[3]");
+    private ILocator ScaleCells => Page.Locator("//table[@class='table']//tr/td[4]");
     private ILocator DeactivateDialog => Page.Locator("//div[@role='alertdialog']");
     private ILocator DeactivateDialogTitle => Page.Locator("//div[@role='alertdialog']//h2");
     private ILocator DeactivateDialogMessage => Page.Locator("//div[@role='alertdialog']//p[@id='confirm-dialog-message']");

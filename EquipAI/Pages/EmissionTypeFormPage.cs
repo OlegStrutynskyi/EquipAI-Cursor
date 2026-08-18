@@ -10,9 +10,11 @@ public abstract class EmissionTypeFormPage : BasePage
     protected ILocator CodeError => Page.Locator("//input[@id='emission-type-code']/following-sibling::span");
     protected ILocator DisplayNameInput => Page.Locator("//input[@id='emission-type-display-name']");
     protected ILocator DisplayNameError => Page.Locator("//input[@id='emission-type-display-name']/following-sibling::span");
-    protected ILocator DefaultUnitDropdown => Page.Locator("//select[@id='emission-type-default-unit']");
-    protected ILocator DefaultUnitOptions => Page.Locator("//select[@id='emission-type-default-unit']/option");
-    protected ILocator DefaultUnitError => Page.Locator("//select[@id='emission-type-default-unit']/../following-sibling::span");
+    protected ILocator DefaultUnitDropdown => Page.Locator("#emission-type-default-unit");
+    protected ILocator DefaultUnitList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
+    protected ILocator DefaultUnitOptions => DefaultUnitList.Locator("[role='option']");
+    protected ILocator DefaultUnitError => Page.Locator(
+        "//button[@id='emission-type-default-unit']/ancestor::*[contains(@class,'form-select-wrapper') or contains(@class,'select')][1]/following-sibling::span | //select[@id='emission-type-default-unit']/../following-sibling::span");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     protected ILocator AlertMessage => Page.Locator("//p[@role='alert']");
 
@@ -46,19 +48,17 @@ public abstract class EmissionTypeFormPage : BasePage
 
     public async Task SelectDefaultUnitByCodeAsync(string code)
     {
-        await DefaultUnitDropdown.WaitForAsync();
-        var options = await DefaultUnitDropdown.Locator("option").AllAsync();
+        await OpenDefaultUnitListAsync();
+        var options = await DefaultUnitOptions.AllAsync();
         foreach (var option in options)
         {
             var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
-            if (!text.Contains(code, StringComparison.Ordinal))
+            if (!(text.Equals(code, StringComparison.Ordinal)
+                  || text.StartsWith(code + " —", StringComparison.Ordinal)
+                  || text.StartsWith(code + " -", StringComparison.Ordinal)))
                 continue;
 
-            var value = await option.GetAttributeAsync("value");
-            if (string.IsNullOrWhiteSpace(value) || value.Contains("null", StringComparison.Ordinal))
-                continue;
-
-            await DefaultUnitDropdown.SelectOptionAsync(value);
+            await option.ClickAsync();
             return;
         }
 
@@ -67,12 +67,22 @@ public abstract class EmissionTypeFormPage : BasePage
 
     public async Task<IReadOnlyList<string>> GetDefaultUnitOptionsAsync()
     {
-        await DefaultUnitDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await OpenDefaultUnitListAsync();
         var options = await DefaultUnitOptions.AllInnerTextsAsync();
         return options
             .Select(option => option.Trim())
             .Where(option => !string.IsNullOrEmpty(option) && !option.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
             .ToList();
+    }
+
+    private async Task OpenDefaultUnitListAsync()
+    {
+        await DefaultUnitDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await DefaultUnitList.IsVisibleAsync())
+            return;
+
+        await DefaultUnitDropdown.ClickAsync();
+        await DefaultUnitList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     public async Task ClearCodeAsync() => await CodeInput.FillAsync(string.Empty);

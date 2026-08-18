@@ -6,12 +6,12 @@ public class EmissionTypesPage : BasePage
 {
     public EmissionTypesPage(IPage page) : base(page) { }
 
-    private ILocator Message => Page.Locator("//p[@class='admin-emission-types__lead']");
+    private ILocator Message => Page.Locator("//p[@class='page-header__lead']");
     private ILocator AddEmissionTypeBtn => Page.Locator("//button[normalize-space()='Add emission type']");
-    private ILocator Grid => Page.Locator("//table[@class='table admin-emission-types__table']");
-    private ILocator CodeCells => Page.Locator("//table[@class='table admin-emission-types__table']//tr/td[1]");
-    private ILocator DisplayNameCells => Page.Locator("//table[@class='table admin-emission-types__table']//tr/td[2]");
-    private ILocator DefaultUnitCells => Page.Locator("//table[@class='table admin-emission-types__table']//tr/td[3]");
+    private ILocator Grid => Page.Locator("//table[@class='table']");
+    private ILocator CodeCells => Page.Locator("//table[@class='table']//tr/td[1]");
+    private ILocator DisplayNameCells => Page.Locator("//table[@class='table']//tr/td[2]");
+    private ILocator DefaultUnitCells => Page.Locator("//table[@class='table']//tr/td[3]");
     private ILocator DeactivateDialog => Page.Locator("//div[@role='alertdialog']");
     private ILocator DeactivateDialogTitle => Page.Locator("//div[@role='alertdialog']//h2");
     private ILocator DeactivateDialogMessage => Page.Locator("//div[@role='alertdialog']//p[@id='confirm-dialog-message']");
@@ -91,7 +91,7 @@ public class EmissionTypesPage : BasePage
     public async Task<(string Code, string DisplayName)> GetCodeAndDisplayNameAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='table admin-emission-types__table']//tr[td[1][normalize-space()='{code}']]");
+        var row = Page.Locator($"//table[@class='table']//tr[td[1][normalize-space()='{code}']]");
         await row.WaitForAsync();
         var codeText = (await row.Locator("td").Nth(0).InnerTextAsync()).Trim();
         var displayName = (await row.Locator("td").Nth(1).InnerTextAsync()).Trim();
@@ -113,7 +113,7 @@ public class EmissionTypesPage : BasePage
     public async Task<EditEmissionTypePage> ClickEditBtnAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='table admin-emission-types__table']//tr[td[1][normalize-space()='{code}']]");
+        var row = Page.Locator($"//table[@class='table']//tr[td[1][normalize-space()='{code}']]");
         await row.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
         var editEmissionTypePage = new EditEmissionTypePage(Page);
         await editEmissionTypePage.WaitForLoadedAsync();
@@ -123,7 +123,7 @@ public class EmissionTypesPage : BasePage
     public async Task ClickDeactivateBtnAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='table admin-emission-types__table']//tr[td[1][normalize-space()='{code}']]");
+        var row = Page.Locator($"//table[@class='table']//tr[td[1][normalize-space()='{code}']]");
         await row.GetByRole(AriaRole.Button, new() { Name = "Deactivate" }).ClickAsync();
         await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
@@ -154,7 +154,7 @@ public class EmissionTypesPage : BasePage
     {
         await DeactivateDialogConfirmBtn.ClickAsync();
         await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
-        var row = Page.Locator($"//table[@class='table admin-emission-types__table']//tr[td[1][normalize-space()='{code}']]");
+        var row = Page.Locator($"//table[@class='table']//tr[td[1][normalize-space()='{code}']]");
         await row.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
     }
 }

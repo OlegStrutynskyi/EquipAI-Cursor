@@ -9,7 +9,7 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T01_EmissionType_DefaultView()
     {
-        const string expectedPageTitle = "Emission types";
+        const string expectedPageTitle = "Emission Types";
         const string expectedMessage = "Manage fuel and emission type reference data used by imports and factors.";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
@@ -25,7 +25,7 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T02_EmissionType_ClickAddEmissionTypeBtn()
     {
-        const string expectedPageTitle = "Add emission type";
+        const string expectedPageTitle = "Add Emission Type";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
@@ -54,7 +54,7 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T04_EmissionType_Add_DefaultView()
     {
-        const string expectedPageTitle = "Add emission type";
+        const string expectedPageTitle = "Add Emission Type";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
@@ -71,19 +71,20 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T05_EmissionType_Add_UnitDropdown()
     {
-        var unitsPage = new UnitsPage(Fixture.Page);
-        await unitsPage.OpenAsync();
-        var units = await unitsPage.GetAllCodesAndDisplayNamesAsync();
-        var expectedOptions = units
-            .Select(unit => $"{unit.Code} — {unit.DisplayName}")
-            .ToList();
+        var expectedOptions = new[]
+        {
+            "KWH — Kilowatt-hour",
+            "SQFT — Square foot",
+            "T — Tonne",
+            "US_GAL — US Gallon",
+        };
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
         var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
 
         var defaultUnitOptions = await addEmissionTypePage.GetDefaultUnitOptionsAsync();
-        defaultUnitOptions.Should().Contain(expectedOptions);
+        defaultUnitOptions.Should().BeEquivalentTo(expectedOptions);
     }
 
     [Test]
@@ -115,7 +116,7 @@ public class EmissionTypesTests : BaseTest
         var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
-        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync("US_GAL");
         await addEmissionTypePage.ClickCreateEmissionTypeBtnAsync();
 
         (await addEmissionTypePage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
@@ -154,7 +155,7 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T10_EmissionType_Add_ClickCancel()
     {
-        const string expectedPageTitle = "Emission types";
+        const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var code = $"Code{stamp}";
         var displayName = $"Type{stamp}";
@@ -164,7 +165,7 @@ public class EmissionTypesTests : BaseTest
         var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
-        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync("US_GAL");
         emissionTypesPage = await addEmissionTypePage.ClickCancelBtnAsync();
 
         (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -174,7 +175,7 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T11_EmissionType_Add_Success()
     {
-        const string expectedPageTitle = "Emission types";
+        const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var codePrefix = $"Code{stamp}";
         var displayNamePrefix = $"Type{stamp}";
@@ -188,7 +189,7 @@ public class EmissionTypesTests : BaseTest
             var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
             await addEmissionTypePage.FillCodeAsync(code);
             await addEmissionTypePage.FillDisplayNameAsync(displayName);
-            await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+            await addEmissionTypePage.SelectDefaultUnitByCodeAsync("US_GAL");
             emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
             (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -204,7 +205,7 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T12_EmissionType_ClickEditBtn()
     {
-        const string expectedPageTitle = "Edit emission type";
+        const string expectedPageTitle = "Edit Emission Type";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
@@ -216,7 +217,7 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T13_EmissionType_Edit_DefaultView()
     {
-        const string expectedPageTitle = "Edit emission type";
+        const string expectedPageTitle = "Edit Emission Type";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
@@ -297,7 +298,7 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T18_EmissionType_Edit_ClickCancel()
     {
-        const string expectedPageTitle = "Emission types";
+        const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var code = $"Code{stamp}";
         var displayName = $"Type{stamp}";
@@ -317,13 +318,13 @@ public class EmissionTypesTests : BaseTest
     [Test]
     public async Task T19_EmissionType_Edit_Success()
     {
-        const string expectedPageTitle = "Emission types";
+        const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var codePrefix = $"Code{stamp}";
         var displayNamePrefix = $"Type{stamp}";
         var code = codePrefix + GenerateRandomString(64 - codePrefix.Length);
         var displayName = displayNamePrefix + GenerateRandomString(256 - displayNamePrefix.Length);
-        var expectedDefaultUnit = $"{Config.SetupCode2} — {Config.SetupUnitName2}";
+        var expectedDefaultUnit = $"{Config.SetupDefaultUnitCode2} — {Config.SetupDefaultUnitName2}";
         object? emissionTypeId = null;
 
         try
@@ -335,7 +336,7 @@ public class EmissionTypesTests : BaseTest
             var editEmissionTypePage = await emissionTypesPage.ClickEditBtnAsync(Config.SetupCode1);
             await editEmissionTypePage.FillCodeAsync(code);
             await editEmissionTypePage.FillDisplayNameAsync(displayName);
-            await editEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode2);
+            await editEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode2);
             emissionTypesPage = await editEmissionTypePage.SaveEmissionTypeAsync();
 
             (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -350,14 +351,14 @@ public class EmissionTypesTests : BaseTest
                     emissionTypeId,
                     Config.SetupCode1,
                     Config.SetupEmissionTypeName1,
-                    Config.SetupCode1);
+                    Config.SetupDefaultUnitCode1);
         }
     }
 
     [Test]
     public async Task T20_EmissionType_Deactivate_Click()
     {
-        const string expectedTitle = "Deactivate emission type";
+        const string expectedTitle = "Deactivate Emission Type";
         var expectedMessage = $"Deactivate emission type {Config.SetupCode1}? It will no longer be available for new imports.";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
@@ -388,19 +389,19 @@ public class EmissionTypesTests : BaseTest
     {
         try
         {
-            await SqlHelper.RestoreEmissionTypeByCodeAsync(Config.SetupCode1);
+            await SqlHelper.RestoreEmissionTypeByCodeAsync(Config.SetupCode3);
 
             var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
             await emissionTypesPage.OpenAsync();
-            await emissionTypesPage.ClickDeactivateBtnAsync(Config.SetupCode1);
-            await emissionTypesPage.ClickDeactivateDialogConfirmBtnAsync(Config.SetupCode1);
+            await emissionTypesPage.ClickDeactivateBtnAsync(Config.SetupCode3);
+            await emissionTypesPage.ClickDeactivateDialogConfirmBtnAsync(Config.SetupCode3);
 
             (await emissionTypesPage.IsDeactivateDialogVisibleAsync()).Should().BeFalse();
-            (await emissionTypesPage.IsCodeInGridAsync(Config.SetupCode1)).Should().BeFalse();
+            (await emissionTypesPage.IsCodeInGridAsync(Config.SetupCode3)).Should().BeFalse();
         }
         finally
         {
-            await SqlHelper.RestoreEmissionTypeByCodeAsync(Config.SetupCode1);
+            await SqlHelper.RestoreEmissionTypeByCodeAsync(Config.SetupCode3);
         }
     }
 }

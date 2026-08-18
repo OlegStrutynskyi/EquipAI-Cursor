@@ -6,7 +6,7 @@ public class EditEmissionTypePage : EmissionTypeFormPage
 {
     public EditEmissionTypePage(IPage page) : base(page) { }
 
-    private ILocator Subtitle => Page.Locator("//span[contains(@class,'admin-emission-type-edit__subtitle')]");
+    private ILocator Subtitle => Page.Locator("//span[@class='page-header__subtitle']");
     private ILocator SaveEmissionTypeBtn => Page.Locator("//button[normalize-space()='Save emission type']");
 
     public async Task WaitForLoadedAsync()

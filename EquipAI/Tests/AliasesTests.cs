@@ -166,6 +166,7 @@ public class AliasesTests : BaseTest
     {
         const string unitOfMeasureOption = "Unit of measure";
         const string emissionTypeOption = "Emission type";
+        const string telemetryProjectOption = "Telemetry project";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
@@ -174,13 +175,21 @@ public class AliasesTests : BaseTest
         var targetKindOptions = await addAliasPage.GetTargetKindOptionsAsync();
         targetKindOptions.Should().Contain(unitOfMeasureOption);
         targetKindOptions.Should().Contain(emissionTypeOption);
+        targetKindOptions.Should().Contain(telemetryProjectOption);
 
         await addAliasPage.SelectTargetKindAsync(unitOfMeasureOption);
         (await addAliasPage.IsUnitOfMeasureDropdownVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsEmissionTypeDropdownVisibleAsync()).Should().BeFalse();
+        (await addAliasPage.IsTelemetryProjectDropdownVisibleAsync()).Should().BeFalse();
 
         await addAliasPage.SelectTargetKindAsync(emissionTypeOption);
         (await addAliasPage.IsEmissionTypeDropdownVisibleAsync()).Should().BeTrue();
+        (await addAliasPage.IsUnitOfMeasureDropdownVisibleAsync()).Should().BeFalse();
+        (await addAliasPage.IsTelemetryProjectDropdownVisibleAsync()).Should().BeFalse();
+
+        await addAliasPage.SelectTargetKindAsync(telemetryProjectOption);
+        (await addAliasPage.IsTelemetryProjectDropdownVisibleAsync()).Should().BeTrue();
+        (await addAliasPage.IsEmissionTypeDropdownVisibleAsync()).Should().BeFalse();
         (await addAliasPage.IsUnitOfMeasureDropdownVisibleAsync()).Should().BeFalse();
     }
 
@@ -209,25 +218,43 @@ public class AliasesTests : BaseTest
     {
         const string dataIngestionOption = "Data ingestion";
         const string catalogFactorMappingOption = "Catalog factor mapping";
+        const string unitOfMeasureOption = "Unit of measure";
+        const string emissionTypeOption = "Emission type";
+        const string telemetryProjectOption = "Telemetry project";
         const string expectedAliasTextError = "Alias text is required.";
         const string expectedUnitError = "Unit is required.";
         const string expectedEmissionTypeError = "Emission type is required.";
         const string expectedFactorSourceError = "Factor source is required.";
+        const string expectedTelemetryProjectError = "Telemetry project is required.";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
 
-        await addAliasPage.SelectContextAsync(dataIngestionOption);
+        await addAliasPage.SelectTargetKindAsync(unitOfMeasureOption);
         await addAliasPage.ClickCreateAliasBtnAsync();
         (await addAliasPage.GetAliasTextErrorAsync()).Should().Be(expectedAliasTextError);
         (await addAliasPage.GetUnitOfMeasureErrorAsync()).Should().Be(expectedUnitError);
 
+        await addAliasPage.SelectTargetKindAsync(emissionTypeOption);
+        await addAliasPage.SelectContextAsync(dataIngestionOption);
+        await addAliasPage.SelectTargetKindAsync(emissionTypeOption);
+        await addAliasPage.ClickCreateAliasBtnAsync();
+        (await addAliasPage.GetAliasTextErrorAsync()).Should().Be(expectedAliasTextError);
+        (await addAliasPage.GetEmissionTypeErrorAsync()).Should().Be(expectedEmissionTypeError);
+
         await addAliasPage.SelectContextAsync(catalogFactorMappingOption);
+        await addAliasPage.SelectTargetKindAsync(emissionTypeOption);
         await addAliasPage.ClickCreateAliasBtnAsync();
         (await addAliasPage.GetAliasTextErrorAsync()).Should().Be(expectedAliasTextError);
         (await addAliasPage.GetEmissionTypeErrorAsync()).Should().Be(expectedEmissionTypeError);
         (await addAliasPage.GetFactorSourceErrorAsync()).Should().Be(expectedFactorSourceError);
+
+        await addAliasPage.SelectContextAsync(dataIngestionOption);
+        await addAliasPage.SelectTargetKindAsync(telemetryProjectOption);
+        await addAliasPage.ClickCreateAliasBtnAsync();
+        (await addAliasPage.GetAliasTextErrorAsync()).Should().Be(expectedAliasTextError);
+        (await addAliasPage.GetTelemetryProjectErrorAsync()).Should().Be(expectedTelemetryProjectError);
     }
 
     [Test]

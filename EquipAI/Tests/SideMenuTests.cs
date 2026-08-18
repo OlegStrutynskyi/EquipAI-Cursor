@@ -17,9 +17,9 @@ public class SideMenuTests : BaseTest
             "Users",
             "Projects",
             "Units",
-            "Emission types",
+            "Emission Types",
             "Aliases",
-            "Factor import",
+            "Factor Import",
             "Data Hub",
             "Reports",
             "Dark Mode",
@@ -55,9 +55,9 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Users")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Projects")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
-            (await sideMenuPage.IsLinkVisibleAsync("Emission types")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
-            (await sideMenuPage.IsLinkVisibleAsync("Factor import")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
         {
@@ -86,9 +86,9 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Telemetry")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Projects")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
-            (await sideMenuPage.IsLinkVisibleAsync("Emission types")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
-            (await sideMenuPage.IsLinkVisibleAsync("Factor import")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
         {
@@ -117,9 +117,9 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Telemetry")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Users")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
-            (await sideMenuPage.IsLinkVisibleAsync("Emission types")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
-            (await sideMenuPage.IsLinkVisibleAsync("Factor import")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
         {
@@ -202,7 +202,7 @@ public class SideMenuTests : BaseTest
     [Test]
     public async Task T11_SideMenu_ClickEmissionTypes()
     {
-        const string expectedTitle = "Emission types";
+        const string expectedTitle = "Emission Types";
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();
@@ -226,7 +226,7 @@ public class SideMenuTests : BaseTest
     [Test]
     public async Task T13_SideMenu_ClickFactorImport()
     {
-        const string expectedTitle = "Factor import";
+        const string expectedTitle = "Factor Import";
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();

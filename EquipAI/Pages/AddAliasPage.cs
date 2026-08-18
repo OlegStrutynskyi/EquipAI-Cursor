@@ -17,7 +17,12 @@ public class AddAliasPage : BasePage
     private ILocator UnitOfMeasureOptions => Page.Locator("//select[@id='alias-unit']/option");
     private ILocator UnitOfMeasureError => Page.Locator("//select[@id='alias-unit']/../following-sibling::span");
     private ILocator EmissionTypeDropdown => Page.Locator("//select[@id='alias-emission-type']");
-    private ILocator EmissionTypeError => Page.Locator("//select[@id='alias-emission-type']/../following-sibling::span");
+    private ILocator EmissionTypeError => Page.Locator(
+        "//select[@id='alias-emission-type']/../following-sibling::span | //select[@id='alias-emission-type']/following-sibling::span");
+    private ILocator TelemetryProjectDropdown => Page.Locator(
+        "//select[@id='alias-telemetry-project'] | //label[normalize-space()='Telemetry project']/following::select[1]");
+    private ILocator TelemetryProjectError => Page.Locator(
+        "//select[@id='alias-telemetry-project']/../following-sibling::span | //label[normalize-space()='Telemetry project']/following::span[1]");
     private ILocator FactorSourceTitle => Page.Locator("//legend[normalize-space()='Factor source']");
     private ILocator FactorSourceMessage => Page.Locator("//legend[normalize-space()='Factor source']/following-sibling::p");
     private ILocator FactorSourceError => Page.Locator("//legend[normalize-space()='Factor source']/following-sibling::span");
@@ -39,6 +44,7 @@ public class AddAliasPage : BasePage
     public Task<bool> IsTargetKindDropdownVisibleAsync() => TargetKindDropdown.IsVisibleAsync();
     public Task<bool> IsUnitOfMeasureDropdownVisibleAsync() => UnitOfMeasureDropdown.IsVisibleAsync();
     public Task<bool> IsEmissionTypeDropdownVisibleAsync() => EmissionTypeDropdown.IsVisibleAsync();
+    public Task<bool> IsTelemetryProjectDropdownVisibleAsync() => TelemetryProjectDropdown.IsVisibleAsync();
     public Task<bool> IsFactorSourceTitleVisibleAsync() => FactorSourceTitle.IsVisibleAsync();
     public Task<bool> IsFactorSourceMessageVisibleAsync() => FactorSourceMessage.IsVisibleAsync();
     public Task<bool> IsEpaBtnVisibleAsync() => EpaBtn.IsVisibleAsync();
@@ -67,7 +73,7 @@ public class AddAliasPage : BasePage
 
     public async Task SelectContextAsync(string optionText)
     {
-        await ContextDropdown.WaitForAsync();
+        await ContextDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await ContextDropdown.SelectOptionAsync(new SelectOptionValue { Label = optionText });
     }
 
@@ -170,6 +176,7 @@ public class AddAliasPage : BasePage
     public async Task<string> GetUnitOfMeasureErrorAsync() => await GetErrorTextAsync(UnitOfMeasureError);
     public async Task<string> GetEmissionTypeErrorAsync() => await GetErrorTextAsync(EmissionTypeError);
     public async Task<string> GetFactorSourceErrorAsync() => await GetErrorTextAsync(FactorSourceError);
+    public async Task<string> GetTelemetryProjectErrorAsync() => await GetErrorTextAsync(TelemetryProjectError);
 
     private static async Task<string> GetErrorTextAsync(ILocator errorLocator)
     {
