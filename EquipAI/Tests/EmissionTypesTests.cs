@@ -116,7 +116,7 @@ public class EmissionTypesTests : BaseTest
         var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
-        await addEmissionTypePage.SelectDefaultUnitByCodeAsync("US_GAL");
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
         await addEmissionTypePage.ClickCreateEmissionTypeBtnAsync();
 
         (await addEmissionTypePage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
@@ -165,7 +165,7 @@ public class EmissionTypesTests : BaseTest
         var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
-        await addEmissionTypePage.SelectDefaultUnitByCodeAsync("US_GAL");
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
         emissionTypesPage = await addEmissionTypePage.ClickCancelBtnAsync();
 
         (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -189,7 +189,7 @@ public class EmissionTypesTests : BaseTest
             var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
             await addEmissionTypePage.FillCodeAsync(code);
             await addEmissionTypePage.FillDisplayNameAsync(displayName);
-            await addEmissionTypePage.SelectDefaultUnitByCodeAsync("US_GAL");
+            await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
             emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
             (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);

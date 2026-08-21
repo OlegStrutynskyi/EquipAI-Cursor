@@ -20,9 +20,12 @@ public class SideMenuPage : BasePage
     private ILocator EmissionTypesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission types" });
     private ILocator AliasesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Aliases" });
     private ILocator FactorImportLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Factor import" });
-    private ILocator DarkModeLink => AccountNav.Locator("label.nav-item--theme");
-    private ILocator DarkModeToggle => AccountNav.Locator("input[aria-label='Toggle dark mode']");
-    private ILocator LogoutLink => AccountNav.Locator("button.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Logout" });
+    private ILocator DataHubLink => PrimaryNav.Locator(".nav-item").Filter(new LocatorFilterOptions { HasTextString = "Data Hub" });
+    private ILocator DarkModeLink => Page.Locator("label.nav-item--theme, label.nav-item")
+        .Filter(new LocatorFilterOptions { HasTextString = "Dark Mode" });
+    private ILocator DarkModeToggle => Page.Locator("input[aria-label='Toggle dark mode']");
+    private ILocator LogoutLink => Page.Locator("nav[aria-label='Account'] button.nav-item, button.nav-item")
+        .Filter(new LocatorFilterOptions { HasTextString = "Logout" });
 
     public async Task OpenAsync()
     {
@@ -33,11 +36,12 @@ public class SideMenuPage : BasePage
 
     public async Task ClickOpenMenuBtnAsync()
     {
-        if (await PrimaryNav.IsVisibleAsync())
-            return;
+        if (!await PrimaryNav.IsVisibleAsync())
+        {
+            await OpenMenuBtn.ClickAsync();
+            await PrimaryNav.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        }
 
-        await OpenMenuBtn.ClickAsync();
-        await PrimaryNav.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await AccountNav.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
@@ -58,18 +62,61 @@ public class SideMenuPage : BasePage
     }
 
     public Task ClickEnterpriseAsync() => ClickLinkAsync(EnterpriseLink);
-    public Task ClickInvoicesAsync() => ClickLinkAsync(InvoicesLink);
-    public Task ClickTelemetryAsync() => ClickLinkAsync(TelemetryLink);
+
+    public async Task ClickInvoicesAsync()
+    {
+        await EnsureDataHubExpandedForAsync(InvoicesLink);
+        await ClickLinkAsync(InvoicesLink);
+    }
+
+    public async Task ClickTelemetryAsync()
+    {
+        await EnsureDataHubExpandedForAsync(TelemetryLink);
+        await ClickLinkAsync(TelemetryLink);
+    }
+
     public Task ClickUsersAsync() => ClickLinkAsync(UsersLink);
     public Task ClickProjectsAsync() => ClickLinkAsync(ProjectsLink);
     public Task ClickUnitsAsync() => ClickLinkAsync(UnitsLink);
     public Task ClickEmissionTypesAsync() => ClickLinkAsync(EmissionTypesLink);
     public Task ClickAliasesAsync() => ClickLinkAsync(AliasesLink);
-    public Task ClickFactorImportAsync() => ClickLinkAsync(FactorImportLink);
+
+    public async Task ClickFactorImportAsync()
+    {
+        await EnsureDataHubExpandedForAsync(FactorImportLink);
+        await ClickLinkAsync(FactorImportLink);
+    }
+
+    public async Task ClickDataHubAsync()
+    {
+        await DataHubLink.First.EvaluateAsync(
+            """
+            element => {
+              let parent = element.parentElement;
+              while (parent) {
+                if (parent.scrollHeight > parent.clientHeight + 1) {
+                  parent.scrollTop = element.offsetTop - parent.clientHeight / 2;
+                  break;
+                }
+                parent = parent.parentElement;
+              }
+              element.click();
+            }
+            """);
+    }
+
+    private async Task EnsureDataHubExpandedForAsync(ILocator link)
+    {
+        if (await link.CountAsync() > 0 && await link.First.IsVisibleAsync())
+            return;
+
+        await ClickDataHubAsync();
+        await link.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
 
     public async Task ClickDarkModeAsync()
     {
-        await DarkModeLink.EvaluateAsync(
+        await DarkModeLink.First.EvaluateAsync(
             """
             element => {
               let parent = element.parentElement;
@@ -90,11 +137,15 @@ public class SideMenuPage : BasePage
         return await Page.EvaluateAsync<string>("() => getComputedStyle(document.body).backgroundColor");
     }
 
-    public Task<bool> IsDarkModeEnabledAsync() => DarkModeToggle.IsCheckedAsync();
+    public async Task<bool> IsDarkModeEnabledAsync()
+    {
+        await DarkModeToggle.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached });
+        return await DarkModeToggle.First.IsCheckedAsync();
+    }
 
     public async Task<LoginPage> ClickLogoutAsync()
     {
-        await LogoutLink.EvaluateAsync(
+        await LogoutLink.First.EvaluateAsync(
             """
             element => {
               let parent = element.parentElement;

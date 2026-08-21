@@ -16,8 +16,10 @@ public class EditInvoicePage : InvoiceFormPage
     private ILocator Description2Input => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//input[contains(@id,'line-description')]");
     private ILocator Quantity2Input => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//input[contains(@id,'quantity')]");
     private ILocator UnitPrice2Input => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//input[contains(@id,'unit-price')]");
-    private ILocator EmissionType2Dropdown => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//select[contains(@id,'emission-type')]");
-    private ILocator Unit2Dropdown => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//select[contains(@id,'unit-of-measure')]");
+    private ILocator EmissionType2Dropdown => Page.Locator(
+        "//legend[normalize-space()='Line 2']/following-sibling::div//*[@id[contains(.,'emission-type')] and (self::select or self::button)]");
+    private ILocator Unit2Dropdown => Page.Locator(
+        "//legend[normalize-space()='Line 2']/following-sibling::div//*[@id[contains(.,'unit-of-measure')] and (self::select or self::button)]");
     private ILocator Toolbar => Page.Locator("//nav[@class='toolbar']");
     private ILocator RejectDialog => Page.Locator("//div[@role='dialog']");
     private ILocator RejectDialogTitle => Page.Locator("//h2[@id='invoice-reject-dialog-title']");

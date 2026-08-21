@@ -44,10 +44,15 @@ public class _01_Setup_Data : BaseTest
         const string unitPrice = "3.71";
         const string emissionType = "On-site diesel combustion";
         const string unitOfMeasure = "US Gallon (US_GAL)";
+        const string expectedStatus = "DRAFT";
+        const string expectedSource = "Manual";
 
         var invoiceDateForInput = DateTime
             .ParseExact(invoiceDate, "dd/MM/yyyy", CultureInfo.InvariantCulture)
             .ToString("yyyy-MM-dd");
+        var expectedInvoiceDateDisplay = DateTime
+            .ParseExact(invoiceDate, "dd/MM/yyyy", CultureInfo.InvariantCulture)
+            .ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -62,6 +67,8 @@ public class _01_Setup_Data : BaseTest
             (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber)).Should().BeTrue();
             return;
         }
+
+        var initialInvoiceCount = await invoicesPage.GetInvoiceNumberCountFromAllPagesAsync();
 
         var createInvoicePage = await invoicesPage.ClickCreateBtnAsync();
         await createInvoicePage.FillInvoiceFormAsync(
@@ -80,8 +87,16 @@ public class _01_Setup_Data : BaseTest
             unitOfMeasure);
         invoicesPage = await createInvoicePage.SaveInvoiceAsync();
 
+        (await invoicesPage.GetInvoiceNumberCountFromAllPagesAsync()).Should().Be(initialInvoiceCount + 1);
         (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber)).Should().BeTrue();
-        Console.WriteLine("Invoice created.");
+
+        var gridRow = await invoicesPage.GetInvoiceGridRowAsync(invoiceNumber);
+        gridRow.Should().NotBeNull();
+        gridRow!.Project.Should().Be(Config.SetupProjectName1);
+        gridRow.Company.Should().Be(companyName);
+        gridRow.Date.Should().Be(expectedInvoiceDateDisplay);
+        gridRow.Status.Should().Be(expectedStatus);
+        gridRow.Source.Should().Be(expectedSource);
     }
 
     [Explicit("Manual setup test. Run before the test suite.")]
@@ -143,7 +158,7 @@ public class _01_Setup_Data : BaseTest
         var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
-        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
         emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
         (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
@@ -165,7 +180,7 @@ public class _01_Setup_Data : BaseTest
         var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
-        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
         emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
         (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
@@ -187,7 +202,7 @@ public class _01_Setup_Data : BaseTest
         var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
-        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupCode1);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
         emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
         (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
@@ -234,7 +249,7 @@ public class _01_Setup_Data : BaseTest
         await addAliasPage.SelectContextAsync("Data ingestion");
         await addAliasPage.FillAliasTextAsync(aliasText);
         await addAliasPage.SelectTargetKindAsync("Emission type");
-        await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode1);
+        await addAliasPage.SelectEmissionTypeAsync(Config.SetupDefaultUnitCode1);
         aliasesPage = await addAliasPage.CreateAliasAsync();
         await aliasesPage.ClickEmissionTypesTabAsync();
 

@@ -9,29 +9,38 @@ public class SideMenuTests : BaseTest
     [Test]
     public async Task T01_SideMenu_SuperAdminView()
     {
-        var expectedLinks = new[]
+        var expectedDefaultLinks = new[]
         {
             "Enterprise",
-            "Invoices",
-            "Telemetry",
             "Users",
             "Projects",
             "Units",
             "Emission Types",
             "Aliases",
-            "Factor Import",
             "Data Hub",
             "Reports",
             "Dark Mode",
             "Permissions",
             "Logout",
         };
+        var expectedDataHubLinks = new[]
+        {
+            "Invoices",
+            "Telemetry",
+            "Factor Import",
+        };
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();
 
         var linkTexts = await sideMenuPage.GetLinkTextsAsync();
-        linkTexts.Should().Contain(expectedLinks);
+        linkTexts.Should().Contain(expectedDefaultLinks);
+        foreach (var link in expectedDataHubLinks)
+            (await sideMenuPage.IsLinkVisibleAsync(link)).Should().BeFalse();
+
+        await sideMenuPage.ClickDataHubAsync();
+        foreach (var link in expectedDataHubLinks)
+            (await sideMenuPage.IsLinkVisibleAsync(link)).Should().BeTrue();
     }
 
     [Test]
@@ -45,8 +54,6 @@ public class SideMenuTests : BaseTest
             await sideMenuPage.OpenAsync();
 
             (await sideMenuPage.IsLinkVisibleAsync("Enterprise")).Should().BeTrue();
-            (await sideMenuPage.IsLinkVisibleAsync("Invoices")).Should().BeTrue();
-            (await sideMenuPage.IsLinkVisibleAsync("Telemetry")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Data Hub")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Reports")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Dark Mode")).Should().BeTrue();
@@ -57,11 +64,15 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
+
+            await sideMenuPage.ClickDataHubAsync();
+            (await sideMenuPage.IsLinkVisibleAsync("Invoices")).Should().BeTrue();
+            (await sideMenuPage.IsLinkVisibleAsync("Telemetry")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
         {
-            await SqlHelper.SetUserCapabilitiesAsync(Config.MicrosoftEmail, 1);
+            await SetUserCapabilitiesAndLoginAsync(1);
         }
     }
 
@@ -77,22 +88,25 @@ public class SideMenuTests : BaseTest
 
             (await sideMenuPage.IsLinkVisibleAsync("Enterprise")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Users")).Should().BeTrue();
-            (await sideMenuPage.IsLinkVisibleAsync("Data Hub")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Reports")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Dark Mode")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Logout")).Should().BeTrue();
 
-            (await sideMenuPage.IsLinkVisibleAsync("Invoices")).Should().BeFalse();
-            (await sideMenuPage.IsLinkVisibleAsync("Telemetry")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Projects")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
+
+            if (await sideMenuPage.IsLinkVisibleAsync("Data Hub"))
+                await sideMenuPage.ClickDataHubAsync();
+
+            (await sideMenuPage.IsLinkVisibleAsync("Invoices")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Telemetry")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
         {
-            await SqlHelper.SetUserCapabilitiesAsync(Config.MicrosoftEmail, 1);
+            await SetUserCapabilitiesAndLoginAsync(1);
         }
     }
 
@@ -108,22 +122,25 @@ public class SideMenuTests : BaseTest
 
             (await sideMenuPage.IsLinkVisibleAsync("Enterprise")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Projects")).Should().BeTrue();
-            (await sideMenuPage.IsLinkVisibleAsync("Data Hub")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Reports")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Dark Mode")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Logout")).Should().BeTrue();
 
-            (await sideMenuPage.IsLinkVisibleAsync("Invoices")).Should().BeFalse();
-            (await sideMenuPage.IsLinkVisibleAsync("Telemetry")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Users")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
+
+            if (await sideMenuPage.IsLinkVisibleAsync("Data Hub"))
+                await sideMenuPage.ClickDataHubAsync();
+
+            (await sideMenuPage.IsLinkVisibleAsync("Invoices")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Telemetry")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
         {
-            await SqlHelper.SetUserCapabilitiesAsync(Config.MicrosoftEmail, 1);
+            await SetUserCapabilitiesAndLoginAsync(1);
         }
     }
 
@@ -257,7 +274,7 @@ public class SideMenuTests : BaseTest
     [Test]
     public async Task T15_SideMenu_ClickLogout()
     {
-        const string expectedLoginTitle = "Sign in to EquipAI";
+        const string expectedLoginTitle = "Sign In to EquipAI";
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();

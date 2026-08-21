@@ -8,21 +8,21 @@ public class InvoicesPage : BasePage
     public InvoicesPage(IPage page) : base(page) { }
 
     private ILocator InvoicesTitle => Page.Locator("//h1[@id='invoice-list-title']");
-    private ILocator InvoicesMessage => Page.Locator("//p[@class='invoice-list__lead']");
+    private ILocator InvoicesMessage => Page.Locator("//p[@class='page-header__lead']");
     private ILocator ImportBtn => Page.Locator("//a[normalize-space()='Import']");
     private ILocator CreateBtn => Page.Locator("//a[normalize-space()='Create']");
-    private ILocator InvoicesGrid => Page.Locator("//table[@class='table invoice-list__table']");
-    private ILocator InvoicesGridProject => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[1]");
-    private ILocator InvoicesGridInvoiceNumber => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[2]");
-    private ILocator InvoicesGridCompany => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[3]");
-    private ILocator InvoicesGridDate => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[4]");
-    private ILocator InvoicesGridStatus => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[5]");
-    private ILocator InvoicesGridImportDate => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[6]");
-    private ILocator InvoicesGridApproveRejectDate => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[7]");
-    private ILocator InvoicesGridSource => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[8]");
+    private ILocator InvoicesGrid => Page.Locator("//table[contains(@class,'table')]");
+    private ILocator InvoicesGridProject => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[1]");
+    private ILocator InvoicesGridInvoiceNumber => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[2]");
+    private ILocator InvoicesGridCompany => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[3]");
+    private ILocator InvoicesGridDate => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[4]");
+    private ILocator InvoicesGridStatus => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[5]");
+    private ILocator InvoicesGridImportDate => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[6]");
+    private ILocator InvoicesGridApproveRejectDate => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[7]");
+    private ILocator InvoicesGridSource => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[8]");
     private ILocator PreviousBtn => Page.Locator("//button[normalize-space()='Previous']");
     private ILocator NextBtn => Page.Locator("//button[normalize-space()='Next']");
-    private ILocator InvoiceNumberCells => Page.Locator("//table[@class='table invoice-list__table']//tbody/tr/td[2]");
+    private ILocator InvoiceNumberCells => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[2]");
     private ILocator PaginationSummary => Page.Locator("//p[@class='pagination__info']");
 
     public async Task OpenAsync()
@@ -227,64 +227,27 @@ public class InvoicesPage : BasePage
 
     public async Task<bool> IsInvoiceNumberInGridAsync(string invoiceNumber)
     {
-        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await WaitForPaginationStableAsync();
-
-        while (true)
-        {
-            var invoiceNumbers = await InvoiceNumberCells.AllInnerTextsAsync();
-            if (invoiceNumbers.Any(number => number.Trim().Equals(invoiceNumber, StringComparison.Ordinal)))
-                return true;
-
-            if (!await IsPaginationButtonEnabledAsync(NextBtn))
-                break;
-
-            try
-            {
-                await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
-            }
-
-            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
-        }
-
-        return false;
+        return await FindInvoiceRowAcrossPagesAsync(invoiceNumber) is not null;
     }
 
     public async Task<InvoiceGridRow?> GetInvoiceGridRowAsync(string invoiceNumber)
     {
-        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await WaitForPaginationStableAsync();
+        var row = await FindInvoiceRowAcrossPagesAsync(invoiceNumber);
+        if (row is null)
+            return null;
 
-        while (true)
+        var cells = row.Locator("td");
+        return new InvoiceGridRow
         {
-            var gridRow = await FindInvoiceGridRowOnCurrentPageAsync(invoiceNumber);
-            if (gridRow is not null)
-                return gridRow;
-
-            if (!await IsPaginationButtonEnabledAsync(NextBtn))
-                break;
-
-            try
-            {
-                await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
-            }
-
-            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
-        }
-
-        return null;
+            Project = (await cells.Nth(0).InnerTextAsync()).Trim(),
+            InvoiceNumber = (await cells.Nth(1).InnerTextAsync()).Trim(),
+            Company = (await cells.Nth(2).InnerTextAsync()).Trim(),
+            Date = (await cells.Nth(3).InnerTextAsync()).Trim(),
+            Status = (await cells.Nth(4).InnerTextAsync()).Trim(),
+            ImportDate = (await cells.Nth(5).InnerTextAsync()).Trim(),
+            ApproveRejectDate = (await cells.Nth(6).InnerTextAsync()).Trim(),
+            Source = (await cells.Nth(7).InnerTextAsync()).Trim(),
+        };
     }
 
     private async Task<InvoiceGridRow?> FindInvoiceGridRowOnCurrentPageAsync(string invoiceNumber)
@@ -296,14 +259,14 @@ public class InvoicesPage : BasePage
         var cells = row.Locator("td");
         return new InvoiceGridRow
         {
-            Project = (await cells.Nth(0).TextContentAsync())?.Trim() ?? string.Empty,
-            InvoiceNumber = (await cells.Nth(1).TextContentAsync())?.Trim() ?? string.Empty,
-            Company = (await cells.Nth(2).TextContentAsync())?.Trim() ?? string.Empty,
-            Date = (await cells.Nth(3).TextContentAsync())?.Trim() ?? string.Empty,
-            Status = (await cells.Nth(4).TextContentAsync())?.Trim() ?? string.Empty,
-            ImportDate = (await cells.Nth(5).TextContentAsync())?.Trim() ?? string.Empty,
-            ApproveRejectDate = (await cells.Nth(6).TextContentAsync())?.Trim() ?? string.Empty,
-            Source = (await cells.Nth(7).TextContentAsync())?.Trim() ?? string.Empty,
+            Project = (await cells.Nth(0).InnerTextAsync()).Trim(),
+            InvoiceNumber = (await cells.Nth(1).InnerTextAsync()).Trim(),
+            Company = (await cells.Nth(2).InnerTextAsync()).Trim(),
+            Date = (await cells.Nth(3).InnerTextAsync()).Trim(),
+            Status = (await cells.Nth(4).InnerTextAsync()).Trim(),
+            ImportDate = (await cells.Nth(5).InnerTextAsync()).Trim(),
+            ApproveRejectDate = (await cells.Nth(6).InnerTextAsync()).Trim(),
+            Source = (await cells.Nth(7).InnerTextAsync()).Trim(),
         };
     }
 
@@ -312,6 +275,21 @@ public class InvoicesPage : BasePage
         await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await WaitForPaginationStableAsync();
+
+        while (await IsPaginationButtonEnabledAsync(PreviousBtn))
+        {
+            try
+            {
+                await PreviousBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
+            }
+            catch (TimeoutException)
+            {
+                break;
+            }
+
+            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await WaitForPaginationStableAsync();
+        }
 
         while (true)
         {
@@ -340,15 +318,18 @@ public class InvoicesPage : BasePage
 
     private async Task<ILocator?> FindInvoiceRowOnCurrentPageAsync(string invoiceNumber)
     {
-        var rows = Page.Locator("//table[@class='table invoice-list__table']//tbody/tr");
+        var rows = InvoicesGrid.Locator("tbody tr");
         var rowCount = await rows.CountAsync();
 
         for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
         {
             var row = rows.Nth(rowIndex);
-            var currentInvoiceNumber = (await row.Locator("td").Nth(1).TextContentAsync())?.Trim() ?? string.Empty;
+            var cell = row.Locator("td").Nth(1);
+            var currentInvoiceNumber = (await cell.InnerTextAsync()).Trim();
+            var title = (await cell.GetAttributeAsync("title"))?.Trim();
 
-            if (currentInvoiceNumber.Equals(invoiceNumber, StringComparison.Ordinal))
+            if (currentInvoiceNumber.Equals(invoiceNumber, StringComparison.Ordinal)
+                || (!string.IsNullOrEmpty(title) && title.Equals(invoiceNumber, StringComparison.Ordinal)))
                 return row;
         }
 

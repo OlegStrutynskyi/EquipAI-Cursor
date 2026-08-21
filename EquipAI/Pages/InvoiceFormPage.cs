@@ -15,12 +15,12 @@ public abstract class InvoiceFormPage : BasePage
     protected ILocator CompanyNameError => Page.Locator("//input[@id='company-name']/following-sibling::span");
     protected ILocator AddressInput => Page.Locator("//input[@id='address']");
     protected ILocator AddressError => Page.Locator("//input[@id='address']/following-sibling::span");
-    protected ILocator ProjectDropdown => Page.Locator("//select[@id='invoice-project']");
+    protected ILocator ProjectDropdown => Page.Locator("#invoice-project");
     protected ILocator InvoiceDateInput => Page.Locator("//input[@id='invoice-date']");
-    protected ILocator InvoiceCategoryDropdown => Page.Locator("//select[@id='invoice-category']");
+    protected ILocator InvoiceCategoryDropdown => Page.Locator("#invoice-category");
     protected ILocator TotalCostInput => Page.Locator("//input[@id='total-cost']");
     protected ILocator TotalCostError => Page.Locator("//input[@id='total-cost']/following-sibling::span");
-    protected ILocator CurrencyDropdown => Page.Locator("//select[@id='currency-code']");
+    protected ILocator CurrencyDropdown => Page.Locator("#currency-code");
     protected ILocator LineItemsSection => Page.Locator("//section[@aria-labelledby='invoice-lines-heading']");
     protected ILocator AddRowBtn => Page.Locator("//button[normalize-space()='Add row']");
     protected ILocator LineNumber => Page.Locator("//legend[@class='invoice-create__line-legend']");
@@ -30,8 +30,11 @@ public abstract class InvoiceFormPage : BasePage
     protected ILocator Quantity1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'quantity')]/following-sibling::span");
     protected ILocator UnitPrice1Input => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'unit-price')]");
     protected ILocator UnitPrice1Error => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'unit-price')]/following-sibling::span");
-    protected ILocator EmissionType1Dropdown => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'emission-type')]");
-    protected ILocator Unit1Dropdown => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//select[contains(@id,'unit-of-measure')]");
+    protected ILocator EmissionType1Dropdown => Page.Locator(
+        "//legend[normalize-space()='Line 1']/following-sibling::div//*[@id[contains(.,'emission-type')] and (self::select or self::button)]");
+    protected ILocator Unit1Dropdown => Page.Locator(
+        "//legend[normalize-space()='Line 1']/following-sibling::div//*[@id[contains(.,'unit-of-measure')] and (self::select or self::button)]");
+    protected ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
 
     protected ILocator RemoveRowBtn(int lineNumber) =>
         Page.Locator($"//legend[normalize-space()='Line {lineNumber}']/following-sibling::div//button[normalize-space()='Remove row']");
@@ -161,43 +164,71 @@ public abstract class InvoiceFormPage : BasePage
         return invoicesPage;
     }
 
-    protected static async Task SelectOptionByTextAsync(ILocator dropdown, string optionText)
+    protected async Task SelectOptionByTextAsync(ILocator dropdown, string optionText)
     {
-        await dropdown.WaitForAsync();
-        var options = await dropdown.Locator("option").AllAsync();
-        foreach (var option in options)
+        await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await IsNativeSelectAsync(dropdown))
         {
+            var options = await dropdown.Locator("option").AllAsync();
+            foreach (var option in options)
+            {
+                var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+                if (!text.Equals(optionText, StringComparison.Ordinal))
+                    continue;
+
+                var value = await option.GetAttributeAsync("value");
+                if (string.IsNullOrWhiteSpace(value))
+                    throw new InvalidOperationException($"Option '{optionText}' has no value.");
+
+                await dropdown.SelectOptionAsync(value);
+                return;
+            }
+
+            throw new InvalidOperationException($"Option '{optionText}' was not found.");
+        }
+
+        await OpenSearchableSelectAsync(dropdown);
+        var searchableOptions = SearchableSelectList.Locator("[role='option']");
+        var count = await searchableOptions.CountAsync();
+        for (var i = 0; i < count; i++)
+        {
+            var option = searchableOptions.Nth(i);
             var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
             if (!text.Equals(optionText, StringComparison.Ordinal))
                 continue;
 
-            var value = await option.GetAttributeAsync("value");
-            if (string.IsNullOrWhiteSpace(value))
-                throw new InvalidOperationException($"Option '{optionText}' has no value.");
-
-            await dropdown.SelectOptionAsync(value);
+            await option.ClickAsync();
             return;
         }
 
         throw new InvalidOperationException($"Option '{optionText}' was not found.");
     }
 
-    protected static async Task<string> GetSelectedOptionTextAsync(ILocator dropdown)
+    protected async Task<string> GetSelectedOptionTextAsync(ILocator dropdown)
     {
-        await dropdown.WaitForAsync();
-        var selectedOption = dropdown.Locator("option:checked");
-        if (await selectedOption.CountAsync() == 0)
-            selectedOption = dropdown.Locator("option[selected]");
+        await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await IsNativeSelectAsync(dropdown))
+        {
+            var selectedOption = dropdown.Locator("option:checked");
+            if (await selectedOption.CountAsync() == 0)
+                selectedOption = dropdown.Locator("option[selected]");
 
-        if (await selectedOption.CountAsync() > 0)
-            return (await selectedOption.First.TextContentAsync())?.Trim() ?? string.Empty;
+            if (await selectedOption.CountAsync() > 0)
+                return (await selectedOption.First.TextContentAsync())?.Trim() ?? string.Empty;
 
-        var value = await dropdown.InputValueAsync();
-        var optionByValue = dropdown.Locator($"option[value='{value}']");
-        if (await optionByValue.CountAsync() > 0)
-            return (await optionByValue.First.TextContentAsync())?.Trim() ?? string.Empty;
+            var value = await dropdown.InputValueAsync();
+            var optionByValue = dropdown.Locator($"option[value='{value}']");
+            if (await optionByValue.CountAsync() > 0)
+                return (await optionByValue.First.TextContentAsync())?.Trim() ?? string.Empty;
 
-        return string.Empty;
+            return string.Empty;
+        }
+
+        var selectedLabel = dropdown.Locator(".select__value:not(.select__value--placeholder), .select__value");
+        if (await selectedLabel.CountAsync() > 0)
+            return (await selectedLabel.First.TextContentAsync())?.Trim() ?? string.Empty;
+
+        return (await dropdown.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
     protected static async Task<string> GetErrorTextAsync(ILocator errorLocator)
@@ -206,29 +237,123 @@ public abstract class InvoiceFormPage : BasePage
         return (await errorLocator.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
-    protected static async Task SelectFirstNonEmptyOptionAsync(ILocator dropdown)
+    protected async Task SelectFirstNonEmptyOptionAsync(ILocator dropdown)
     {
         await SelectFirstNonEmptyOptionAndGetTextAsync(dropdown);
     }
 
-    protected static async Task<string?> SelectFirstNonEmptyOptionAndGetTextAsync(ILocator dropdown)
+    protected async Task<IReadOnlyList<string>> GetDropdownOptionsAsync(ILocator dropdown)
     {
-        var options = await dropdown.Locator("option").AllAsync();
-        foreach (var option in options)
+        await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await IsNativeSelectAsync(dropdown))
         {
-            var value = await option.GetAttributeAsync("value");
+            var options = await dropdown.Locator("option").AllInnerTextsAsync();
+            return options
+                .Select(option => option.Trim())
+                .Where(option => !string.IsNullOrEmpty(option)
+                                 && !option.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        await OpenSearchableSelectAsync(dropdown);
+        var searchableOptions = await SearchableSelectList.Locator("[role='option']").AllInnerTextsAsync();
+        return searchableOptions
+            .Select(option => option.Trim())
+            .Where(option => !string.IsNullOrEmpty(option)
+                             && !option.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    protected async Task<string?> SelectFirstNonEmptyOptionAndGetTextAsync(ILocator dropdown)
+    {
+        await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await IsNativeSelectAsync(dropdown))
+        {
+            var options = await dropdown.Locator("option").AllAsync();
+            foreach (var option in options)
+            {
+                var value = await option.GetAttributeAsync("value");
+                var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(value) || value.Contains(": null", StringComparison.Ordinal))
+                    continue;
+
+                if (IsPlaceholderOption(text))
+                    continue;
+
+                await dropdown.SelectOptionAsync(value);
+                return text;
+            }
+
+            return null;
+        }
+
+        await OpenSearchableSelectAsync(dropdown);
+        var searchableOptions = SearchableSelectList.Locator("[role='option']");
+        var count = await searchableOptions.CountAsync();
+        for (var i = 0; i < count; i++)
+        {
+            var option = searchableOptions.Nth(i);
             var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(value) || value.Contains(": null", StringComparison.Ordinal))
+            if (IsPlaceholderOption(text))
                 continue;
 
-            if (text.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            await dropdown.SelectOptionAsync(value);
+            await option.ClickAsync();
             return text;
         }
 
         return null;
+    }
+
+    private static bool IsPlaceholderOption(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return true;
+
+        if (text.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (text.Equals("No project", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (text is "—" or "-" or "–")
+            return true;
+
+        return false;
+    }
+
+    private static async Task<bool> IsNativeSelectAsync(ILocator dropdown)
+    {
+        var tagName = await dropdown.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+        return tagName == "select";
+    }
+
+    private async Task OpenSearchableSelectAsync(ILocator dropdown)
+    {
+        var expanded = await dropdown.GetAttributeAsync("aria-expanded");
+        if (string.Equals(expanded, "true", StringComparison.OrdinalIgnoreCase)
+            && await SearchableSelectList.IsVisibleAsync())
+            return;
+
+        if (await SearchableSelectList.IsVisibleAsync()
+            || await Page.Locator("button.overlay[aria-label='Close dropdown']").IsVisibleAsync())
+        {
+            await Page.Keyboard.PressAsync("Escape");
+            try
+            {
+                await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = 2_000,
+                });
+            }
+            catch (TimeoutException)
+            {
+                // Dropdown may already be closed.
+            }
+        }
+
+        await dropdown.ClickAsync();
+        await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 }

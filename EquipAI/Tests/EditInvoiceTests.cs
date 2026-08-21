@@ -10,7 +10,7 @@ public class EditInvoiceTests : BaseTest
     public async Task T01_EditInvoice_DefaultView()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
-        const string expectedTitle = "Edit invoice";
+        const string expectedTitle = "Edit Invoice";
         const string expectedMessage = "Review and edit this draft invoice, then approve or reject.";
         const string expectedCompany = Config.SetupCompanyName1;
         const string expectedAddress = Config.SetupInvoiceAddress1;
@@ -101,7 +101,7 @@ public class EditInvoiceTests : BaseTest
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedDialogTitle = "Confirm rejection";
-        const string expectedDialogLabel = "Rejection reason";
+        const string expectedDialogLabel = "Rejection Reason";
         const string rejectionReason = "Rejected by Autotests";
         const string expectedStatus = "Rejected";
 
@@ -284,7 +284,8 @@ public class EditInvoiceTests : BaseTest
         var updatedCurrency = "EUR";
         var updatedTotalDisplay = "111.11 EUR";
         var updatedCategory = "Fuel";
-        var updatedStatus = "Draft";
+        var updatedGridStatus = "DRAFT";
+        var updatedViewStatus = "Draft";
         var updatedSource = "Manual";
         var updatedDescription1 = "Description1" + stamp;
         var updatedQuantity1 = "500.55";
@@ -337,13 +338,13 @@ public class EditInvoiceTests : BaseTest
             gridRow!.Project.Should().Be(updatedProject);
             gridRow.InvoiceNumber.Should().Be(updatedInvoiceNumber);
             gridRow.Company.Should().Be(updatedCompany);
-            gridRow.Status.Should().Be(updatedStatus);
+            gridRow.Status.Should().Be(updatedGridStatus);
             gridRow.Date.Should().Be(updatedInvoiceDateDisplay);
             gridRow.Source.Should().Be(updatedSource);
 
             var viewInvoicePage = await invoicesPage.ClickViewBtnAsync(updatedInvoiceNumber);
             (await viewInvoicePage.GetTitleAsync()).Should().Be("Invoice " + updatedInvoiceNumber);
-            (await viewInvoicePage.GetStatusAsync()).Should().Be(updatedStatus);
+            (await viewInvoicePage.GetStatusAsync()).Should().Be(updatedViewStatus);
             (await viewInvoicePage.GetSourceAsync()).Should().Be(updatedSource);
             (await viewInvoicePage.GetCompanyNameAsync()).Should().Be(updatedCompany);
             (await viewInvoicePage.GetAddressAsync()).Should().Be(updatedAddress);

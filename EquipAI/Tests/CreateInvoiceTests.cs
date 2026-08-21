@@ -10,7 +10,7 @@ public class CreateInvoiceTests : BaseTest
     [Test]
     public async Task T01_CreateInvoice_DefaultView()
     {
-        const string expectedTitle = "Create invoice";
+        const string expectedTitle = "Create Invoice";
         const string expectedMessage = "Enter invoice header details and line items, then save as a draft.";
 
         var createInvoicePage = new CreateInvoicePage(Fixture.Page);
@@ -263,7 +263,7 @@ public class CreateInvoiceTests : BaseTest
 
         try
         {
-            const string expectedStatus = "Draft";
+            const string expectedStatus = "DRAFT";
             const string expectedSource = "Manual";
 
             var invoicesPage = new InvoicesPage(Fixture.Page);
@@ -272,10 +272,10 @@ public class CreateInvoiceTests : BaseTest
 
             var createInvoicePage = await invoicesPage.ClickCreateBtnAsync();
             var filledInvoice = await createInvoicePage.FillAllFieldsAsync(
-                invoiceNumber: GenerateRandomString(64),
-                companyName: GenerateRandomString(256),
-                address: GenerateRandomString(512),
-                description: GenerateRandomString(512));
+                invoiceNumber: GenerateAlphanumericString(64),
+                companyName: GenerateAlphanumericString(256),
+                address: GenerateAlphanumericString(512),
+                description: GenerateAlphanumericString(512));
             invoiceNumber = filledInvoice.InvoiceNumber;
             invoicesPage = await createInvoicePage.SaveInvoiceAsync();
 
@@ -297,5 +297,11 @@ public class CreateInvoiceTests : BaseTest
             if (!string.IsNullOrEmpty(invoiceNumber))
                 await SqlHelper.DeleteInvoiceByInvoiceNumberAsync(invoiceNumber);
         }
+    }
+
+    private static string GenerateAlphanumericString(int length)
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        return new string(Enumerable.Range(0, length).Select(_ => chars[Random.Shared.Next(chars.Length)]).ToArray());
     }
 }

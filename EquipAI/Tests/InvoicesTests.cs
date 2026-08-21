@@ -72,7 +72,7 @@ public class InvoicesTests : BaseTest
         const string expectedProject = Config.SetupProjectName1;
         const string expectedCompany = Config.SetupCompanyName1;
         const string expectedInvoiceDate = "Jun 2, 2026";
-        const string expectedStatus = "Draft";
+        const string expectedStatus = "DRAFT";
         const string expectedSource = "Manual";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
@@ -104,7 +104,7 @@ public class InvoicesTests : BaseTest
     public async Task T07_Invoices_ClickEditBtn()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
-        const string expectedTitle = "Edit invoice";
+        const string expectedTitle = "Edit Invoice";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -117,7 +117,7 @@ public class InvoicesTests : BaseTest
     public async Task T08_Invoices_Rejected_View()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
-        const string expectedStatus = "Rejected";
+        const string expectedStatus = "REJECTED";
 
         try
         {
@@ -145,7 +145,7 @@ public class InvoicesTests : BaseTest
     public async Task T09_Invoices_Approved_View()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
-        const string expectedStatus = "Approved";
+        const string expectedStatus = "APPROVED";
 
         try
         {
