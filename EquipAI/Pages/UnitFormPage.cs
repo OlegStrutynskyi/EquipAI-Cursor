@@ -10,8 +10,9 @@ public abstract class UnitFormPage : BasePage
     protected ILocator CodeError => Page.Locator("//input[@id='unit-code']/following-sibling::span");
     protected ILocator DisplayNameInput => Page.Locator("//input[@id='unit-display-name']");
     protected ILocator DisplayNameError => Page.Locator("//input[@id='unit-display-name']/following-sibling::span");
-    protected ILocator DimensionDropdown => Page.Locator("//select[@id='unit-dimension']");
-    protected ILocator DimensionOptions => Page.Locator("//select[@id='unit-dimension']/option");
+    protected ILocator DimensionDropdown => Page.Locator("#unit-dimension");
+    protected ILocator DimensionList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
+    protected ILocator DimensionOptions => DimensionList.Locator("[role='option']");
     protected ILocator ScaleInput => Page.Locator("//input[@id='unit-scale']");
     protected ILocator ScaleHelpMessage => Page.Locator("//input[@id='unit-scale']/following-sibling::p");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
@@ -45,7 +46,7 @@ public abstract class UnitFormPage : BasePage
 
     public async Task<IReadOnlyList<string>> GetDimensionOptionsAsync()
     {
-        await DimensionDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await OpenDimensionListAsync();
         var options = await DimensionOptions.AllInnerTextsAsync();
         return options
             .Select(option => option.Trim())
@@ -65,8 +66,49 @@ public abstract class UnitFormPage : BasePage
 
     public async Task SelectDimensionAsync(string optionText)
     {
-        await DimensionDropdown.WaitForAsync();
-        await DimensionDropdown.SelectOptionAsync(new SelectOptionValue { Label = optionText });
+        await OpenDimensionListAsync();
+        var options = await DimensionOptions.AllAsync();
+        foreach (var option in options)
+        {
+            var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+            if (!text.Equals(optionText, StringComparison.Ordinal))
+                continue;
+
+            await option.ClickAsync();
+            return;
+        }
+
+        throw new InvalidOperationException($"Dimension option '{optionText}' was not found.");
+    }
+
+    private async Task OpenDimensionListAsync()
+    {
+        await DimensionDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var expanded = await DimensionDropdown.GetAttributeAsync("aria-expanded");
+        if (string.Equals(expanded, "true", StringComparison.OrdinalIgnoreCase)
+            && await DimensionList.IsVisibleAsync())
+            return;
+
+        if (await DimensionList.IsVisibleAsync()
+            || await Page.Locator("button.overlay[aria-label='Close dropdown']").IsVisibleAsync())
+        {
+            await Page.Keyboard.PressAsync("Escape");
+            try
+            {
+                await DimensionList.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = 2_000,
+                });
+            }
+            catch (TimeoutException)
+            {
+                // Dropdown may already be closed.
+            }
+        }
+
+        await DimensionDropdown.ClickAsync();
+        await DimensionList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     public async Task FillScaleAsync(string scale)

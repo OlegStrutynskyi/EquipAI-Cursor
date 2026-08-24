@@ -101,7 +101,49 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T03_Setup_CreateUnit1()
+    public async Task T03_Setup_CreateDefaultUnit1()
+    {
+        const string code = Config.SetupDefaultUnitCode1;
+        const string displayName = Config.SetupDefaultUnitName1;
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+
+        if (await unitsPage.IsCodeInGridAsync(code))
+            Assert.Pass("Default unit 1 already exists.");
+
+        var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
+        await addUnitPage.FillCodeAsync(code);
+        await addUnitPage.FillDisplayNameAsync(displayName);
+        unitsPage = await addUnitPage.CreateUnitAsync();
+
+        (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T04_Setup_CreateDefaultUnit2()
+    {
+        const string code = Config.SetupDefaultUnitCode2;
+        const string displayName = Config.SetupDefaultUnitName2;
+
+        var unitsPage = new UnitsPage(Fixture.Page);
+        await unitsPage.OpenAsync();
+
+        if (await unitsPage.IsCodeInGridAsync(code))
+            Assert.Pass("Default unit 2 already exists.");
+
+        var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
+        await addUnitPage.FillCodeAsync(code);
+        await addUnitPage.FillDisplayNameAsync(displayName);
+        unitsPage = await addUnitPage.CreateUnitAsync();
+
+        (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T05_Setup_CreateUnit1()
     {
         const string code = Config.SetupCode1;
         const string displayName = Config.SetupUnitName1;
@@ -120,10 +162,9 @@ public class _01_Setup_Data : BaseTest
         (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
     }
 
-
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T04_Setup_CreateUnit2()
+    public async Task T06_Setup_CreateUnit2()
     {
         const string code = Config.SetupCode2;
         const string displayName = Config.SetupUnitName2;
@@ -144,7 +185,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T05_Setup_CreateEmissionType1()
+    public async Task T07_Setup_CreateEmissionType1()
     {
         const string code = Config.SetupCode1;
         const string displayName = Config.SetupEmissionTypeName1;
@@ -166,7 +207,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T06_Setup_CreateEmissionType2()
+    public async Task T08_Setup_CreateEmissionType2()
     {
         const string code = Config.SetupCode2;
         const string displayName = Config.SetupEmissionTypeName2;
@@ -188,7 +229,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T07_Setup_CreateEmissionType3()
+    public async Task T09_Setup_CreateEmissionType3()
     {
         const string code = Config.SetupCode3;
         const string displayName = Config.SetupEmissionTypeName3;
@@ -210,7 +251,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T08_Setup_CreateAliasUnit()
+    public async Task T10_Setup_CreateAliasUnit()
     {
         const string aliasText = Config.SetupAliasUnit;
 
@@ -222,10 +263,10 @@ public class _01_Setup_Data : BaseTest
             Assert.Pass("Alias already exists.");
 
         var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
-        await addAliasPage.SelectContextAsync("Data ingestion");
         await addAliasPage.FillAliasTextAsync(aliasText);
-        await addAliasPage.SelectTargetKindAsync("Unit of measure");
+        await addAliasPage.SelectTargetKindAsync("Unit of Measure");
         await addAliasPage.SelectUnitOfMeasureAsync(Config.SetupCode1);
+        await addAliasPage.FillAliasTextAsync(aliasText);
         aliasesPage = await addAliasPage.CreateAliasAsync();
         await aliasesPage.ClickUnitsOfMeasureTabAsync();
 
@@ -234,7 +275,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T09_Setup_CreateAliasEmissionType()
+    public async Task T11_Setup_CreateAliasEmissionType()
     {
         const string aliasText = Config.SetupAliasEmissionType;
 
@@ -246,10 +287,11 @@ public class _01_Setup_Data : BaseTest
             Assert.Pass("Alias already exists.");
 
         var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
-        await addAliasPage.SelectContextAsync("Data ingestion");
         await addAliasPage.FillAliasTextAsync(aliasText);
-        await addAliasPage.SelectTargetKindAsync("Emission type");
-        await addAliasPage.SelectEmissionTypeAsync(Config.SetupDefaultUnitCode1);
+        await addAliasPage.SelectContextAsync("Data Ingestion");
+        await addAliasPage.SelectTargetKindAsync("Emission Type");
+        await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode1);
+        await addAliasPage.FillAliasTextAsync(aliasText);
         aliasesPage = await addAliasPage.CreateAliasAsync();
         await aliasesPage.ClickEmissionTypesTabAsync();
 
@@ -258,7 +300,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T10_Setup_CreateAliasFactor1()
+    public async Task T12_Setup_CreateAliasFactor1()
     {
         const string aliasText = Config.SetupAliasFactor1;
 
@@ -270,11 +312,12 @@ public class _01_Setup_Data : BaseTest
             Assert.Pass("Alias already exists.");
 
         var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
-        await addAliasPage.SelectContextAsync("Catalog factor mapping");
         await addAliasPage.FillAliasTextAsync(aliasText);
-        await addAliasPage.SelectTargetKindAsync("Emission type");
+        await addAliasPage.SelectContextAsync("Catalog Factor Mapping");
+        await addAliasPage.SelectTargetKindAsync("Emission Type");
         await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode1);
         await addAliasPage.SelectEpaFactorSourceAsync();
+        await addAliasPage.FillAliasTextAsync(aliasText);
         aliasesPage = await addAliasPage.CreateAliasAsync();
         await aliasesPage.ClickEmissionTypesTabAsync();
 

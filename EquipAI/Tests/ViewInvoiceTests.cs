@@ -19,6 +19,8 @@ public class ViewInvoiceTests : BaseTest
         const string expectedCost = "1,562.99";
         const string expectedEmissionType = "On-site diesel combustion";
         const string expectedUnit = "US Gallon (US_GAL)";
+        const string expectedGridStatus = "DRAFT";
+        const string expectedViewStatus = "Draft";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -29,15 +31,15 @@ public class ViewInvoiceTests : BaseTest
         var expectedInvoiceNumber = gridRow.InvoiceNumber;
         var expectedCompany = gridRow.Company;
         var expectedInvoiceDate = gridRow.Date;
-        var expectedStatus = gridRow.Status;
         var expectedType = gridRow.Source;
+        gridRow.Status.Should().Be(expectedGridStatus);
 
         var viewInvoicePage = await invoicesPage.ClickViewBtnAsync(invoiceNumber);
 
         // Top section
         (await viewInvoicePage.IsBackBtnVisibleAsync()).Should().BeTrue();
         (await viewInvoicePage.GetTitleAsync()).Should().Be("Invoice " + expectedInvoiceNumber);
-        (await viewInvoicePage.GetStatusAsync()).Should().Be(expectedStatus);
+        (await viewInvoicePage.GetStatusAsync()).Should().Be(expectedViewStatus);
         (await viewInvoicePage.GetSourceAsync()).Should().Be(expectedType);
         (await viewInvoicePage.IsEditDraftBtnVisibleAsync()).Should().BeTrue();
 
@@ -63,7 +65,7 @@ public class ViewInvoiceTests : BaseTest
     public async Task T02_ViewInvoice_ClickEditDraft()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
-        const string expectedTitle = "Edit invoice";
+        const string expectedTitle = "Edit Invoice";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();

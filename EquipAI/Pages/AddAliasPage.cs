@@ -6,30 +6,30 @@ public class AddAliasPage : BasePage
 {
     public AddAliasPage(IPage page) : base(page) { }
 
-    private ILocator ContextDropdown => Page.Locator("//select[@id='alias-context']");
-    private ILocator ContextHelpMessage => Page.Locator("//select[@id='alias-context']/../following-sibling::p");
-    private ILocator ContextOptions => Page.Locator("//select[@id='alias-context']/option");
+    private ILocator ContextDropdown => Page.Locator("#alias-context");
+    private ILocator ContextHelpMessage => Page.Locator(
+        "//app-searchable-select[@controlid='alias-context']/following-sibling::p");
     private ILocator AliasTextInput => Page.Locator("//input[@id='alias-text']");
     private ILocator AliasTextError => Page.Locator("//input[@id='alias-text']/following-sibling::span");
-    private ILocator TargetKindDropdown => Page.Locator("//select[@id='alias-target-kind']");
-    private ILocator TargetKindOptions => Page.Locator("//select[@id='alias-target-kind']/option");
-    private ILocator UnitOfMeasureDropdown => Page.Locator("//select[@id='alias-unit']");
-    private ILocator UnitOfMeasureOptions => Page.Locator("//select[@id='alias-unit']/option");
-    private ILocator UnitOfMeasureError => Page.Locator("//select[@id='alias-unit']/../following-sibling::span");
-    private ILocator EmissionTypeDropdown => Page.Locator("//select[@id='alias-emission-type']");
+    private ILocator TargetKindDropdown => Page.Locator("#alias-target-kind");
+    private ILocator UnitOfMeasureDropdown => Page.Locator("#alias-unit");
+    private ILocator UnitOfMeasureError => Page.Locator(
+        "//*[@id='alias-unit']/ancestor::app-searchable-select/following-sibling::span[contains(@class,'form-hint--error')] | //*[@id='alias-unit']/ancestor::*[contains(@class,'form-group')][1]//span[contains(@class,'form-hint--error')]");
+    private ILocator EmissionTypeDropdown => Page.Locator("#alias-emission-type");
     private ILocator EmissionTypeError => Page.Locator(
-        "//select[@id='alias-emission-type']/../following-sibling::span | //select[@id='alias-emission-type']/following-sibling::span");
-    private ILocator TelemetryProjectDropdown => Page.Locator(
-        "//select[@id='alias-telemetry-project'] | //label[normalize-space()='Telemetry project']/following::select[1]");
+        "//*[@id='alias-emission-type']/ancestor::app-searchable-select/following-sibling::span[contains(@class,'form-hint--error')] | //*[@id='alias-emission-type']/ancestor::*[contains(@class,'form-group')][1]//span[contains(@class,'form-hint--error')]");
+    private ILocator TelemetryProjectDropdown => Page.Locator("#alias-project");
     private ILocator TelemetryProjectError => Page.Locator(
-        "//select[@id='alias-telemetry-project']/../following-sibling::span | //label[normalize-space()='Telemetry project']/following::span[1]");
-    private ILocator FactorSourceTitle => Page.Locator("//legend[normalize-space()='Factor source']");
-    private ILocator FactorSourceMessage => Page.Locator("//legend[normalize-space()='Factor source']/following-sibling::p");
-    private ILocator FactorSourceError => Page.Locator("//legend[normalize-space()='Factor source']/following-sibling::span");
+        "//*[@id='alias-project']/ancestor::app-searchable-select/following-sibling::span[contains(@class,'form-hint--error')] | //*[@id='alias-project']/ancestor::*[contains(@class,'form-group')][1]//span[contains(@class,'form-hint--error')]");
+    private ILocator FactorSourceTitle => Page.Locator("//legend")
+        .Filter(new LocatorFilterOptions { HasTextString = "Factor Source" });
+    private ILocator FactorSourceMessage => FactorSourceTitle.Locator("xpath=following-sibling::p[1]");
+    private ILocator FactorSourceError => FactorSourceTitle.Locator("xpath=following-sibling::span[1]");
     private ILocator EpaBtn => Page.Locator("//label[normalize-space()='EPA']");
     private ILocator DefraBtn => Page.Locator("//label[normalize-space()='DEFRA']");
     private ILocator CreateAliasBtn => Page.Locator("//button[normalize-space()='Create alias']");
     private ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
+    private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
 
     public async Task WaitForLoadedAsync()
     {
@@ -55,7 +55,7 @@ public class AddAliasPage : BasePage
     public async Task SelectEpaFactorSourceAsync()
     {
         await EpaBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var epaInput = Page.Locator("//label[normalize-space()='EPA']//input | //input[@type='radio' and (@value='EPA' or @value='Epa')]");
+        var epaInput = Page.Locator("//label[normalize-space()='EPA']//input | //input[@type='radio' and (@value='EPA' or @value='epa')]");
         if (await epaInput.CountAsync() > 0)
         {
             await epaInput.First.CheckAsync();
@@ -65,39 +65,20 @@ public class AddAliasPage : BasePage
         await EpaBtn.ClickAsync();
     }
 
-    public async Task<IReadOnlyList<string>> GetContextOptionsAsync()
-    {
-        var options = await ContextOptions.AllInnerTextsAsync();
-        return options.Select(option => option.Trim()).Where(option => !string.IsNullOrEmpty(option)).ToList();
-    }
+    public async Task<IReadOnlyList<string>> GetContextOptionsAsync() =>
+        await GetDropdownOptionsAsync(ContextDropdown);
 
-    public async Task SelectContextAsync(string optionText)
-    {
-        await ContextDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await ContextDropdown.SelectOptionAsync(new SelectOptionValue { Label = optionText });
-    }
+    public async Task SelectContextAsync(string optionText) =>
+        await SelectOptionByTextAsync(ContextDropdown, optionText);
 
-    public async Task<IReadOnlyList<string>> GetTargetKindOptionsAsync()
-    {
-        var options = await TargetKindOptions.AllInnerTextsAsync();
-        return options.Select(option => option.Trim()).Where(option => !string.IsNullOrEmpty(option)).ToList();
-    }
+    public async Task<IReadOnlyList<string>> GetTargetKindOptionsAsync() =>
+        await GetDropdownOptionsAsync(TargetKindDropdown);
 
-    public async Task SelectTargetKindAsync(string optionText)
-    {
-        await TargetKindDropdown.WaitForAsync();
-        await TargetKindDropdown.SelectOptionAsync(new SelectOptionValue { Label = optionText });
-    }
+    public async Task SelectTargetKindAsync(string optionText) =>
+        await SelectOptionByTextAsync(TargetKindDropdown, optionText);
 
-    public async Task<IReadOnlyList<string>> GetUnitOfMeasureOptionsAsync()
-    {
-        await UnitOfMeasureDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var options = await UnitOfMeasureOptions.AllInnerTextsAsync();
-        return options
-            .Select(option => option.Trim())
-            .Where(option => !string.IsNullOrEmpty(option) && !option.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-    }
+    public async Task<IReadOnlyList<string>> GetUnitOfMeasureOptionsAsync() =>
+        await GetDropdownOptionsAsync(UnitOfMeasureDropdown);
 
     public async Task<string> GetContextHelpMessageAsync()
     {
@@ -112,7 +93,6 @@ public class AddAliasPage : BasePage
 
     public async Task<string> SelectUnitOfMeasureAsync(string code)
     {
-        await UnitOfMeasureDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         var options = await GetUnitOfMeasureOptionsAsync();
         var option = options.FirstOrDefault(o =>
                 o.Equals(code, StringComparison.Ordinal)
@@ -120,24 +100,20 @@ public class AddAliasPage : BasePage
                 || o.StartsWith(code + " -", StringComparison.Ordinal))
             ?? throw new InvalidOperationException($"Unit of measure '{code}' was not found in the dropdown.");
 
-        await UnitOfMeasureDropdown.SelectOptionAsync(new SelectOptionValue { Label = option });
+        await SelectOptionByTextAsync(UnitOfMeasureDropdown, option);
         return option;
     }
 
     public async Task<string> SelectEmissionTypeAsync(string code)
     {
-        await EmissionTypeDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var options = await EmissionTypeDropdown.Locator("option").AllInnerTextsAsync();
-        var option = options
-            .Select(o => o.Trim())
-            .Where(o => !string.IsNullOrEmpty(o) && !o.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
-            .FirstOrDefault(o =>
+        var options = await GetDropdownOptionsAsync(EmissionTypeDropdown);
+        var option = options.FirstOrDefault(o =>
                 o.Equals(code, StringComparison.Ordinal)
                 || o.StartsWith(code + " —", StringComparison.Ordinal)
                 || o.StartsWith(code + " -", StringComparison.Ordinal))
             ?? throw new InvalidOperationException($"Emission type '{code}' was not found in the dropdown.");
 
-        await EmissionTypeDropdown.SelectOptionAsync(new SelectOptionValue { Label = option });
+        await SelectOptionByTextAsync(EmissionTypeDropdown, option);
         return option;
     }
 
@@ -178,10 +154,100 @@ public class AddAliasPage : BasePage
     public async Task<string> GetFactorSourceErrorAsync() => await GetErrorTextAsync(FactorSourceError);
     public async Task<string> GetTelemetryProjectErrorAsync() => await GetErrorTextAsync(TelemetryProjectError);
 
+    private async Task<IReadOnlyList<string>> GetDropdownOptionsAsync(ILocator dropdown)
+    {
+        await OpenSearchableSelectAsync(dropdown);
+        var options = await SearchableSelectList.Locator("[role='option']").AllInnerTextsAsync();
+        var result = options
+            .Select(option => option.Trim())
+            .Where(option => !string.IsNullOrEmpty(option)
+                             && !option.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        await Page.Keyboard.PressAsync("Escape");
+        try
+        {
+            await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Hidden,
+                Timeout = 2_000,
+            });
+        }
+        catch (TimeoutException)
+        {
+            // Dropdown may already be closed.
+        }
+
+        return result;
+    }
+
+    private async Task SelectOptionByTextAsync(ILocator dropdown, string optionText)
+    {
+        await OpenSearchableSelectAsync(dropdown);
+        var options = SearchableSelectList.Locator("[role='option']");
+        var count = await options.CountAsync();
+        for (var i = 0; i < count; i++)
+        {
+            var option = options.Nth(i);
+            var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+            if (!text.Equals(optionText, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            await option.ClickAsync();
+            try
+            {
+                await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = 5_000,
+                });
+            }
+            catch (TimeoutException)
+            {
+                // List may close without animation.
+            }
+
+            await dropdown.Filter(new LocatorFilterOptions { HasTextString = text }).WaitForAsync(
+                new LocatorWaitForOptions { Timeout = 5_000 });
+            return;
+        }
+
+        throw new InvalidOperationException($"Option '{optionText}' was not found.");
+    }
+
+    private async Task OpenSearchableSelectAsync(ILocator dropdown)
+    {
+        await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var expanded = await dropdown.GetAttributeAsync("aria-expanded");
+        if (string.Equals(expanded, "true", StringComparison.OrdinalIgnoreCase)
+            && await SearchableSelectList.IsVisibleAsync())
+            return;
+
+        if (await SearchableSelectList.IsVisibleAsync()
+            || await Page.Locator("button.overlay[aria-label='Close dropdown']").IsVisibleAsync())
+        {
+            await Page.Keyboard.PressAsync("Escape");
+            try
+            {
+                await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = 2_000,
+                });
+            }
+            catch (TimeoutException)
+            {
+                // Dropdown may already be closed.
+            }
+        }
+
+        await dropdown.ClickAsync();
+        await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
     private static async Task<string> GetErrorTextAsync(ILocator errorLocator)
     {
         await errorLocator.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         return (await errorLocator.TextContentAsync())?.Trim() ?? string.Empty;
     }
 }
-

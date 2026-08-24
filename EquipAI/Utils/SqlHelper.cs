@@ -556,6 +556,94 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
+    public static async Task EnsureSetupUnitAliasAsync()
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var restoreCommand = new SqlCommand(
+            """
+            UPDATE [emissions].[ReferenceAlias]
+            SET IsDeleted = 0,
+                AliasText = @aliasText,
+                UnitOfMeasureId = (SELECT [Id] FROM [emissions].[UnitOfMeasure] WHERE Code = @unitCode),
+                EmissionTypeId = NULL,
+                FactorSource = NULL
+            WHERE UnitOfMeasureId IS NOT NULL
+              AND (
+                    UnitOfMeasureId = (SELECT [Id] FROM [emissions].[UnitOfMeasure] WHERE Code = @unitCode)
+                 OR AliasText = @aliasText
+                 OR AliasText = @aliasText + N' UPDATED'
+              )
+            """,
+            connection))
+        {
+            restoreCommand.Parameters.AddWithValue("@aliasText", Config.SetupAliasUnit);
+            restoreCommand.Parameters.AddWithValue("@unitCode", Config.SetupCode1);
+            var updated = await restoreCommand.ExecuteNonQueryAsync();
+            if (updated > 0)
+                return;
+        }
+
+        await using var insertCommand = new SqlCommand(
+            """
+            INSERT INTO [emissions].[ReferenceAlias]
+                (AliasText, UnitOfMeasureId, IsDeleted)
+            VALUES
+                (@aliasText, (SELECT [Id] FROM [emissions].[UnitOfMeasure] WHERE Code = @unitCode), 0)
+            """,
+            connection);
+        insertCommand.Parameters.AddWithValue("@aliasText", Config.SetupAliasUnit);
+        insertCommand.Parameters.AddWithValue("@unitCode", Config.SetupCode1);
+        await insertCommand.ExecuteNonQueryAsync();
+    }
+
+    public static async Task EnsureSetupEmissionTypeAliasAsync()
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var restoreCommand = new SqlCommand(
+            """
+            UPDATE [emissions].[ReferenceAlias]
+            SET IsDeleted = 0,
+                AliasText = @aliasText,
+                EmissionTypeId = (SELECT [Id] FROM [emissions].[EmissionType] WHERE Code = @emissionTypeCode),
+                UnitOfMeasureId = NULL,
+                FactorSource = NULL
+            WHERE UnitOfMeasureId IS NULL
+              AND (
+                    AliasText = @aliasText
+                 OR AliasText = @aliasText + N' UPDATED'
+                 OR (
+                        EmissionTypeId = (SELECT [Id] FROM [emissions].[EmissionType] WHERE Code = @emissionTypeCode)
+                    AND FactorSource IS NULL
+                    AND AliasText LIKE N'DONT DELETE ALIAS EMISSION TYPE%'
+                    )
+              )
+            """,
+            connection))
+        {
+            restoreCommand.Parameters.AddWithValue("@aliasText", Config.SetupAliasEmissionType);
+            restoreCommand.Parameters.AddWithValue("@emissionTypeCode", Config.SetupCode1);
+            var updated = await restoreCommand.ExecuteNonQueryAsync();
+            if (updated > 0)
+                return;
+        }
+
+        await using var insertCommand = new SqlCommand(
+            """
+            INSERT INTO [emissions].[ReferenceAlias]
+                (AliasText, EmissionTypeId, IsDeleted)
+            VALUES
+                (@aliasText, (SELECT [Id] FROM [emissions].[EmissionType] WHERE Code = @emissionTypeCode), 0)
+            """,
+            connection);
+        insertCommand.Parameters.AddWithValue("@aliasText", Config.SetupAliasEmissionType);
+        insertCommand.Parameters.AddWithValue("@emissionTypeCode", Config.SetupCode1);
+        await insertCommand.ExecuteNonQueryAsync();
+    }
+
     public static async Task RestoreReferenceAliasByAliasTextAsync(string aliasText)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);

@@ -13,8 +13,7 @@ public abstract class EmissionTypeFormPage : BasePage
     protected ILocator DefaultUnitDropdown => Page.Locator("#emission-type-default-unit");
     protected ILocator DefaultUnitList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
     protected ILocator DefaultUnitOptions => DefaultUnitList.Locator("[role='option']");
-    protected ILocator DefaultUnitError => Page.Locator(
-        "//button[@id='emission-type-default-unit']/ancestor::*[contains(@class,'form-select-wrapper') or contains(@class,'select')][1]/following-sibling::span | //select[@id='emission-type-default-unit']/../following-sibling::span");
+    protected ILocator DefaultUnitError => Page.Locator("//label[normalize-space()='Default Unit of Measure']/following-sibling::span");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     protected ILocator AlertMessage => Page.Locator("//p[@role='alert']");
 

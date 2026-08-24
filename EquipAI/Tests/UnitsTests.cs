@@ -25,7 +25,7 @@ public class UnitsTests : BaseTest
     [Test]
     public async Task T02_Units_ClickAddUnitBtn()
     {
-        const string expectedPageTitle = "Add unit";
+        const string expectedPageTitle = "Add Unit";
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -55,7 +55,7 @@ public class UnitsTests : BaseTest
     [Test]
     public async Task T04_Units_AddUnit_DefaultView()
     {
-        const string expectedPageTitle = "Add unit";
+        const string expectedPageTitle = "Add Unit";
         const string expectedScaleHelpMessage =
             "Multiply CO₂e intensity per this unit by Scale to get intensity per the same-dimension canonical (Volume→US_GAL, Mass→T, Energy→KWH). Leave blank when not convertible. Other requires blank scale.";
 
@@ -76,7 +76,7 @@ public class UnitsTests : BaseTest
     [Test]
     public async Task T05_Units_AddUnit_DimensionDropdown()
     {
-        var expectedOptions = new[] { "Volume", "Mass", "Energy", "Other" };
+        var expectedOptions = new[] { "Volume", "Mass", "Energy", "Other", "Area" };
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -206,7 +206,7 @@ public class UnitsTests : BaseTest
     [Test]
     public async Task T12_Units_ClickEditBtn()
     {
-        const string expectedPageTitle = "Edit unit";
+        const string expectedPageTitle = "Edit Unit";
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -218,7 +218,7 @@ public class UnitsTests : BaseTest
     [Test]
     public async Task T13_Units_Edit_DefaultView()
     {
-        const string expectedPageTitle = "Edit unit";
+        const string expectedPageTitle = "Edit Unit";
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -367,7 +367,7 @@ public class UnitsTests : BaseTest
     [Test]
     public async Task T20_Units_Deactivate_Click()
     {
-        const string expectedTitle = "Deactivate unit";
+        const string expectedTitle = "Deactivate Unit";
         var expectedMessage = $"Deactivate unit {Config.SetupCode1}? It will no longer be available for new imports.";
 
         var unitsPage = new UnitsPage(Fixture.Page);
@@ -417,17 +417,17 @@ public class UnitsTests : BaseTest
     {
         const string expectedAlertMessage =
             "Cannot deactivate a unit of measure that is an emission type's default unit.";
-        var expectedDefaultUnit = $"{Config.SetupCode1} — {Config.SetupUnitName1}";
+        var expectedDefaultUnit = $"{Config.SetupDefaultUnitCode1} — {Config.SetupDefaultUnitName1}";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
 
         if (!await emissionTypesPage.IsDefaultUnitInGridAsync(expectedDefaultUnit))
-            Assert.Fail("Setup is not complete. Run test 'T05_Setup_CreateEmissionType1'.");
+            Assert.Fail("Setup is not complete. Run test 'T07_Setup_CreateEmissionType1'.");
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
-        await unitsPage.ClickDeactivateBtnAsync(Config.SetupCode1);
+        await unitsPage.ClickDeactivateBtnAsync(Config.SetupDefaultUnitCode1);
         await unitsPage.ClickDeactivateDialogConfirmBtnExpectingErrorAsync();
 
         (await unitsPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);

@@ -11,7 +11,7 @@ public class AliasesTests : BaseTest
     {
         const string expectedPageTitle = "Aliases";
         const string expectedMessage =
-            "Manage import-time synonyms for units and emission types during data ingestion and factor catalog import.";
+            "Manage import-time synonyms. Unit aliases are global (invoice ingestion and factor catalogs). Emission-type aliases are scoped by context — invoice ingestion vs EPA/DEFRA catalog mapping. Telemetry project aliases map vendor project names during telemetry import.";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
@@ -26,7 +26,7 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T02_Aliases_ClickAddAliasBtn()
     {
-        const string expectedPageTitle = "Add alias";
+        const string expectedPageTitle = "Add Alias";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
@@ -40,7 +40,6 @@ public class AliasesTests : BaseTest
     {
         var expectedColumns = new[]
         {
-            "CONTEXT",
             "ALIAS TEXT",
             "RESOLVES TO",
             "ACTIONS",
@@ -75,14 +74,14 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T05_Aliases_Add_DefaultView()
     {
-        const string expectedPageTitle = "Add alias";
+        const string expectedPageTitle = "Add Alias";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
 
         (await addAliasPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
-        (await addAliasPage.IsContextDropdownVisibleAsync()).Should().BeTrue();
+        (await addAliasPage.IsContextDropdownVisibleAsync()).Should().BeFalse();
         (await addAliasPage.IsAliasTextInputVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsTargetKindDropdownVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsUnitOfMeasureDropdownVisibleAsync()).Should().BeTrue();
@@ -93,17 +92,17 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T06_Aliases_Add_ContextDropdown()
     {
-        const string dataIngestionOption = "Data ingestion";
-        const string catalogFactorMappingOption = "Catalog factor mapping";
+        const string dataIngestionOption = "Data Ingestion";
+        const string catalogFactorMappingOption = "Catalog Factor Mapping";
         const string expectedDataIngestionMessage =
-            "Maps strings from invoice CSV upload and AI ingestion to units or emission types.";
+            "Maps strings from invoice CSV upload and AI ingestion to emission types.";
         const string expectedCatalogFactorMappingMessage =
-            "Maps strings from external factor catalogs to emission types (gov fuel labels) or units of measure (gov activity UOM spellings).";
+            "Maps fuel labels from EPA/DEFRA/Custom workbooks to emission types.";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
-
+        await addAliasPage.SelectTargetKindAsync("Emission Type");
         var contextOptions = await addAliasPage.GetContextOptionsAsync();
         contextOptions.Should().Contain(dataIngestionOption);
         contextOptions.Should().Contain(catalogFactorMappingOption);
@@ -118,18 +117,29 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T07_Aliases_Add_FieldsList()
     {
-        const string dataIngestionOption = "Data ingestion";
-        const string catalogFactorMappingOption = "Catalog factor mapping";
+        const string targetKindOption = "Emission Type";
+        const string catalogFactorMappingOption = "Catalog Factor Mapping";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
 
-        await addAliasPage.SelectContextAsync(dataIngestionOption);
         (await addAliasPage.IsAliasTextInputVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsTargetKindDropdownVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsUnitOfMeasureDropdownVisibleAsync()).Should().BeTrue();
+        (await addAliasPage.IsContextDropdownVisibleAsync()).Should().BeFalse();
         (await addAliasPage.IsEmissionTypeDropdownVisibleAsync()).Should().BeFalse();
+        (await addAliasPage.IsFactorSourceTitleVisibleAsync()).Should().BeFalse();
+        (await addAliasPage.IsFactorSourceMessageVisibleAsync()).Should().BeFalse();
+        (await addAliasPage.IsEpaBtnVisibleAsync()).Should().BeFalse();
+        (await addAliasPage.IsDefraBtnVisibleAsync()).Should().BeFalse();
+
+        await addAliasPage.SelectTargetKindAsync(targetKindOption);
+        (await addAliasPage.IsAliasTextInputVisibleAsync()).Should().BeTrue();
+        (await addAliasPage.IsTargetKindDropdownVisibleAsync()).Should().BeTrue();
+        (await addAliasPage.IsContextDropdownVisibleAsync()).Should().BeTrue();
+        (await addAliasPage.IsUnitOfMeasureDropdownVisibleAsync()).Should().BeFalse();
+        (await addAliasPage.IsEmissionTypeDropdownVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsFactorSourceTitleVisibleAsync()).Should().BeFalse();
         (await addAliasPage.IsFactorSourceMessageVisibleAsync()).Should().BeFalse();
         (await addAliasPage.IsEpaBtnVisibleAsync()).Should().BeFalse();
@@ -138,6 +148,7 @@ public class AliasesTests : BaseTest
         await addAliasPage.SelectContextAsync(catalogFactorMappingOption);
         (await addAliasPage.IsAliasTextInputVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsTargetKindDropdownVisibleAsync()).Should().BeTrue();
+        (await addAliasPage.IsContextDropdownVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsEmissionTypeDropdownVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsFactorSourceTitleVisibleAsync()).Should().BeTrue();
         (await addAliasPage.IsFactorSourceMessageVisibleAsync()).Should().BeTrue();
@@ -164,9 +175,9 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T09_Aliases_Add_TargetKind()
     {
-        const string unitOfMeasureOption = "Unit of measure";
-        const string emissionTypeOption = "Emission type";
-        const string telemetryProjectOption = "Telemetry project";
+        const string unitOfMeasureOption = "Unit of Measure";
+        const string emissionTypeOption = "Emission Type";
+        const string telemetryProjectOption = "Project";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
@@ -206,8 +217,7 @@ public class AliasesTests : BaseTest
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
-        await addAliasPage.SelectContextAsync("Data ingestion");
-        await addAliasPage.SelectTargetKindAsync("Unit of measure");
+        await addAliasPage.SelectTargetKindAsync("Unit of Measure");
 
         var unitOfMeasureOptions = await addAliasPage.GetUnitOfMeasureOptionsAsync();
         unitOfMeasureOptions.Should().Contain(expectedOptions);
@@ -218,14 +228,14 @@ public class AliasesTests : BaseTest
     {
         const string dataIngestionOption = "Data ingestion";
         const string catalogFactorMappingOption = "Catalog factor mapping";
-        const string unitOfMeasureOption = "Unit of measure";
-        const string emissionTypeOption = "Emission type";
-        const string telemetryProjectOption = "Telemetry project";
+        const string unitOfMeasureOption = "Unit of Measure";
+        const string emissionTypeOption = "Emission Type";
+        const string telemetryProjectOption = "Project";
         const string expectedAliasTextError = "Alias text is required.";
         const string expectedUnitError = "Unit is required.";
         const string expectedEmissionTypeError = "Emission type is required.";
         const string expectedFactorSourceError = "Factor source is required.";
-        const string expectedTelemetryProjectError = "Telemetry project is required.";
+        const string expectedTelemetryProjectError = "Project is required.";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
@@ -250,7 +260,6 @@ public class AliasesTests : BaseTest
         (await addAliasPage.GetEmissionTypeErrorAsync()).Should().Be(expectedEmissionTypeError);
         (await addAliasPage.GetFactorSourceErrorAsync()).Should().Be(expectedFactorSourceError);
 
-        await addAliasPage.SelectContextAsync(dataIngestionOption);
         await addAliasPage.SelectTargetKindAsync(telemetryProjectOption);
         await addAliasPage.ClickCreateAliasBtnAsync();
         (await addAliasPage.GetAliasTextErrorAsync()).Should().Be(expectedAliasTextError);
@@ -279,7 +288,6 @@ public class AliasesTests : BaseTest
     public async Task T13_Aliases_Add_Success_Unit()
     {
         const string expectedPageTitle = "Aliases";
-        const string expectedContext = "Data ingestion";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var aliasText = $"Alias{stamp}";
 
@@ -288,10 +296,10 @@ public class AliasesTests : BaseTest
             var aliasesPage = new AliasesPage(Fixture.Page);
             await aliasesPage.OpenAsync();
             var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
-            await addAliasPage.SelectContextAsync(expectedContext);
             await addAliasPage.FillAliasTextAsync(aliasText);
-            await addAliasPage.SelectTargetKindAsync("Unit of measure");
+            await addAliasPage.SelectTargetKindAsync("Unit of Measure");
             var expectedResolvesTo = await addAliasPage.SelectUnitOfMeasureAsync(Config.SetupCode1);
+            await addAliasPage.FillAliasTextAsync(aliasText);
             aliasesPage = await addAliasPage.CreateAliasAsync();
 
             (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -299,8 +307,7 @@ public class AliasesTests : BaseTest
 
             var gridRow = await aliasesPage.GetUnitAliasGridRowAsync(aliasText);
             gridRow.Should().NotBeNull();
-            gridRow!.Context.Should().Be(expectedContext);
-            gridRow.AliasText.Should().Be(aliasText);
+            gridRow!.AliasText.Should().Be(aliasText);
             gridRow.ResolvesTo.Should().Be(expectedResolvesTo);
         }
         finally
@@ -313,7 +320,7 @@ public class AliasesTests : BaseTest
     public async Task T14_Aliases_Add_Success_EmissionType()
     {
         const string expectedPageTitle = "Aliases";
-        const string expectedContext = "Data ingestion";
+        const string expectedContext = "Data Ingestion";
         const string expectedFactorSource = "—";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var aliasText = $"Alias{stamp}";
@@ -323,10 +330,11 @@ public class AliasesTests : BaseTest
             var aliasesPage = new AliasesPage(Fixture.Page);
             await aliasesPage.OpenAsync();
             var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+            await addAliasPage.SelectTargetKindAsync("Emission Type");
             await addAliasPage.SelectContextAsync(expectedContext);
             await addAliasPage.FillAliasTextAsync(aliasText);
-            await addAliasPage.SelectTargetKindAsync("Emission type");
             var expectedResolvesTo = await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode1);
+            await addAliasPage.FillAliasTextAsync(aliasText);
             aliasesPage = await addAliasPage.CreateAliasAsync();
 
             (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -349,7 +357,7 @@ public class AliasesTests : BaseTest
     public async Task T15_Aliases_Add_Success_CatalogEmissionType()
     {
         const string expectedPageTitle = "Aliases";
-        const string expectedContext = "Catalog factor mapping";
+        const string expectedContext = "Catalog Factor Mapping";
         const string expectedFactorSource = "EPA";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var aliasText = $"Alias{stamp}";
@@ -359,11 +367,12 @@ public class AliasesTests : BaseTest
             var aliasesPage = new AliasesPage(Fixture.Page);
             await aliasesPage.OpenAsync();
             var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+            await addAliasPage.SelectTargetKindAsync("Emission Type");
             await addAliasPage.SelectContextAsync(expectedContext);
             await addAliasPage.FillAliasTextAsync(aliasText);
-            await addAliasPage.SelectTargetKindAsync("Emission type");
             var expectedResolvesTo = await addAliasPage.SelectEmissionTypeAsync(Config.SetupCode2);
             await addAliasPage.SelectEpaFactorSourceAsync();
+            await addAliasPage.FillAliasTextAsync(aliasText);
             aliasesPage = await addAliasPage.CreateAliasAsync();
 
             (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -385,7 +394,7 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T16_Aliases_ClickEdit()
     {
-        const string expectedPageTitle = "Edit alias";
+        var expectedPageTitle = "Edit Alias " + Config.SetupAliasUnit;
 
         var editAliasPage = await OpenEditAliasUnitPageAsync();
 
@@ -395,15 +404,14 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T17_Aliases_Edit_Unit_DefaultView()
     {
-        const string expectedPageTitle = "Edit alias";
-        const string expectedContext = "Data ingestion";
-        const string expectedTargetKind = "Unit of measure";
+        var expectedPageTitle = "Edit Alias " + Config.SetupAliasUnit;
+        const string expectedTargetKind = "Unit of Measure";
 
         var editAliasPage = await OpenEditAliasUnitPageAsync();
 
         (await editAliasPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
         (await editAliasPage.GetSubtitleAsync()).Should().Be(Config.SetupAliasUnit);
-        (await editAliasPage.GetContextAsync()).Should().Be(expectedContext);
+        (await editAliasPage.IsContextDropdownVisibleAsync()).Should().BeFalse();
         (await editAliasPage.GetAliasTextAsync()).Should().Be(Config.SetupAliasUnit);
         (await editAliasPage.GetTargetKindAsync()).Should().Be(expectedTargetKind);
         (await editAliasPage.GetUnitOfMeasureAsync()).Should().Match(value =>
@@ -431,13 +439,32 @@ public class AliasesTests : BaseTest
     public async Task T19_Aliases_Edit_Unit_ExistingAliasText()
     {
         const string expectedAlertMessage = "Alias text should be unique.";
+        var conflictingAliasText = $"AliasConflict{DateTime.Now:yyyyMMddHHmmss}";
 
-        var editAliasPage = await OpenEditAliasUnitPageAsync();
-        await editAliasPage.ClearAliasTextAsync();
-        await editAliasPage.FillAliasTextAsync(Config.SetupAliasEmissionType);
-        await editAliasPage.ClickSaveAliasBtnAsync();
+        try
+        {
+            await SqlHelper.EnsureSetupUnitAliasAsync();
 
-        (await editAliasPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+            var aliasesPage = new AliasesPage(Fixture.Page);
+            await aliasesPage.OpenAsync();
+            var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+            await addAliasPage.FillAliasTextAsync(conflictingAliasText);
+            await addAliasPage.SelectTargetKindAsync("Unit of Measure");
+            await addAliasPage.SelectUnitOfMeasureAsync(Config.SetupCode2);
+            await addAliasPage.FillAliasTextAsync(conflictingAliasText);
+            await addAliasPage.CreateAliasAsync();
+
+            var editAliasPage = await OpenEditAliasUnitPageAsync();
+            await editAliasPage.ClearAliasTextAsync();
+            await editAliasPage.FillAliasTextAsync(conflictingAliasText);
+            await editAliasPage.ClickSaveAliasBtnAsync();
+
+            (await editAliasPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+        }
+        finally
+        {
+            await SqlHelper.DeleteReferenceAliasByAliasTextAsync(conflictingAliasText);
+        }
     }
 
     [Test]
@@ -512,9 +539,9 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T23_Aliases_Edit_EmissionType_DefaultView()
     {
-        const string expectedPageTitle = "Edit alias";
-        const string expectedContext = "Data ingestion";
-        const string expectedTargetKind = "Emission type";
+        var expectedPageTitle = "Edit Alias " + Config.SetupAliasEmissionType;
+        const string expectedContext = "Data Ingestion";
+        const string expectedTargetKind = "Emission Type";
 
         var editAliasPage = await OpenEditAliasEmissionTypePageAsync();
 
@@ -540,11 +567,13 @@ public class AliasesTests : BaseTest
 
         try
         {
+            await SqlHelper.EnsureSetupEmissionTypeAliasAsync();
             aliasId = await SqlHelper.GetReferenceAliasIdByAliasTextAsync(Config.SetupAliasEmissionType);
 
             var editAliasPage = await OpenEditAliasEmissionTypePageAsync();
             await editAliasPage.FillAliasTextAsync(updatedAliasText);
             await editAliasPage.SelectEmissionTypeAsync(Config.SetupCode2);
+            await editAliasPage.FillAliasTextAsync(updatedAliasText);
             var aliasesPage = await editAliasPage.SaveAliasAsync();
 
             (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -569,9 +598,9 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T25_Aliases_Edit_Factor_DefaultView()
     {
-        const string expectedPageTitle = "Edit alias";
-        const string expectedContext = "Catalog factor mapping";
-        const string expectedTargetKind = "Emission type";
+        var expectedPageTitle = "Edit Alias " + Config.SetupAliasFactor1;
+        const string expectedContext = "Catalog Factor Mapping";
+        const string expectedTargetKind = "Emission Type";
 
         var editAliasPage = await OpenEditAliasFactorPageAsync();
 
@@ -605,6 +634,7 @@ public class AliasesTests : BaseTest
             await editAliasPage.FillAliasTextAsync(updatedAliasText);
             await editAliasPage.SelectEmissionTypeAsync(Config.SetupCode2);
             await editAliasPage.SelectDefraFactorSourceAsync();
+            await editAliasPage.FillAliasTextAsync(updatedAliasText);
             var aliasesPage = await editAliasPage.SaveAliasAsync();
 
             (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -630,9 +660,11 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T27_Aliases_ClickDeactivate()
     {
-        const string expectedTitle = "Deactivate alias";
+        const string expectedTitle = "Deactivate Alias";
         var expectedMessage =
             $"Deactivate alias \"{Config.SetupAliasUnit}\"? Imports will no longer resolve this text.";
+
+        await SqlHelper.EnsureSetupUnitAliasAsync();
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
@@ -651,6 +683,8 @@ public class AliasesTests : BaseTest
     [Test]
     public async Task T28_Aliases_Deactivate_Cancel()
     {
+        await SqlHelper.EnsureSetupUnitAliasAsync();
+
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         await aliasesPage.ClickUnitsOfMeasureTabAsync();
@@ -666,6 +700,8 @@ public class AliasesTests : BaseTest
     {
         try
         {
+            await SqlHelper.EnsureSetupUnitAliasAsync();
+
             var aliasesPage = new AliasesPage(Fixture.Page);
             await aliasesPage.OpenAsync();
             await aliasesPage.ClickUnitsOfMeasureTabAsync();
@@ -683,6 +719,8 @@ public class AliasesTests : BaseTest
 
     private async Task<EditAliasPage> OpenEditAliasUnitPageAsync()
     {
+        await SqlHelper.EnsureSetupUnitAliasAsync();
+
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         await aliasesPage.ClickUnitsOfMeasureTabAsync();
@@ -691,6 +729,8 @@ public class AliasesTests : BaseTest
 
     private async Task<EditAliasPage> OpenEditAliasEmissionTypePageAsync()
     {
+        await SqlHelper.EnsureSetupEmissionTypeAliasAsync();
+
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         await aliasesPage.ClickEmissionTypesTabAsync();
