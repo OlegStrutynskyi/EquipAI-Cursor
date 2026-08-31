@@ -15,6 +15,7 @@ public class EditAliasPage : BasePage
     private ILocator TargetKindDropdown => Page.Locator("#alias-target-kind");
     private ILocator UnitOfMeasureDropdown => Page.Locator("#alias-unit");
     private ILocator EmissionTypeDropdown => Page.Locator("#alias-emission-type");
+    private ILocator TelemetryProjectDropdown => Page.Locator("#alias-project");
     private ILocator EpaFactorSourceInput => Page.Locator("//label[normalize-space()='EPA']//input | //input[@type='radio' and (@value='EPA' or @value='epa')]");
     private ILocator DefraFactorSourceInput => Page.Locator("//label[normalize-space()='DEFRA']//input | //input[@type='radio' and (@value='DEFRA' or @value='defra')]");
     private ILocator DefraFactorSourceBtn => Page.Locator("//label[normalize-space()='DEFRA']");
@@ -107,8 +108,11 @@ public class EditAliasPage : BasePage
 
     public async Task<string> GetEmissionTypeAsync() => await GetSelectedOptionTextAsync(EmissionTypeDropdown);
 
+    public async Task<string> GetTelemetryProjectAsync() => await GetSelectedOptionTextAsync(TelemetryProjectDropdown);
+
     public Task<bool> IsPreparedFactorsPreviewTextVisibleAsync() => PreparedFactorsPreviewText.IsVisibleAsync();
     public Task<bool> IsContextDropdownVisibleAsync() => ContextDropdown.IsVisibleAsync();
+    public Task<bool> IsTelemetryProjectDropdownVisibleAsync() => TelemetryProjectDropdown.IsVisibleAsync();
 
     public async Task<bool> IsEpaFactorSourceSelectedAsync()
     {
@@ -150,6 +154,43 @@ public class EditAliasPage : BasePage
             ?? throw new InvalidOperationException($"Emission type '{code}' was not found in the dropdown.");
 
         await SelectOptionByTextAsync(EmissionTypeDropdown, option);
+    }
+
+    public async Task<string> SelectDifferentTelemetryProjectAsync(string excludeNameOrCode)
+    {
+        await OpenSearchableSelectAsync(TelemetryProjectDropdown);
+        var options = SearchableSelectList.Locator("[role='option']");
+        var count = await options.CountAsync();
+        for (var i = 0; i < count; i++)
+        {
+            var option = options.Nth(i);
+            var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(text)
+                || text.StartsWith("Select", StringComparison.OrdinalIgnoreCase)
+                || text.Contains(excludeNameOrCode, StringComparison.Ordinal))
+                continue;
+
+            await option.ClickAsync();
+            try
+            {
+                await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = 5_000,
+                });
+            }
+            catch (TimeoutException)
+            {
+                // List may close without animation.
+            }
+
+            await TelemetryProjectDropdown.Filter(new LocatorFilterOptions { HasTextString = text })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = 5_000 });
+            return text;
+        }
+
+        throw new InvalidOperationException(
+            $"No alternative project found excluding '{excludeNameOrCode}'.");
     }
 
     public async Task<AliasesPage> ClickCancelBtnAsync()

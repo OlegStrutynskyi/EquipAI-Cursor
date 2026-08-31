@@ -556,6 +556,25 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
+    public static async Task RestoreReferenceAliasProjectAsync(object id, string aliasText, string projectName)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [emissions].[ReferenceAlias]
+            SET AliasText = @aliasText,
+                ProjectId = (SELECT [Id] FROM [projects].[Project] WHERE Name = @projectName)
+            WHERE Id = @id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@aliasText", aliasText);
+        command.Parameters.AddWithValue("@projectName", projectName);
+        command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync();
+    }
+
     public static async Task EnsureSetupUnitAliasAsync()
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);

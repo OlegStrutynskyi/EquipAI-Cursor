@@ -34,6 +34,7 @@ public static class Config
     public const string SetupAliasUnit = "DONT DELETE ALIAS UNIT";
     public const string SetupAliasEmissionType = "DONT DELETE ALIAS EMISSION TYPE";
     public const string SetupAliasFactor1 = "DONT DELETE ALIAS FACTOR1";
+    public const string SetupAliasProject1 = "DONT DELETE ALIAS PROJECT 1";
 
     public static bool Headless =>
         bool.TryParse(Environment.GetEnvironmentVariable("HEADLESS"), out var headless) && headless;

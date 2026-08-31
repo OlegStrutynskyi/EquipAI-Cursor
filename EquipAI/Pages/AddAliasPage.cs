@@ -80,6 +80,67 @@ public class AddAliasPage : BasePage
     public async Task<IReadOnlyList<string>> GetUnitOfMeasureOptionsAsync() =>
         await GetDropdownOptionsAsync(UnitOfMeasureDropdown);
 
+    public async Task<IReadOnlyList<string>> GetTelemetryProjectOptionsAsync() =>
+        await GetDropdownOptionsAsync(TelemetryProjectDropdown);
+
+    public async Task<string> SelectAnyTelemetryProjectAsync()
+    {
+        await OpenSearchableSelectAsync(TelemetryProjectDropdown);
+        var firstOption = SearchableSelectList.Locator("[role='option']").First;
+        await firstOption.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var optionText = (await firstOption.TextContentAsync())?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(optionText)
+            || optionText.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("No projects found in the dropdown.");
+
+        await firstOption.ClickAsync();
+        try
+        {
+            await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Hidden,
+                Timeout = 5_000,
+            });
+        }
+        catch (TimeoutException)
+        {
+            // List may close without animation.
+        }
+
+        await TelemetryProjectDropdown.Filter(new LocatorFilterOptions { HasTextString = optionText })
+            .WaitForAsync(new LocatorWaitForOptions { Timeout = 5_000 });
+        return optionText;
+    }
+
+    public async Task<string> SelectTelemetryProjectAsync(string codeOrName)
+    {
+        await OpenSearchableSelectAsync(TelemetryProjectDropdown);
+        var options = SearchableSelectList.Locator("[role='option']");
+        var match = options.Filter(new LocatorFilterOptions { HasTextString = codeOrName }).First;
+        await match.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var optionText = (await match.TextContentAsync())?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(optionText))
+            throw new InvalidOperationException($"Project '{codeOrName}' was not found in the dropdown.");
+
+        await match.ClickAsync();
+        try
+        {
+            await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Hidden,
+                Timeout = 5_000,
+            });
+        }
+        catch (TimeoutException)
+        {
+            // List may close without animation.
+        }
+
+        await TelemetryProjectDropdown.Filter(new LocatorFilterOptions { HasTextString = optionText })
+            .WaitForAsync(new LocatorWaitForOptions { Timeout = 5_000 });
+        return optionText;
+    }
+
     public async Task<string> GetContextHelpMessageAsync()
     {
         await ContextHelpMessage.WaitForAsync();

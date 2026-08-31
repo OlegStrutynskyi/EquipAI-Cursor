@@ -10,6 +10,7 @@ public class AliasesPage : BasePage
     private ILocator AddAliasBtn => Page.Locator("//button[normalize-space()='Add alias']");
     private ILocator UnitsOfMeasureTab => Page.Locator("//button[normalize-space()='Units of Measure']");
     private ILocator EmissionTypesTab => Page.Locator("//button[normalize-space()='Emission Types']");
+    private ILocator ProjectsTab => Page.Locator("//button[normalize-space()='Projects']");
     private ILocator Grid => Page.Locator("//table[@class='table']").Locator("visible=true");
     private ILocator DeactivateDialog => Page.Locator("//div[@class='modal']");
     private ILocator DeactivateDialogTitle => Page.Locator("//h2[@id='confirm-dialog-title']");
@@ -60,6 +61,21 @@ public class AliasesPage : BasePage
         await Grid.Locator("thead th")
             .Filter(new LocatorFilterOptions { HasTextString = "Factor Source" })
             .WaitForAsync();
+    }
+
+    public async Task ClickProjectsTabAsync()
+    {
+        await ProjectsTab.ClickAsync();
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Grid.Locator("thead th")
+            .Filter(new LocatorFilterOptions { HasTextString = "Resolves to" })
+            .WaitForAsync();
+        await Grid.Locator("thead th")
+            .Filter(new LocatorFilterOptions { HasTextString = "Factor Source" })
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
+        await Grid.Locator("thead th")
+            .Filter(new LocatorFilterOptions { HasTextString = "Context" })
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
     }
 
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
@@ -246,6 +262,9 @@ public class AliasesPage : BasePage
 
         return null;
     }
+
+    public async Task<AliasUnitGridRow?> GetProjectAliasGridRowAsync(string aliasText) =>
+        await GetUnitAliasGridRowAsync(aliasText);
 
     public async Task<AliasUnitGridRow?> GetUnitAliasGridRowAsync(string aliasText)
     {

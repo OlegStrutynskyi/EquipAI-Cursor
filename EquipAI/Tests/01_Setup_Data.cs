@@ -323,4 +323,28 @@ public class _01_Setup_Data : BaseTest
 
         (await aliasesPage.IsAliasTextInGridAsync(aliasText)).Should().BeTrue();
     }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T13_Setup_CreateAliasProject1()
+    {
+        const string aliasText = Config.SetupAliasProject1;
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickProjectsTabAsync();
+
+        if (await aliasesPage.IsAliasTextInGridAsync(aliasText))
+            Assert.Pass("Alias already exists.");
+
+        var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+        await addAliasPage.FillAliasTextAsync(aliasText);
+        await addAliasPage.SelectTargetKindAsync("Project");
+        await addAliasPage.SelectTelemetryProjectAsync(Config.SetupProjectName1);
+        await addAliasPage.FillAliasTextAsync(aliasText);
+        aliasesPage = await addAliasPage.CreateAliasAsync();
+        await aliasesPage.ClickProjectsTabAsync();
+
+        (await aliasesPage.IsAliasTextInGridAsync(aliasText)).Should().BeTrue();
+    }
 }
