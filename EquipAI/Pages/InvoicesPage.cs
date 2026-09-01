@@ -72,7 +72,9 @@ public class InvoicesPage : BasePage
     {
         await ImportBtn.ClickAsync();
         await Page.WaitForURLAsync("**/invoices/import**");
-        return new ImportInvoicePage(Page);
+        var importInvoicePage = new ImportInvoicePage(Page);
+        await importInvoicePage.WaitForLoadedAsync();
+        return importInvoicePage;
     }
 
     public async Task<ViewInvoicePage> ClickViewBtnAsync(string invoiceNumber)

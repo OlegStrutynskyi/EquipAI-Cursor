@@ -314,6 +314,80 @@ public static class SqlHelper
         await deleteInvoiceCommand.ExecuteNonQueryAsync();
     }
 
+    public static async Task DeleteImportedInvoiceByInvoiceNumberAsync(string invoiceNumber)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        object? invoiceId = null;
+        object? sourceId = null;
+        await using (var getIdsCommand = new SqlCommand(
+            """
+            SELECT [Id], [SourceId]
+            FROM [invoices].[Invoice]
+            WHERE [InvoiceNumber] = @invoiceNumber
+            """,
+            connection))
+        {
+            getIdsCommand.Parameters.AddWithValue("@invoiceNumber", invoiceNumber);
+            await using var reader = await getIdsCommand.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                invoiceId = reader.GetValue(0);
+                sourceId = reader.IsDBNull(1) ? null : reader.GetValue(1);
+            }
+        }
+
+        if (invoiceId is not null)
+        {
+            await using (var deleteLineItemsCommand = new SqlCommand(
+                "DELETE FROM [invoices].[InvoiceLineItem] WHERE InvoiceId = @invoiceId",
+                connection))
+            {
+                deleteLineItemsCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+                await deleteLineItemsCommand.ExecuteNonQueryAsync();
+            }
+
+            await using var deleteInvoiceCommand = new SqlCommand(
+                "DELETE FROM [invoices].[Invoice] WHERE Id = @invoiceId",
+                connection);
+            deleteInvoiceCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+            await deleteInvoiceCommand.ExecuteNonQueryAsync();
+        }
+
+        if (sourceId is not null)
+        {
+            await using var deleteActivitySourceCommand = new SqlCommand(
+                "DELETE FROM [sources].[ActivitySource] WHERE Id = @sourceId",
+                connection);
+            deleteActivitySourceCommand.Parameters.AddWithValue("@sourceId", sourceId);
+            await deleteActivitySourceCommand.ExecuteNonQueryAsync();
+        }
+    }
+
+    public static async Task DeleteActivitySourceByCsvFileAsync(string fileName)
+    {
+        var filePath = Path.Combine(AppContext.BaseDirectory, "TestData", fileName);
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"Test data file was not found: {filePath}");
+
+        var fileBytes = await File.ReadAllBytesAsync(filePath);
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fileBytes)).ToLowerInvariant();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            DELETE FROM [sources].[ActivitySource]
+            WHERE [SourceType] = 'BulkCsv'
+              AND [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
+            """,
+            connection);
+        command.Parameters.AddWithValue("@hash", hash);
+        await command.ExecuteNonQueryAsync();
+    }
+
     public static async Task DeleteUnitOfMeasureByCodeAsync(string code)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);

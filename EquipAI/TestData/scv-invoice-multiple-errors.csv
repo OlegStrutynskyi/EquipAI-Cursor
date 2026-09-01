@@ -1,0 +1,6 @@
+InvoiceNumber,CompanyName,Address,ProjectCode,InvoiceDate,CurrencyCode,TotalCost,LineDescription,Quantity,UnitOfMeasure,UnitPrice,Cost,EmissionTypeCode
+AUTOTEST-Import-1,TestCompany1,8400 Baymeadows Way Jacksonville FL 32256,,,,,,200,US_GAL,3.75,750,DIESEL_MINERAL
+,,,,,,,Crane fuel delivery,,my_text,3.75,562.5,GAS_OIL
+,,,,,,,Excavator top-off,100,,3.75,375,Gas oil
+,,,,,,,Backup generator run,75,lt,,281.25,PROPANE
+,,,,,,,Emergency delivery,60,gallons,3.125,,
