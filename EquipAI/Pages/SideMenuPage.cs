@@ -18,6 +18,7 @@ public class SideMenuPage : BasePage
     private ILocator ProjectsLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Projects" });
     private ILocator UnitsLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Units" });
     private ILocator EmissionTypesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission types" });
+    private ILocator EmissionCategoriesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission categories" });
     private ILocator AliasesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Aliases" });
     private ILocator FactorImportLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Factor import" });
     private ILocator DataHubLink => PrimaryNav.Locator(".nav-item").Filter(new LocatorFilterOptions { HasTextString = "Data Hub" });
@@ -79,6 +80,7 @@ public class SideMenuPage : BasePage
     public Task ClickProjectsAsync() => ClickLinkAsync(ProjectsLink);
     public Task ClickUnitsAsync() => ClickLinkAsync(UnitsLink);
     public Task ClickEmissionTypesAsync() => ClickLinkAsync(EmissionTypesLink);
+    public Task ClickEmissionCategoriesAsync() => ClickLinkAsync(EmissionCategoriesLink);
     public Task ClickAliasesAsync() => ClickLinkAsync(AliasesLink);
 
     public async Task ClickFactorImportAsync()

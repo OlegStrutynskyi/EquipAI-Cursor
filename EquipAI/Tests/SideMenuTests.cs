@@ -16,6 +16,7 @@ public class SideMenuTests : BaseTest
             "Projects",
             "Units",
             "Emission Types",
+            "Emission Categories",
             "Aliases",
             "Data Hub",
             "Reports",
@@ -63,6 +64,7 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Projects")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Emission Categories")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
 
             await sideMenuPage.ClickDataHubAsync();
@@ -95,6 +97,7 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Projects")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Emission Categories")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
 
             if (await sideMenuPage.IsLinkVisibleAsync("Data Hub"))
@@ -129,6 +132,7 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Users")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Units")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Emission Types")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Emission Categories")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Aliases")).Should().BeFalse();
 
             if (await sideMenuPage.IsLinkVisibleAsync("Data Hub"))
@@ -157,43 +161,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T06_SideMenu_ClickInvoices()
-    {
-        const string expectedTitle = "Invoices";
-
-        var sideMenuPage = new SideMenuPage(Fixture.Page);
-        await sideMenuPage.OpenAsync();
-        await sideMenuPage.ClickInvoicesAsync();
-
-        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
-    }
-
-    [Test]
-    public async Task T07_SideMenu_ClickTelemetry()
-    {
-        const string expectedTitle = "Telemetry";
-
-        var sideMenuPage = new SideMenuPage(Fixture.Page);
-        await sideMenuPage.OpenAsync();
-        await sideMenuPage.ClickTelemetryAsync();
-
-        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
-    }
-
-    [Test]
-    public async Task T08_SideMenu_ClickUsers()
-    {
-        const string expectedTitle = "Users";
-
-        var sideMenuPage = new SideMenuPage(Fixture.Page);
-        await sideMenuPage.OpenAsync();
-        await sideMenuPage.ClickUsersAsync();
-
-        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
-    }
-
-    [Test]
-    public async Task T09_SideMenu_ClickProjects()
+    public async Task T06_SideMenu_ClickProjects()
     {
         const string expectedTitle = "Projects";
 
@@ -205,7 +173,19 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T10_SideMenu_ClickUnits()
+    public async Task T07_SideMenu_ClickUsers()
+    {
+        const string expectedTitle = "Users";
+
+        var sideMenuPage = new SideMenuPage(Fixture.Page);
+        await sideMenuPage.OpenAsync();
+        await sideMenuPage.ClickUsersAsync();
+
+        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
+    }
+
+    [Test]
+    public async Task T08_SideMenu_ClickUnits()
     {
         const string expectedTitle = "Units";
 
@@ -217,7 +197,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T11_SideMenu_ClickEmissionTypes()
+    public async Task T09_SideMenu_ClickEmissionTypes()
     {
         const string expectedTitle = "Emission Types";
 
@@ -229,7 +209,19 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T12_SideMenu_ClickAliases()
+    public async Task T10_SideMenu_ClickEmissionCategories()
+    {
+        const string expectedTitle = "Emission Categories";
+
+        var sideMenuPage = new SideMenuPage(Fixture.Page);
+        await sideMenuPage.OpenAsync();
+        await sideMenuPage.ClickEmissionCategoriesAsync();
+
+        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
+    }
+
+    [Test]
+    public async Task T11_SideMenu_ClickAliases()
     {
         const string expectedTitle = "Aliases";
 
@@ -241,7 +233,31 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T13_SideMenu_ClickFactorImport()
+    public async Task T12_SideMenu_ClickInvoices()
+    {
+        const string expectedTitle = "Invoices";
+
+        var sideMenuPage = new SideMenuPage(Fixture.Page);
+        await sideMenuPage.OpenAsync();
+        await sideMenuPage.ClickInvoicesAsync();
+
+        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
+    }
+
+    [Test]
+    public async Task T13_SideMenu_ClickTelemetry()
+    {
+        const string expectedTitle = "Telemetry";
+
+        var sideMenuPage = new SideMenuPage(Fixture.Page);
+        await sideMenuPage.OpenAsync();
+        await sideMenuPage.ClickTelemetryAsync();
+
+        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
+    }
+
+    [Test]
+    public async Task T14_SideMenu_ClickFactorImport()
     {
         const string expectedTitle = "Factor Import";
 
@@ -253,7 +269,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T14_SideMenu_ClickDarkMode()
+    public async Task T15_SideMenu_ClickDarkMode()
     {
         const string expectedDarkBackground = "rgb(0, 0, 0)";
         const string expectedLightBackground = "rgb(255, 255, 255)";
@@ -272,7 +288,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T15_SideMenu_ClickLogout()
+    public async Task T16_SideMenu_ClickLogout()
     {
         const string expectedLoginTitle = "Sign In to EquipAI";
 
