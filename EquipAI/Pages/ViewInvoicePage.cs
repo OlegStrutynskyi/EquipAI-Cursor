@@ -16,7 +16,7 @@ public class ViewInvoicePage : BasePage
     private ILocator Address => Page.Locator("//dt[normalize-space()='Address']/following-sibling::dd");
     private ILocator Project => Page.Locator("//dt[normalize-space()='Project']/following-sibling::dd");
     private ILocator InvoiceDate => Page.Locator("//dt[normalize-space()='Invoice date']/following-sibling::dd");
-    private ILocator Category => Page.Locator("//dt[normalize-space()='Category']/following-sibling::dd");
+    private ILocator Category => Page.Locator("//dt[normalize-space()='Emission Category']/following-sibling::dd");
     private ILocator Total => Page.Locator("//dt[normalize-space()='Total']/following-sibling::dd");
     private ILocator LineItemsSection => Page.Locator("//h2[@id='invoice-detail-lines-heading']/..");
     private ILocator Description1 => Page.Locator("//td[normalize-space()='1']/following-sibling::td[1]");

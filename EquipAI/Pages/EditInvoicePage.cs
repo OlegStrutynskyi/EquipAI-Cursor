@@ -55,6 +55,9 @@ public class EditInvoicePage : InvoiceFormPage
     public async Task SelectCurrencyAsync(string currency) =>
         await SelectOptionByTextAsync(CurrencyDropdown, currency);
 
+    public async Task SelectEmissionCategoryAsync(string emissionCategory) =>
+        await SelectOptionByTextAsync(EmissionCategoryDropdown, emissionCategory);
+
     public async Task SelectEmissionType1Async(string emissionType) =>
         await SelectOptionByTextAsync(EmissionType1Dropdown, emissionType);
 
@@ -187,7 +190,7 @@ public class EditInvoicePage : InvoiceFormPage
         return (await InvoiceDateInput.InputValueAsync()).Trim();
     }
 
-    public async Task<string> GetInvoiceCategoryAsync() => await GetSelectedOptionTextAsync(InvoiceCategoryDropdown);
+    public async Task<string> GetEmissionCategoryAsync() => await GetSelectedOptionTextAsync(EmissionCategoryDropdown);
 
     public async Task<string> GetTotalCostAsync()
     {

@@ -17,7 +17,7 @@ public abstract class InvoiceFormPage : BasePage
     protected ILocator AddressError => Page.Locator("//input[@id='address']/following-sibling::span");
     protected ILocator ProjectDropdown => Page.Locator("#invoice-project");
     protected ILocator InvoiceDateInput => Page.Locator("//input[@id='invoice-date']");
-    protected ILocator InvoiceCategoryDropdown => Page.Locator("#invoice-category");
+    protected ILocator EmissionCategoryDropdown => Page.Locator("#invoice-category");
     protected ILocator TotalCostInput => Page.Locator("//input[@id='total-cost']");
     protected ILocator TotalCostError => Page.Locator("//input[@id='total-cost']/following-sibling::span");
     protected ILocator CurrencyDropdown => Page.Locator("#currency-code");

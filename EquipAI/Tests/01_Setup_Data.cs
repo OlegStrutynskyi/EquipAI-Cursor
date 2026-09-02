@@ -36,7 +36,7 @@ public class _01_Setup_Data : BaseTest
         const string companyName = Config.SetupCompanyName1;
         const string address = Config.SetupInvoiceAddress1;
         const string invoiceDate = "02/06/2026";
-        const string invoiceCategory = "Fuel";
+        const string emissionCategory = "Fuel";
         const string totalCost = "1562.99";
         const string currency = "USD";
         const string description = Config.SetupInvoiceLineDescription1;
@@ -76,7 +76,7 @@ public class _01_Setup_Data : BaseTest
             companyName,
             address,
             invoiceDateForInput,
-            invoiceCategory,
+            emissionCategory,
             totalCost,
             currency,
             description,
@@ -200,6 +200,7 @@ public class _01_Setup_Data : BaseTest
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
         await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
+        await addEmissionTypePage.SelectDefaultEmissionCategoryAsync(Config.SetupDefaultEmissionCategory1);
         emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
         (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
@@ -222,6 +223,7 @@ public class _01_Setup_Data : BaseTest
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
         await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
+        await addEmissionTypePage.SelectDefaultEmissionCategoryAsync(Config.SetupDefaultEmissionCategory1);
         emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
         (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
@@ -244,6 +246,7 @@ public class _01_Setup_Data : BaseTest
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
         await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
+        await addEmissionTypePage.SelectDefaultEmissionCategoryAsync(Config.SetupDefaultEmissionCategory1);
         emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
         (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();

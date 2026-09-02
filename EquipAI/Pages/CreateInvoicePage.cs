@@ -13,7 +13,7 @@ public class CreateInvoicePage : InvoiceFormPage
     private ILocator ProjectError => Page.Locator(
         "//*[@id='invoice-project']/ancestor::app-searchable-select/following-sibling::span[contains(@class,'form-hint--error')] | //select[@id='invoice-project']/following-sibling::span");
     private ILocator InvoiceDateError => Page.Locator("//input[@id='invoice-date']/following-sibling::span");
-    private ILocator InvoiceCategoryError => Page.Locator(
+    private ILocator EmissionCategoryError => Page.Locator(
         "//*[@id='invoice-category']/ancestor::app-searchable-select/following-sibling::span[contains(@class,'form-hint--error')] | //select[@id='invoice-category']/../following-sibling::span");
     private ILocator CurrencyError => Page.Locator(
         "//*[@id='currency-code']/ancestor::app-searchable-select/following-sibling::span[contains(@class,'form-hint--error')] | //select[@id='currency-code']/../following-sibling::span");
@@ -69,7 +69,7 @@ public class CreateInvoicePage : InvoiceFormPage
         string companyName,
         string address,
         string invoiceDate,
-        string invoiceCategory,
+        string emissionCategory,
         string totalCost,
         string currency,
         string description,
@@ -86,7 +86,7 @@ public class CreateInvoicePage : InvoiceFormPage
         await CompanyNameInput.FillAsync(companyName);
         await AddressInput.FillAsync(address);
         await InvoiceDateInput.FillAsync(invoiceDate);
-        await SelectOptionByTextAsync(InvoiceCategoryDropdown, invoiceCategory);
+        await SelectOptionByTextAsync(EmissionCategoryDropdown, emissionCategory);
         await TotalCostInput.FillAsync(totalCost);
         await SelectOptionByTextAsync(CurrencyDropdown, currency);
         await Description1Input.FillAsync(description);
@@ -107,13 +107,13 @@ public class CreateInvoicePage : InvoiceFormPage
         await UnitPrice1Input.FillAsync(unitPrice);
     }
 
-    public async Task ClickInvoiceCategoryDropdownAsync()
+    public async Task ClickEmissionCategoryDropdownAsync()
     {
-        await InvoiceCategoryDropdown.ClickAsync();
+        await EmissionCategoryDropdown.ClickAsync();
     }
 
-    public async Task<IReadOnlyList<string>> GetInvoiceCategoryOptionsAsync() =>
-        await GetDropdownOptionsAsync(InvoiceCategoryDropdown);
+    public async Task<IReadOnlyList<string>> GetEmissionCategoryOptionsAsync() =>
+        await GetDropdownOptionsAsync(EmissionCategoryDropdown);
 
     public async Task ClickCurrencyDropdownAsync()
     {
@@ -141,7 +141,7 @@ public class CreateInvoicePage : InvoiceFormPage
 
     public async Task<string> GetProjectErrorAsync() => await GetErrorTextAsync(ProjectError);
     public async Task<string> GetInvoiceDateErrorAsync() => await GetErrorTextAsync(InvoiceDateError);
-    public async Task<string> GetInvoiceCategoryErrorAsync() => await GetErrorTextAsync(InvoiceCategoryError);
+    public async Task<string> GetEmissionCategoryErrorAsync() => await GetErrorTextAsync(EmissionCategoryError);
     public async Task<string> GetCurrencyErrorAsync() => await GetErrorTextAsync(CurrencyError);
     public async Task<string> GetEmissionType1ErrorAsync() => await GetErrorTextAsync(Emissiontype1Error);
     public async Task<string> GetUnit1ErrorAsync() => await GetErrorTextAsync(Unit1Error);
@@ -166,7 +166,7 @@ public class CreateInvoicePage : InvoiceFormPage
         await CompanyNameInput.FillAsync(companyName);
         await AddressInput.FillAsync(address);
         await InvoiceDateInput.FillAsync(invoiceDate);
-        await SelectFirstNonEmptyOptionAsync(InvoiceCategoryDropdown);
+        await SelectFirstNonEmptyOptionAsync(EmissionCategoryDropdown);
         await TotalCostInput.FillAsync(totalCost);
         var currency = await SelectFirstNonEmptyOptionAndGetTextAsync(CurrencyDropdown)
             ?? throw new InvalidOperationException("Currency option was not selected.");

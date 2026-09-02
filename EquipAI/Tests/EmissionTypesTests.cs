@@ -64,10 +64,11 @@ public class EmissionTypesTests : BaseTest
         (await addEmissionTypePage.IsCodeInputVisibleAsync()).Should().BeTrue();
         (await addEmissionTypePage.IsDisplayNameInputVisibleAsync()).Should().BeTrue();
         (await addEmissionTypePage.IsDefaultUnitDropdownVisibleAsync()).Should().BeTrue();
+        (await addEmissionTypePage.IsDefaultEmissionCategoryDropdownVisibleAsync()).Should().BeTrue();
         (await addEmissionTypePage.IsCreateEmissionTypeBtnVisibleAsync()).Should().BeTrue();
         (await addEmissionTypePage.IsCancelBtnVisibleAsync()).Should().BeTrue();
     }
-
+    
     [Test]
     public async Task T05_EmissionType_Add_UnitDropdown()
     {
@@ -88,11 +89,27 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T06_EmissionType_Add_EmptyFields()
+    public async Task T06_EmissionType_Add_CategoryDropdown()
+    {
+        var categoriesPage = new EmissionCategoriesPage(Fixture.Page);
+        await categoriesPage.OpenAsync();
+        var expectedOptions = await categoriesPage.GetAllDisplayNamesWithGhgScopesAsync();
+
+        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
+        await emissionTypesPage.OpenAsync();
+        var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
+
+        var categoryOptions = await addEmissionTypePage.GetDefaultEmissionCategoryOptionsAsync();
+        categoryOptions.Should().Contain(expectedOptions);
+    }
+
+    [Test]
+    public async Task T07_EmissionType_Add_EmptyFields()
     {
         const string expectedCodeError = "Code is required.";
         const string expectedDisplayNameError = "Display name is required.";
         const string expectedDefaultUnitError = "Default unit is required.";
+        const string expectedDefaultCategoryError = "Default category is required.";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
@@ -102,10 +119,11 @@ public class EmissionTypesTests : BaseTest
         (await addEmissionTypePage.GetCodeErrorAsync()).Should().Be(expectedCodeError);
         (await addEmissionTypePage.GetDisplayNameErrorAsync()).Should().Be(expectedDisplayNameError);
         (await addEmissionTypePage.GetDefaultUnitErrorAsync()).Should().Be(expectedDefaultUnitError);
+        (await addEmissionTypePage.GetDefaultCategoryErrorAsync()).Should().Be(expectedDefaultCategoryError);
     }
 
     [Test]
-    public async Task T07_EmissionType_Add_ExistingCode()
+    public async Task T08_EmissionType_Add_ExistingCode()
     {
         const string code = Config.SetupCode1;
         const string expectedAlertMessage = "Code should be unique.";
@@ -117,13 +135,14 @@ public class EmissionTypesTests : BaseTest
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
         await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
+        await addEmissionTypePage.SelectRandomDefaultEmissionCategoryAsync();
         await addEmissionTypePage.ClickCreateEmissionTypeBtnAsync();
 
         (await addEmissionTypePage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
     }
 
     [Test]
-    public async Task T08_EmissionType_Add_CodeTooLong()
+    public async Task T09_EmissionType_Add_CodeTooLong()
     {
         const string expectedCodeError = "Code must be at most 64 characters.";
         var randomCode = GenerateRandomString(65);
@@ -138,7 +157,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T09_EmissionType_Add_DisplayNameTooLong()
+    public async Task T10_EmissionType_Add_DisplayNameTooLong()
     {
         const string expectedDisplayNameError = "Display name must be at most 256 characters.";
         var randomDisplayName = GenerateRandomString(257);
@@ -153,7 +172,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T10_EmissionType_Add_ClickCancel()
+    public async Task T11_EmissionType_Add_ClickCancel()
     {
         const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -166,6 +185,7 @@ public class EmissionTypesTests : BaseTest
         await addEmissionTypePage.FillCodeAsync(code);
         await addEmissionTypePage.FillDisplayNameAsync(displayName);
         await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
+        await addEmissionTypePage.SelectRandomDefaultEmissionCategoryAsync();
         emissionTypesPage = await addEmissionTypePage.ClickCancelBtnAsync();
 
         (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -173,7 +193,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T11_EmissionType_Add_Success()
+    public async Task T12_EmissionType_Add_Success()
     {
         const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -190,6 +210,7 @@ public class EmissionTypesTests : BaseTest
             await addEmissionTypePage.FillCodeAsync(code);
             await addEmissionTypePage.FillDisplayNameAsync(displayName);
             await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
+            await addEmissionTypePage.SelectRandomDefaultEmissionCategoryAsync();
             emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
 
             (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -203,7 +224,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T12_EmissionType_ClickEditBtn()
+    public async Task T13_EmissionType_ClickEditBtn()
     {
         const string expectedPageTitle = "Edit Emission Type";
 
@@ -215,9 +236,11 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T13_EmissionType_Edit_DefaultView()
+    public async Task T14_EmissionType_Edit_DefaultView()
     {
         const string expectedPageTitle = "Edit Emission Type";
+        var expectedDefaultUnit = $"{Config.SetupDefaultUnitCode1} — {Config.SetupDefaultUnitName1}";
+        var expectedDefaultEmissionCategory = Config.SetupDefaultEmissionCategory1;
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
@@ -228,6 +251,8 @@ public class EmissionTypesTests : BaseTest
         (await editEmissionTypePage.GetSubtitleAsync()).Should().Be(code);
         (await editEmissionTypePage.GetCodeAsync()).Should().Be(code);
         (await editEmissionTypePage.GetDisplayNameAsync()).Should().Be(displayName);
+        (await editEmissionTypePage.GetDefaultUnitAsync()).Should().Be(expectedDefaultUnit);
+        (await editEmissionTypePage.GetDefaultEmissionCategoryAsync()).Should().Be(expectedDefaultEmissionCategory);
         (await editEmissionTypePage.IsSaveEmissionTypeBtnVisibleAsync()).Should().BeTrue();
         (await editEmissionTypePage.IsSaveEmissionTypeBtnEnabledAsync()).Should().BeTrue();
         (await editEmissionTypePage.IsCancelBtnVisibleAsync()).Should().BeTrue();
@@ -235,7 +260,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T14_EmissionType_Edit_EmptyFields()
+    public async Task T15_EmissionType_Edit_EmptyFields()
     {
         const string expectedCodeError = "Code is required.";
         const string expectedDisplayNameError = "Display name is required.";
@@ -252,7 +277,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T15_EmissionType_Edit_ExistingCode()
+    public async Task T16_EmissionType_Edit_ExistingCode()
     {
         const string expectedAlertMessage = "Code should be unique.";
 
@@ -266,7 +291,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T16_EmissionType_Edit_CodeTooLong()
+    public async Task T17_EmissionType_Edit_CodeTooLong()
     {
         const string expectedCodeError = "Code must be at most 64 characters.";
         var randomCode = GenerateRandomString(65);
@@ -281,7 +306,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T17_EmissionType_Edit_DisplayNameTooLong()
+    public async Task T18_EmissionType_Edit_DisplayNameTooLong()
     {
         const string expectedDisplayNameError = "Display name must be at most 256 characters.";
         var randomDisplayName = GenerateRandomString(257);
@@ -296,7 +321,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T18_EmissionType_Edit_ClickCancel()
+    public async Task T19_EmissionType_Edit_ClickCancel()
     {
         const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -316,7 +341,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T19_EmissionType_Edit_Success()
+    public async Task T20_EmissionType_Edit_Success()
     {
         const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -337,6 +362,7 @@ public class EmissionTypesTests : BaseTest
             await editEmissionTypePage.FillCodeAsync(code);
             await editEmissionTypePage.FillDisplayNameAsync(displayName);
             await editEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode2);
+            await editEmissionTypePage.SelectDefaultEmissionCategoryAsync(Config.SetupDefaultEmissionCategory2);
             emissionTypesPage = await editEmissionTypePage.SaveEmissionTypeAsync();
 
             (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
@@ -351,12 +377,13 @@ public class EmissionTypesTests : BaseTest
                     emissionTypeId,
                     Config.SetupCode1,
                     Config.SetupEmissionTypeName1,
-                    Config.SetupDefaultUnitCode1);
+                    Config.SetupDefaultUnitCode1,
+                    Config.SetupDefaultEmissionCategory1);
         }
     }
 
     [Test]
-    public async Task T20_EmissionType_Deactivate_Click()
+    public async Task T21_EmissionType_Deactivate_Click()
     {
         const string expectedTitle = "Deactivate Emission Type";
         var expectedMessage = $"Deactivate emission type {Config.SetupCode1}? It will no longer be available for new imports.";
@@ -373,7 +400,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T21_EmissionType_Deactivate_Cancel()
+    public async Task T22_EmissionType_Deactivate_Cancel()
     {
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
@@ -385,7 +412,7 @@ public class EmissionTypesTests : BaseTest
     }
 
     [Test]
-    public async Task T22_EmissionType_Deactivate_Success()
+    public async Task T23_EmissionType_Deactivate_Success()
     {
         try
         {

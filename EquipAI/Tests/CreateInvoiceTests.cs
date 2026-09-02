@@ -57,7 +57,7 @@ public class CreateInvoiceTests : BaseTest
         const string expectedInvoiceNumberError = "Invoice number is required.";
         const string expectedCompanyNameError = "Company name is required.";
         const string expectedInvoiceDateError = "Invoice date is required.";
-        const string expectedInvoiceCategoryError = "Invoice category is required.";
+        const string expectedEmissionCategoryError = "Emission category is required.";
         const string expectedTotalCostError = "Total cost is required.";
         const string expectedCurrencyError = "Currency is required.";
         const string expectedDescriptionError = "Description is required.";
@@ -74,7 +74,7 @@ public class CreateInvoiceTests : BaseTest
         (await createInvoicePage.GetCompanyNameErrorAsync()).Should().Be(expectedCompanyNameError);
         (await createInvoicePage.IsAddressErrorVisibleAsync()).Should().BeFalse();
         (await createInvoicePage.GetInvoiceDateErrorAsync()).Should().Be(expectedInvoiceDateError);
-        (await createInvoicePage.GetInvoiceCategoryErrorAsync()).Should().Be(expectedInvoiceCategoryError);
+        (await createInvoicePage.GetEmissionCategoryErrorAsync()).Should().Be(expectedEmissionCategoryError);
         (await createInvoicePage.GetTotalCostErrorAsync()).Should().Be(expectedTotalCostError);
         (await createInvoicePage.GetCurrencyErrorAsync()).Should().Be(expectedCurrencyError);
         (await createInvoicePage.GetDescription1ErrorAsync()).Should().Be(expectedDescriptionError);
@@ -141,22 +141,18 @@ public class CreateInvoiceTests : BaseTest
     }
 
     [Test]
-    public async Task T09_CreateInvoice_CategoryOptions()
+    public async Task T09_CreateInvoice_EmissionCategoryOptions()
     {
-        var expectedCategoryOptions = new[] { "Fuel" };
+        var categoriesPage = new EmissionCategoriesPage(Fixture.Page);
+        await categoriesPage.OpenAsync();
+        var expectedOptions = await categoriesPage.GetAllDisplayNamesWithGhgScopesAsync();
 
         var createInvoicePage = new CreateInvoicePage(Fixture.Page);
         await createInvoicePage.OpenAsync();
-        await createInvoicePage.ClickInvoiceCategoryDropdownAsync();
+        await createInvoicePage.ClickEmissionCategoryDropdownAsync();
 
-        var categoryOptions = await createInvoicePage.GetInvoiceCategoryOptionsAsync();
-
-        foreach (var expectedCategoryOption in expectedCategoryOptions)
-        {
-            categoryOptions.Should().Contain(
-                expectedCategoryOption,
-                because: $"invoice category dropdown is missing option: {expectedCategoryOption}");
-        }
+        var categoryOptions = await createInvoicePage.GetEmissionCategoryOptionsAsync();
+        categoryOptions.Should().Contain(expectedOptions);
     }
 
     [Test]

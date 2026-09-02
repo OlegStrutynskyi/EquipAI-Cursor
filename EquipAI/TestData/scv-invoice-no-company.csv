@@ -1,6 +1,0 @@
-InvoiceNumber,CompanyName,Address,ProjectCode,InvoiceDate,CurrencyCode,TotalCost,LineDescription,Quantity,UnitOfMeasure,UnitPrice,Cost,EmissionTypeCode
-,,8400 Baymeadows Way Jacksonville FL 32256,TEST-1,01/06/2026,USD,1687.5,Generator diesel fill-up,200,US_GAL,3.75,750,DIESEL_MINERAL
-,,,,,,,Crane fuel delivery,150,my_text,3.75,562.5,GAS_OIL
-,,,,,,,Excavator top-off,100,my-alias-2,3.75,375,Gas oil
-,,,,,,,Backup generator run,75,lt,3.75,281.25,PROPANE
-,,,,,,,Emergency delivery,60,gallons,3.125,187.5,Propane

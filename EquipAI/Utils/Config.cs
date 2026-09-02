@@ -26,6 +26,8 @@ public static class Config
     public const string SetupDefaultUnitCode2 = "T";
     public const string SetupDefaultUnitName1 = "US Gallon";
     public const string SetupDefaultUnitName2 = "Tonne";
+    public const string SetupDefaultEmissionCategory1 = "Internal Fuel (Scope 1)";
+    public const string SetupDefaultEmissionCategory2 = "External Fuel (Scope 3)";
     public const string SetupUnitName1 = "DONT DELETE UNIT 1";
     public const string SetupUnitName2 = "DONT DELETE UNIT 2";
     public const string SetupEmissionTypeName1 = "DONT DELETE EMISSION TYPE 1";

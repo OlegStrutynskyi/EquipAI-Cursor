@@ -44,7 +44,7 @@ public class EditInvoiceTests : BaseTest
         (await editInvoicePage.GetAddressAsync()).Should().Be(expectedAddress);
         (await editInvoicePage.GetProjectAsync()).Should().Be(expectedProject);
         (await editInvoicePage.GetInvoiceDateAsync()).Should().Be(expectedInvoiceDate);
-        (await editInvoicePage.GetInvoiceCategoryAsync()).Should().Be(expectedCategory);
+        (await editInvoicePage.GetEmissionCategoryAsync()).Should().Be(expectedCategory);
         (await editInvoicePage.GetTotalCostAsync()).Should().Be(expectedTotalCost);
         (await editInvoicePage.GetCurrencyAsync()).Should().Be(expectedCurrency);
 
@@ -283,7 +283,7 @@ public class EditInvoiceTests : BaseTest
         var updatedTotalCost = "111.11";
         var updatedCurrency = "EUR";
         var updatedTotalDisplay = "111.11 EUR";
-        var updatedCategory = "Fuel";
+        var updatedCategory = "External Fuel";
         var updatedGridStatus = "DRAFT";
         var updatedViewStatus = "Draft";
         var updatedSource = "Manual";
@@ -318,6 +318,7 @@ public class EditInvoiceTests : BaseTest
             await editInvoicePage.FillInvoiceDateAsync(updatedInvoiceDateInput);
             await editInvoicePage.FillTotalCostAsync(updatedTotalCost);
             await editInvoicePage.SelectCurrencyAsync(updatedCurrency);
+            await editInvoicePage.SelectEmissionCategoryAsync(Config.SetupDefaultEmissionCategory2);
             await editInvoicePage.FillQuantity1Async(updatedQuantity1);
             await editInvoicePage.FillUnitPrice1Async(updatedUnitPrice1);
             await editInvoicePage.SelectEmissionType1Async(updatedEmissionType1);

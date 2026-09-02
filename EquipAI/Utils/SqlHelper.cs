@@ -257,6 +257,7 @@ public static class SqlHelper
                 CompanyName = @companyName,
                 Address = @address,
                 CurrencyCode = 'USD',
+                EmissionCategoryId = 1,
                 ProjectId = (SELECT [Id] FROM [projects].[Project] WHERE Name = @projectName)
             WHERE Id = @invoiceId
             """,
@@ -505,7 +506,7 @@ public static class SqlHelper
         return result;
     }
 
-    public static async Task RestoreEmissionTypeAsync(object id, string code, string displayName, string defaultUnitCode)
+    public static async Task RestoreEmissionTypeAsync(object id, string code, string displayName, string defaultUnitCode, string defaultEmissionCategory)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
         await connection.OpenAsync();
@@ -515,13 +516,19 @@ public static class SqlHelper
             UPDATE [emissions].[EmissionType]
             SET Code = @code,
                 DisplayName = @displayName,
-                DefaultUnitOfMeasureId = (SELECT [Id] FROM [emissions].[UnitOfMeasure] WHERE Code = @defaultUnitCode)
+                DefaultUnitOfMeasureId = (SELECT [Id] FROM [emissions].[UnitOfMeasure] WHERE Code = @defaultUnitCode),
+                DefaultCategoryId = (
+                    SELECT [Id]
+                    FROM [emissions].[EmissionCategory]
+                    WHERE CONCAT(DisplayName, ' (Scope ', CAST(GhgScope AS varchar(10)), ')') = @defaultEmissionCategory
+                )
             WHERE Id = @id
             """,
             connection);
         command.Parameters.AddWithValue("@code", code);
         command.Parameters.AddWithValue("@displayName", displayName);
         command.Parameters.AddWithValue("@defaultUnitCode", defaultUnitCode);
+        command.Parameters.AddWithValue("@defaultEmissionCategory", defaultEmissionCategory);
         command.Parameters.AddWithValue("@id", id);
         await command.ExecuteNonQueryAsync();
     }
