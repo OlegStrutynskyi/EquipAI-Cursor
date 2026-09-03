@@ -533,6 +533,42 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
+    public static async Task<object> GetEmissionCategoryIdByDisplayNameAsync(string displayName)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "SELECT [Id] FROM [emissions].[EmissionCategory] WHERE [DisplayName] = @displayName",
+            connection);
+        command.Parameters.AddWithValue("@displayName", displayName);
+
+        var result = await command.ExecuteScalarAsync();
+        if (result is null or DBNull)
+            throw new InvalidOperationException($"Emission category '{displayName}' was not found.");
+
+        return result;
+    }
+
+    public static async Task RestoreEmissionCategoryAsync(object id, string displayName, int ghgScope)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [emissions].[EmissionCategory]
+            SET [DisplayName] = @displayName,
+                [GhgScope] = @ghgScope
+            WHERE [Id] = @id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@displayName", displayName);
+        command.Parameters.AddWithValue("@ghgScope", ghgScope);
+        command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync();
+    }
+
     public static async Task RestoreEmissionTypeByCodeAsync(string code)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
