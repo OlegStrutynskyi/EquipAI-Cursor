@@ -14,6 +14,11 @@ public static class Config
     public const string SqlConnectionString =
         "Server=tcp:sql-equipai-eu.database.windows.net,1433;Initial Catalog=equipai-qa;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=\"Active Directory Default\";";
 
+    public const string PdfBlobStorageAccountName = "stequipaiinvqa";
+    public const string PdfBlobStorageResourceGroup = "rg-equipai-qa";
+    public const string PdfBlobStorageSubscriptionId = "1deb1018-b4d6-4861-82cd-546490f3664e";
+    public const string PdfBlobStorageContainerName = "invoices-pdf-qa";
+
     public const string SetupProjectName1 = "DONT-DELETE-Project-1";
     public const string SetupInvoiceNumber1 = "DONT-DELETE-Invoice-1";
     public const string SetupCompanyName1 = "DONT-DELETE-Company-1";

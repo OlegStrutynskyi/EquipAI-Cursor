@@ -9,7 +9,8 @@ public class InvoicesPage : BasePage
 
     private ILocator InvoicesTitle => Page.Locator("//h1[@id='invoice-list-title']");
     private ILocator InvoicesMessage => Page.Locator("//p[@class='page-header__lead']");
-    private ILocator ImportBtn => Page.Locator("//a[normalize-space()='Import']");
+    private ILocator ImportCSVBtn => Page.Locator("//a[normalize-space()='Import CSV']");
+    private ILocator ImportPDFBtn => Page.Locator("//a[normalize-space()='Import PDF']");
     private ILocator CreateBtn => Page.Locator("//a[normalize-space()='Create']");
     private ILocator InvoicesGrid => Page.Locator("//table[contains(@class,'table')]");
     private ILocator InvoicesGridProject => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[1]");
@@ -46,7 +47,8 @@ public class InvoicesPage : BasePage
 
     public Task<bool> IsInvoicesTitleVisibleAsync() => InvoicesTitle.IsVisibleAsync();
     public Task<bool> IsInvoicesMessageVisibleAsync() => InvoicesMessage.IsVisibleAsync();
-    public Task<bool> IsImportBtnVisibleAsync() => ImportBtn.IsVisibleAsync();
+    public Task<bool> IsImportCSVBtnVisibleAsync() => ImportCSVBtn.IsVisibleAsync();
+    public Task<bool> IsImportPDFBtnVisibleAsync() => ImportPDFBtn.IsVisibleAsync();
     public Task<bool> IsCreateBtnVisibleAsync() => CreateBtn.IsVisibleAsync();
     public Task<bool> IsInvoicesGridVisibleAsync() => InvoicesGrid.IsVisibleAsync();
 
@@ -68,13 +70,24 @@ public class InvoicesPage : BasePage
         return new CreateInvoicePage(Page);
     }
 
-    public async Task<ImportInvoicePage> ClickImportBtnAsync()
+    public async Task<ImportInvoicePage> ClickImportCSVBtnAsync()
     {
-        await ImportBtn.ClickAsync();
+        await ImportCSVBtn.ClickAsync();
         await Page.WaitForURLAsync("**/invoices/import**");
         var importInvoicePage = new ImportInvoicePage(Page);
         await importInvoicePage.WaitForLoadedAsync();
         return importInvoicePage;
+    }
+
+    public async Task<ImportPDFInvoicePage> ClickImportPDFBtnAsync()
+    {
+        await ImportPDFBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url => url.Contains("/invoices/", StringComparison.OrdinalIgnoreCase)
+                   && url.Contains("pdf", StringComparison.OrdinalIgnoreCase));
+        var importPDFInvoicePage = new ImportPDFInvoicePage(Page);
+        await importPDFInvoicePage.WaitForLoadedAsync();
+        return importPDFInvoicePage;
     }
 
     public async Task<ViewInvoicePage> ClickViewBtnAsync(string invoiceNumber)

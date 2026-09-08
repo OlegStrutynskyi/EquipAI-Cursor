@@ -18,13 +18,34 @@ public class InvoicesTests : BaseTest
 
         (await invoicesPage.GetTitleAsync()).Should().Be(expectedTitle);
         (await invoicesPage.GetMessageAsync()).Should().Be(expectedMessage);
-        (await invoicesPage.IsImportBtnVisibleAsync()).Should().BeTrue();
+        (await invoicesPage.IsImportCSVBtnVisibleAsync()).Should().BeTrue();
+        (await invoicesPage.IsImportPDFBtnVisibleAsync()).Should().BeTrue();
         (await invoicesPage.IsCreateBtnVisibleAsync()).Should().BeTrue();
         (await invoicesPage.IsInvoicesGridVisibleAsync()).Should().BeTrue();
     }
+        
+    [Test]
+    public async Task T02_Invoices_ClickImportCSVBtn()
+    {
+        var invoicesPage = new InvoicesPage(Fixture.Page);
+        await invoicesPage.OpenAsync();
+        var importInvoicePage = await invoicesPage.ClickImportCSVBtnAsync();
+
+        (await importInvoicePage.IsImportTitleVisibleAsync()).Should().BeTrue();
+    }
 
     [Test]
-    public async Task T02_Invoices_ClickCreateBtn()
+    public async Task T03_Invoices_ClickImportPDFBtn()
+    {
+        var invoicesPage = new InvoicesPage(Fixture.Page);
+        await invoicesPage.OpenAsync();
+        var importPDFInvoicePage = await invoicesPage.ClickImportPDFBtnAsync();
+
+        (await importPDFInvoicePage.IsImportTitleVisibleAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T04_Invoices_ClickCreateBtn()
     {
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -34,17 +55,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T03_Invoices_ClickImportBtn()
-    {
-        var invoicesPage = new InvoicesPage(Fixture.Page);
-        await invoicesPage.OpenAsync();
-        var importInvoicePage = await invoicesPage.ClickImportBtnAsync();
-
-        (await importInvoicePage.IsImportTitleVisibleAsync()).Should().BeTrue();
-    }
-
-    [Test]
-    public async Task T04_Invoices_GridColumns()
+    public async Task T05_Invoices_GridColumns()
     {
         var expectedColumns = new[]
         {
@@ -66,7 +77,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T05_Invoices_Manual_Data()
+    public async Task T06_Invoices_Manual_Data()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedProject = Config.SetupProjectName1;
@@ -89,7 +100,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T06_Invoices_ClickViewBtn()
+    public async Task T07_Invoices_ClickViewBtn()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
 
@@ -101,7 +112,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T07_Invoices_ClickEditBtn()
+    public async Task T08_Invoices_ClickEditBtn()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedTitle = "Edit Invoice";
@@ -114,7 +125,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T08_Invoices_Rejected_View()
+    public async Task T09_Invoices_Rejected_View()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedStatus = "REJECTED";
@@ -142,7 +153,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T09_Invoices_Approved_View()
+    public async Task T10_Invoices_Approved_View()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedStatus = "APPROVED";
@@ -170,7 +181,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T10_Invoices_InvoicesCount()
+    public async Task T11_Invoices_InvoicesCount()
     {
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();

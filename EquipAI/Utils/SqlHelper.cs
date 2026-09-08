@@ -1,9 +1,18 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
+using Azure.Core;
+using Azure.Identity;
+using Azure.Storage;
+using Azure.Storage.Blobs;
 using Microsoft.Data.SqlClient;
 
 namespace EquipAI.Utils;
 
 public static class SqlHelper
 {
+    private static StorageSharedKeyCredential? _pdfStorageCredential;
+    private static readonly SemaphoreSlim PdfStorageCredentialLock = new(1, 1);
+
     public static async Task SetUserCapabilitiesAsync(string email, int capabilities)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -341,6 +350,27 @@ public static class SqlHelper
 
         if (invoiceId is not null)
         {
+            await using (var deleteLineRecognitionsCommand = new SqlCommand(
+                """
+                DELETE FROM [ingestion].[InvoiceLineRecognition]
+                WHERE [InvoiceLineItemId] IN (
+                    SELECT [Id] FROM [invoices].[InvoiceLineItem] WHERE [InvoiceId] = @invoiceId
+                )
+                """,
+                connection))
+            {
+                deleteLineRecognitionsCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+                await deleteLineRecognitionsCommand.ExecuteNonQueryAsync();
+            }
+
+            await using (var deleteInvoiceRecognitionCommand = new SqlCommand(
+                "DELETE FROM [ingestion].[InvoiceRecognition] WHERE [InvoiceId] = @invoiceId",
+                connection))
+            {
+                deleteInvoiceRecognitionCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+                await deleteInvoiceRecognitionCommand.ExecuteNonQueryAsync();
+            }
+
             await using (var deleteLineItemsCommand = new SqlCommand(
                 "DELETE FROM [invoices].[InvoiceLineItem] WHERE InvoiceId = @invoiceId",
                 connection))
@@ -388,6 +418,146 @@ public static class SqlHelper
         command.Parameters.AddWithValue("@hash", hash);
         await command.ExecuteNonQueryAsync();
     }
+
+    public static async Task DeleteActivitySourceByPdfFileAsync(string fileName)
+    {
+        var filePath = ResolveTestDataPath(fileName);
+        var fileBytes = await File.ReadAllBytesAsync(filePath);
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fileBytes)).ToLowerInvariant();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            DELETE FROM [sources].[ActivitySource]
+            WHERE [SourceType] = 'AiInvoice'
+              AND (
+                    [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
+                 OR [OriginalDocumentBlobUrl] LIKE '%' + @fileName + '%' ESCAPE '\'
+              )
+            """,
+            connection);
+        command.Parameters.AddWithValue("@hash", hash);
+        command.Parameters.AddWithValue("@fileName", EscapeLikePattern(fileName));
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task DeletePdfBlobByFileAsync(string fileName)
+    {
+        var filePath = ResolveTestDataPath(fileName);
+        var fileBytes = await File.ReadAllBytesAsync(filePath);
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fileBytes)).ToLowerInvariant();
+        var likeFileName = EscapeLikePattern(fileName);
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        var blobUrls = new List<string>();
+        await using (var command = new SqlCommand(
+            """
+            SELECT [OriginalDocumentBlobUrl]
+            FROM [sources].[ActivitySource]
+            WHERE [SourceType] = 'AiInvoice'
+              AND (
+                    [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
+                 OR [OriginalDocumentBlobUrl] LIKE '%' + @fileName + '%' ESCAPE '\'
+              )
+            """,
+            connection))
+        {
+            command.Parameters.AddWithValue("@hash", hash);
+            command.Parameters.AddWithValue("@fileName", likeFileName);
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (!reader.IsDBNull(0))
+                {
+                    var url = reader.GetString(0).Trim();
+                    if (!string.IsNullOrWhiteSpace(url))
+                        blobUrls.Add(url);
+                }
+            }
+        }
+
+        if (blobUrls.Count == 0)
+        {
+            blobUrls.Add(
+                $"https://{Config.PdfBlobStorageAccountName}.blob.core.windows.net/{Config.PdfBlobStorageContainerName}/{hash}.pdf");
+        }
+
+        var sharedKey = await GetPdfStorageSharedKeyCredentialAsync();
+        foreach (var blobUrl in blobUrls.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var blobClient = new BlobClient(new Uri(blobUrl), sharedKey);
+            await blobClient.DeleteIfExistsAsync();
+        }
+    }
+
+    private static async Task<StorageSharedKeyCredential> GetPdfStorageSharedKeyCredentialAsync()
+    {
+        if (_pdfStorageCredential is not null)
+            return _pdfStorageCredential;
+
+        await PdfStorageCredentialLock.WaitAsync();
+        try
+        {
+            if (_pdfStorageCredential is not null)
+                return _pdfStorageCredential;
+
+            var token = await new DefaultAzureCredential().GetTokenAsync(
+                new TokenRequestContext(["https://management.azure.com/.default"]));
+
+            var listKeysUrl =
+                $"https://management.azure.com/subscriptions/{Config.PdfBlobStorageSubscriptionId}" +
+                $"/resourceGroups/{Config.PdfBlobStorageResourceGroup}" +
+                $"/providers/Microsoft.Storage/storageAccounts/{Config.PdfBlobStorageAccountName}" +
+                "/listKeys?api-version=2023-01-01";
+
+            using var http = new HttpClient();
+            using var request = new HttpRequestMessage(HttpMethod.Post, listKeysUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+
+            using var response = await http.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            var key = doc.RootElement.GetProperty("keys")[0].GetProperty("value").GetString();
+            if (string.IsNullOrWhiteSpace(key))
+                throw new InvalidOperationException("Storage account key was empty.");
+
+            _pdfStorageCredential = new StorageSharedKeyCredential(Config.PdfBlobStorageAccountName, key);
+            return _pdfStorageCredential;
+        }
+        finally
+        {
+            PdfStorageCredentialLock.Release();
+        }
+    }
+
+    private static string ResolveTestDataPath(string fileName)
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "TestData", fileName),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "TestData", fileName)),
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        throw new FileNotFoundException($"Test data file was not found: {fileName}");
+    }
+
+    private static string EscapeLikePattern(string value) =>
+        value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
 
     public static async Task DeleteUnitOfMeasureByCodeAsync(string code)
     {
