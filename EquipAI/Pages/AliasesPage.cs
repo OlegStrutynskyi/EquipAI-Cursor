@@ -30,6 +30,7 @@ public class AliasesPage : BasePage
     {
         await Message.WaitForAsync();
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
     }
 
     public async Task<string> GetMessageAsync()
@@ -52,6 +53,7 @@ public class AliasesPage : BasePage
         await Grid.Locator("thead th")
             .Filter(new LocatorFilterOptions { HasTextString = "Factor Source" })
             .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
+        await WaitForGridDataAsync();
     }
 
     public async Task ClickEmissionTypesTabAsync()
@@ -61,6 +63,7 @@ public class AliasesPage : BasePage
         await Grid.Locator("thead th")
             .Filter(new LocatorFilterOptions { HasTextString = "Factor Source" })
             .WaitForAsync();
+        await WaitForGridDataAsync();
     }
 
     public async Task ClickProjectsTabAsync()
@@ -76,6 +79,7 @@ public class AliasesPage : BasePage
         await Grid.Locator("thead th")
             .Filter(new LocatorFilterOptions { HasTextString = "Context" })
             .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
+        await WaitForGridDataAsync();
     }
 
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
@@ -99,6 +103,7 @@ public class AliasesPage : BasePage
     public async Task<bool> IsAliasTextInGridAsync(string aliasText)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
         await GoToFirstGridPageAsync();
 
         while (true)
@@ -120,14 +125,43 @@ public class AliasesPage : BasePage
 
     public async Task<EditAliasPage> ClickEditBtnAsync(string aliasText)
     {
+        return await ClickEditBtnAsync(context: null, aliasText);
+    }
+
+    public async Task<EditAliasPage> ClickEditBtnAsync(string? context, string aliasText)
+    {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await GoToFirstGridPageAsync();
 
         while (true)
         {
-            var row = await FindAliasRowOnCurrentPageAsync(aliasText);
-            if (row is not null)
+            var rows = Grid.Locator("tbody tr");
+            var rowCount = await rows.CountAsync();
+            for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
             {
+                var row = rows.Nth(rowIndex);
+                var cells = row.Locator("td");
+                if (await cells.CountAsync() < 2)
+                    continue;
+
+                var currentAliasText = (await cells.Nth(1).InnerTextAsync()).Trim();
+                if (string.IsNullOrWhiteSpace(context))
+                {
+                    // Units/Projects tabs put alias text in the first column.
+                    var aliasTextColumnIndex = await GetAliasTextColumnIndexAsync();
+                    currentAliasText = (await cells.Nth(aliasTextColumnIndex).InnerTextAsync()).Trim();
+                }
+
+                if (!currentAliasText.Equals(aliasText, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!string.IsNullOrWhiteSpace(context))
+                {
+                    var currentContext = NormalizeContext((await cells.Nth(0).InnerTextAsync()).Trim());
+                    if (!currentContext.Equals(context, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
+
                 await row.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
                 var editAliasPage = new EditAliasPage(Page);
                 await editAliasPage.WaitForLoadedAsync();
@@ -139,7 +173,8 @@ public class AliasesPage : BasePage
                 break;
         }
 
-        throw new InvalidOperationException($"Alias '{aliasText}' was not found in the grid.");
+        var contextSuffix = string.IsNullOrWhiteSpace(context) ? string.Empty : $" with context '{context}'";
+        throw new InvalidOperationException($"Alias '{aliasText}'{contextSuffix} was not found in the grid.");
     }
 
     public async Task ClickDeactivateBtnAsync(string aliasText)
@@ -149,7 +184,7 @@ public class AliasesPage : BasePage
 
         while (true)
         {
-            var row = await FindAliasRowOnCurrentPageAsync(aliasText);
+            var row = await FindAliasRowOnCurrentPageAsync(aliasText, context: null);
             if (row is not null)
             {
                 await row.GetByRole(AriaRole.Button, new() { Name = "Deactivate" }).ClickAsync();
@@ -198,18 +233,30 @@ public class AliasesPage : BasePage
         await row.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
     }
 
-    private async Task<ILocator?> FindAliasRowOnCurrentPageAsync(string aliasText)
+    private async Task<ILocator?> FindAliasRowOnCurrentPageAsync(string aliasText, string? context)
     {
         var aliasTextColumnIndex = await GetAliasTextColumnIndexAsync();
+        var hasContext = (await GetGridColumnHeadersAsync())
+            .Any(header => header.Contains("CONTEXT", StringComparison.OrdinalIgnoreCase));
         var rows = Grid.Locator("tbody tr");
         var rowCount = await rows.CountAsync();
 
         for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
         {
             var row = rows.Nth(rowIndex);
-            var currentAliasText = (await row.Locator("td").Nth(aliasTextColumnIndex).InnerTextAsync()).Trim();
-            if (currentAliasText.Equals(aliasText, StringComparison.Ordinal))
-                return row;
+            var cells = row.Locator("td");
+            var currentAliasText = (await cells.Nth(aliasTextColumnIndex).InnerTextAsync()).Trim();
+            if (!currentAliasText.Equals(aliasText, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(context) && hasContext)
+            {
+                var currentContext = NormalizeContext((await cells.Nth(0).InnerTextAsync()).Trim());
+                if (!currentContext.Equals(context, StringComparison.OrdinalIgnoreCase))
+                    continue;
+            }
+
+            return row;
         }
 
         return null;
@@ -287,6 +334,13 @@ public class AliasesPage : BasePage
 
         await GoToFirstGridPageAsync();
         return null;
+    }
+
+    private async Task WaitForGridDataAsync()
+    {
+        await Grid.Locator("xpath=.//tbody/tr/td[normalize-space()!='']")
+            .First
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     private async Task GoToFirstGridPageAsync()
@@ -388,10 +442,13 @@ public class AliasesPage : BasePage
 
     private static string NormalizeContext(string context)
     {
-        if (context.Contains("Catalog Factor Mapping", StringComparison.OrdinalIgnoreCase))
+        var compact = context.Replace(" ", string.Empty).Replace("-", string.Empty);
+        if (compact.Contains("CatalogFactorMapping", StringComparison.OrdinalIgnoreCase)
+            || context.Contains("Catalog Factor Mapping", StringComparison.OrdinalIgnoreCase))
             return "Catalog Factor Mapping";
 
-        if (context.Contains("Data Ingestion", StringComparison.OrdinalIgnoreCase))
+        if (compact.Contains("DataIngestion", StringComparison.OrdinalIgnoreCase)
+            || context.Contains("Data Ingestion", StringComparison.OrdinalIgnoreCase))
             return "Data Ingestion";
 
         return context;

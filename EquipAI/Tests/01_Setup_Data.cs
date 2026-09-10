@@ -254,7 +254,30 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T10_Setup_CreateAliasUnit()
+    public async Task T10_Setup_CreateEmissionTypePropane()
+    {
+        const string code = Config.SetupCodePropane;
+        const string displayName = Config.SetupEmissionNamePropane;
+
+        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
+        await emissionTypesPage.OpenAsync();
+
+        if (await emissionTypesPage.IsCodeInGridAsync(code))
+            Assert.Pass("Emission type Propane already exists.");
+
+        var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
+        await addEmissionTypePage.FillCodeAsync(code);
+        await addEmissionTypePage.FillDisplayNameAsync(displayName);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode1);
+        await addEmissionTypePage.SelectDefaultEmissionCategoryAsync(Config.SetupDefaultEmissionCategory1);
+        emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
+
+        (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T11_Setup_CreateAliasUnit()
     {
         const string aliasText = Config.SetupAliasUnit;
 
@@ -278,7 +301,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T11_Setup_CreateAliasEmissionType()
+    public async Task T12_Setup_CreateAliasEmissionType()
     {
         const string aliasText = Config.SetupAliasEmissionType;
 
@@ -303,7 +326,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T12_Setup_CreateAliasFactor1()
+    public async Task T13_Setup_CreateAliasFactor1()
     {
         const string aliasText = Config.SetupAliasFactor1;
 
@@ -329,7 +352,33 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T13_Setup_CreateAliasProject1()
+    public async Task T14_Setup_CreateAliasFactorPropane()
+    {
+        const string aliasText = Config.SetupAliasFactorPropane;
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+
+        if (await aliasesPage.IsAliasTextInGridAsync(aliasText))
+            Assert.Pass("Alias already exists.");
+
+        var addAliasPage = await aliasesPage.ClickAddAliasBtnAsync();
+        await addAliasPage.FillAliasTextAsync(aliasText);
+        await addAliasPage.SelectContextAsync("Catalog Factor Mapping");
+        await addAliasPage.SelectTargetKindAsync("Emission Type");
+        await addAliasPage.SelectEmissionTypeAsync(Config.SetupCodePropane);
+        await addAliasPage.SelectEpaFactorSourceAsync();
+        await addAliasPage.FillAliasTextAsync(aliasText);
+        aliasesPage = await addAliasPage.CreateAliasAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+
+        (await aliasesPage.IsAliasTextInGridAsync(aliasText)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T15_Setup_CreateAliasProject1()
     {
         const string aliasText = Config.SetupAliasProject1;
 

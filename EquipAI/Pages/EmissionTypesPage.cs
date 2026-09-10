@@ -17,6 +17,8 @@ public class EmissionTypesPage : BasePage
     private ILocator DeactivateDialogMessage => Page.Locator("//div[@role='alertdialog']//p[@id='confirm-dialog-message']");
     private ILocator DeactivateDialogCancelBtn => Page.Locator("//div[@role='alertdialog']//button[normalize-space()='Cancel']");
     private ILocator DeactivateDialogConfirmBtn => Page.Locator("//div[@role='alertdialog']//button[normalize-space()='Deactivate']");
+    private ILocator NextPageBtn => Page.Locator(
+        "//nav[contains(@class,'pagination')]//button[@aria-label='Next page' or normalize-space()='Next']");
 
     public async Task OpenAsync()
     {
@@ -30,6 +32,9 @@ public class EmissionTypesPage : BasePage
     {
         await Message.WaitForAsync();
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Page.Locator("//table[@class='table']//tbody/tr/td[1][normalize-space()!='']")
+            .First
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     public async Task<string> GetMessageAsync()
@@ -56,15 +61,59 @@ public class EmissionTypesPage : BasePage
     public async Task<bool> IsCodeInGridAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var codes = await CodeCells.AllInnerTextsAsync();
-        return codes.Any(c => c.Trim().Equals(code, StringComparison.Ordinal));
+
+        while (true)
+        {
+            var codes = await CodeCells.AllInnerTextsAsync();
+            if (codes.Any(c => c.Trim().Equals(code, StringComparison.Ordinal)))
+                return true;
+
+            if (!await TryGoToNextGridPageAsync(codes.FirstOrDefault()?.Trim() ?? string.Empty))
+                return false;
+        }
     }
 
     public async Task<bool> IsDisplayNameInGridAsync(string displayName)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var displayNames = await DisplayNameCells.AllInnerTextsAsync();
-        return displayNames.Any(name => name.Trim().Equals(displayName, StringComparison.Ordinal));
+
+        while (true)
+        {
+            var displayNames = await DisplayNameCells.AllInnerTextsAsync();
+            if (displayNames.Any(name => name.Trim().Equals(displayName, StringComparison.Ordinal)))
+                return true;
+
+            if (!await TryGoToNextGridPageAsync(
+                    (await CodeCells.AllInnerTextsAsync()).FirstOrDefault()?.Trim() ?? string.Empty))
+                return false;
+        }
+    }
+
+    private async Task<bool> TryGoToNextGridPageAsync(string firstCodeBefore)
+    {
+        if (await NextPageBtn.CountAsync() == 0
+            || !await NextPageBtn.IsVisibleAsync()
+            || !await NextPageBtn.IsEnabledAsync())
+            return false;
+
+        await NextPageBtn.ClickAsync();
+        if (!string.IsNullOrEmpty(firstCodeBefore))
+        {
+            await CodeCells
+                .Filter(new LocatorFilterOptions { HasTextString = firstCodeBefore })
+                .First
+                .WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Detached,
+                    Timeout = 10_000,
+                });
+        }
+        else
+        {
+            await Page.WaitForTimeoutAsync(500);
+        }
+
+        return true;
     }
 
     public async Task<bool> IsDefaultUnitInGridAsync(string defaultUnit)

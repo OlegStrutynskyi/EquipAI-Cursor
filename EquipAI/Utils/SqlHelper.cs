@@ -472,6 +472,110 @@ public static class SqlHelper
         await deleteSourceCommand.ExecuteNonQueryAsync();
     }
 
+    public static async Task DeleteCustomFactorImportAsync(string batchId, int year = 2001)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        var batchIdValue = long.Parse(batchId);
+
+        await using (var deleteFactorsCommand = new SqlCommand(
+            """
+            DELETE FROM [factors].[EmissionFactor]
+            WHERE FactorLibraryVersionId IN (
+                SELECT Id FROM [factors].[FactorLibraryVersion] WHERE Year = @year
+            )
+            """,
+            connection))
+        {
+            deleteFactorsCommand.Parameters.AddWithValue("@year", year);
+            await deleteFactorsCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var deleteLinesCommand = new SqlCommand(
+            """
+            DELETE FROM [factors].[FactorImportLine]
+            WHERE BatchId = @batchId
+            """,
+            connection))
+        {
+            deleteLinesCommand.Parameters.AddWithValue("@batchId", batchIdValue);
+            await deleteLinesCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var deleteBatchCommand = new SqlCommand(
+            """
+            DELETE FROM [factors].[FactorImportBatch]
+            WHERE Id = @batchId
+            """,
+            connection))
+        {
+            deleteBatchCommand.Parameters.AddWithValue("@batchId", batchIdValue);
+            await deleteBatchCommand.ExecuteNonQueryAsync();
+        }
+
+        await using var deleteLibraryCommand = new SqlCommand(
+            """
+            DELETE FROM [factors].[FactorLibraryVersion]
+            WHERE Year = @year
+            """,
+            connection);
+        deleteLibraryCommand.Parameters.AddWithValue("@year", year);
+        await deleteLibraryCommand.ExecuteNonQueryAsync();
+    }
+
+    public static async Task DeleteCustomFactorImportByYearAsync(int year = 2001)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var deleteFactorsCommand = new SqlCommand(
+            """
+            DELETE FROM [factors].[EmissionFactor]
+            WHERE FactorLibraryVersionId IN (
+                SELECT Id FROM [factors].[FactorLibraryVersion] WHERE Year = @year
+            )
+            """,
+            connection))
+        {
+            deleteFactorsCommand.Parameters.AddWithValue("@year", year);
+            await deleteFactorsCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var deleteLinesCommand = new SqlCommand(
+            """
+            DELETE FROM [factors].[FactorImportLine]
+            WHERE BatchId IN (
+                SELECT Id FROM [factors].[FactorImportBatch] WHERE Year = @year
+            )
+            """,
+            connection))
+        {
+            deleteLinesCommand.Parameters.AddWithValue("@year", year);
+            await deleteLinesCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var deleteBatchesCommand = new SqlCommand(
+            """
+            DELETE FROM [factors].[FactorImportBatch]
+            WHERE Year = @year
+            """,
+            connection))
+        {
+            deleteBatchesCommand.Parameters.AddWithValue("@year", year);
+            await deleteBatchesCommand.ExecuteNonQueryAsync();
+        }
+
+        await using var deleteLibraryCommand = new SqlCommand(
+            """
+            DELETE FROM [factors].[FactorLibraryVersion]
+            WHERE Year = @year
+            """,
+            connection);
+        deleteLibraryCommand.Parameters.AddWithValue("@year", year);
+        await deleteLibraryCommand.ExecuteNonQueryAsync();
+    }
+
     public static async Task DeletePdfBlobByFileAsync(string fileName)
     {
         var filePath = ResolveTestDataPath(fileName);

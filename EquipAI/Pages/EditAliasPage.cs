@@ -18,8 +18,12 @@ public class EditAliasPage : BasePage
     private ILocator TelemetryProjectDropdown => Page.Locator("#alias-project");
     private ILocator EpaFactorSourceInput => Page.Locator("//label[normalize-space()='EPA']//input | //input[@type='radio' and (@value='EPA' or @value='epa')]");
     private ILocator DefraFactorSourceInput => Page.Locator("//label[normalize-space()='DEFRA']//input | //input[@type='radio' and (@value='DEFRA' or @value='defra')]");
+    private ILocator CustomFactorSourceInput => Page.Locator("//label[normalize-space()='Custom']//input | //input[@type='radio' and (@value='Custom' or @value='CUSTOM' or @value='custom')]");
     private ILocator DefraFactorSourceBtn => Page.Locator("//label[normalize-space()='DEFRA']");
+    private ILocator CustomFactorSourceBtn => Page.Locator("//label[normalize-space()='Custom']");
     private ILocator PreparedFactorsPreviewText => Page.Locator("//h2[@id='alias-prepared-factors-title']");
+    private ILocator PreparedFactorsTable => Page.Locator("//h2[@id='alias-prepared-factors-title']/following::table[1]");
+    private ILocator SelectedTargetTable => Page.Locator("//h3[normalize-space()='Selected Target']/following-sibling::*//table").First;
     private ILocator SaveAliasBtn => Page.Locator("//button[normalize-space()='Save alias']");
     private ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     private ILocator AlertMessage => Page.Locator(
@@ -120,6 +124,15 @@ public class EditAliasPage : BasePage
         return await EpaFactorSourceInput.First.IsCheckedAsync();
     }
 
+    public async Task<bool> IsCustomFactorSourceSelectedAsync()
+    {
+        if (await CustomFactorSourceInput.CountAsync() == 0)
+            return false;
+
+        await CustomFactorSourceInput.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return await CustomFactorSourceInput.First.IsCheckedAsync();
+    }
+
     public async Task SelectDefraFactorSourceAsync()
     {
         await DefraFactorSourceBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -130,6 +143,45 @@ public class EditAliasPage : BasePage
         }
 
         await DefraFactorSourceBtn.ClickAsync();
+    }
+
+    public async Task SelectCustomFactorSourceAsync()
+    {
+        await CustomFactorSourceBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await CustomFactorSourceInput.CountAsync() > 0)
+        {
+            await CustomFactorSourceInput.First.CheckAsync();
+        }
+        else
+        {
+            await CustomFactorSourceBtn.ClickAsync();
+        }
+
+        await SelectedTargetTable.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+    }
+
+    public async Task<IReadOnlyList<PreparedFactorGridRow>> GetPreparedFactorsRowsAsync()
+    {
+        await PreparedFactorsTable.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+        return await ReadFactorRowsAsync(PreparedFactorsTable);
+    }
+
+    public async Task<IReadOnlyList<PreparedFactorGridRow>> GetSelectedTargetFactorRowsAsync()
+    {
+        await SelectedTargetTable.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+        return await ReadFactorRowsAsync(SelectedTargetTable);
     }
 
     public async Task SelectUnitOfMeasureAsync(string code)
@@ -269,6 +321,49 @@ public class EditAliasPage : BasePage
         throw new InvalidOperationException($"Option '{optionText}' was not found.");
     }
 
+    private static async Task<IReadOnlyList<PreparedFactorGridRow>> ReadFactorRowsAsync(ILocator table)
+    {
+        var headers = (await table.Locator("thead th").AllInnerTextsAsync())
+            .Select(h => h.Replace('\u00A0', ' ').Trim().ToUpperInvariant())
+            .ToList();
+        var rows = table.Locator("tbody tr");
+        var count = await rows.CountAsync();
+        var result = new List<PreparedFactorGridRow>();
+
+        for (var i = 0; i < count; i++)
+        {
+            var cells = rows.Nth(i).Locator("td");
+            var cellCount = await cells.CountAsync();
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (var c = 0; c < cellCount && c < headers.Count; c++)
+                values[headers[c]] = (await cells.Nth(c).InnerTextAsync()).Replace('\u00A0', ' ').Trim();
+
+            result.Add(new PreparedFactorGridRow
+            {
+                Year = GetFactorCell(values, "YEAR"),
+                Unit = GetFactorCell(values, "UNIT"),
+                TCo2ePerActivityUnit = GetFactorCell(values, "TCO2E / ACTIVITY UNIT", "TCO2E/ACTIVITY UNIT"),
+                TCo2 = GetFactorCell(values, "TCO2"),
+                TCh4 = GetFactorCell(values, "TCH4"),
+                TN2o = GetFactorCell(values, "TN2O", "TH2O"),
+                SourceFileLine = GetFactorCell(values, "SOURCE FILE LINE"),
+            });
+        }
+
+        return result;
+    }
+
+    private static string GetFactorCell(IReadOnlyDictionary<string, string> values, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (values.TryGetValue(key, out var value))
+                return value;
+        }
+
+        return string.Empty;
+    }
+
     private async Task OpenSearchableSelectAsync(ILocator dropdown)
     {
         await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -326,4 +421,15 @@ public class EditAliasPage : BasePage
 
         return (await dropdown.TextContentAsync())?.Trim() ?? string.Empty;
     }
+}
+
+public sealed class PreparedFactorGridRow
+{
+    public required string Year { get; init; }
+    public required string Unit { get; init; }
+    public required string TCo2ePerActivityUnit { get; init; }
+    public required string TCo2 { get; init; }
+    public required string TCh4 { get; init; }
+    public required string TN2o { get; init; }
+    public required string SourceFileLine { get; init; }
 }

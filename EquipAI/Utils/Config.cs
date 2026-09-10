@@ -27,6 +27,7 @@ public static class Config
     public const string SetupCode1 = "DONTDELETECODE1";
     public const string SetupCode2 = "DONTDELETECODE2";
     public const string SetupCode3 = "DONTDELETECODE3";
+    public const string SetupCodePropane = "PROPANE";
     public const string SetupDefaultUnitCode1 = "US_GAL";
     public const string SetupDefaultUnitCode2 = "T";
     public const string SetupDefaultUnitName1 = "US Gallon";
@@ -38,9 +39,11 @@ public static class Config
     public const string SetupEmissionTypeName1 = "DONT DELETE EMISSION TYPE 1";
     public const string SetupEmissionTypeName2 = "DONT DELETE EMISSION TYPE 2";
     public const string SetupEmissionTypeName3 = "DONT DELETE EMISSION TYPE 3";
+    public const string SetupEmissionNamePropane = "Propane";
     public const string SetupAliasUnit = "DONT DELETE ALIAS UNIT";
     public const string SetupAliasEmissionType = "DONT DELETE ALIAS EMISSION TYPE";
     public const string SetupAliasFactor1 = "DONT DELETE ALIAS FACTOR1";
+    public const string SetupAliasFactorPropane = "Propane";
     public const string SetupAliasProject1 = "DONT DELETE ALIAS PROJECT 1";
 
     public static bool Headless =>
