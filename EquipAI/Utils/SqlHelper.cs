@@ -443,6 +443,35 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
+    public static async Task DeleteTelemetryByExternalReferenceAsync(string externalReferenceId)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var deleteReadingsCommand = new SqlCommand(
+            """
+            DELETE FROM [telemetry].[EquipmentReading]
+            WHERE SourceId = (
+                SELECT Id FROM [sources].[ActivitySource]
+                WHERE ExternalReferenceId = @externalReferenceId
+            )
+            """,
+            connection))
+        {
+            deleteReadingsCommand.Parameters.AddWithValue("@externalReferenceId", externalReferenceId);
+            await deleteReadingsCommand.ExecuteNonQueryAsync();
+        }
+
+        await using var deleteSourceCommand = new SqlCommand(
+            """
+            DELETE FROM [sources].[ActivitySource]
+            WHERE ExternalReferenceId = @externalReferenceId
+            """,
+            connection);
+        deleteSourceCommand.Parameters.AddWithValue("@externalReferenceId", externalReferenceId);
+        await deleteSourceCommand.ExecuteNonQueryAsync();
+    }
+
     public static async Task DeletePdfBlobByFileAsync(string fileName)
     {
         var filePath = ResolveTestDataPath(fileName);

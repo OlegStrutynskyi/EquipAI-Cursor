@@ -39,9 +39,9 @@ public class InvoicesTests : BaseTest
     {
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
-        var importPDFInvoicePage = await invoicesPage.ClickImportPDFBtnAsync();
+        var importInvoicePage = await invoicesPage.ClickImportPDFBtnAsync();
 
-        (await importPDFInvoicePage.IsImportTitleVisibleAsync()).Should().BeTrue();
+        (await importInvoicePage.IsImportTitleVisibleAsync()).Should().BeTrue();
     }
 
     [Test]

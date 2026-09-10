@@ -6,14 +6,16 @@ public class ImportInvoicePage : BasePage
 {
     public ImportInvoicePage(IPage page) : base(page) { }
 
-    private ILocator ImportTitle => Page.Locator("//h1[@id='invoice-import-title']");
+    private ILocator ImportTitle => Page.Locator("//h1[@id='invoice-import-title'] | //h1[contains(@id,'title')]");
     private ILocator ImportMessage => Page.Locator(
         "//p[@class='invoice-import__lead'] | //p[contains(@class,'page-header__lead')]");
     private ILocator BackBtn => Page.Locator("//a[contains(text(),'Back')]");
     private ILocator CsvFileLabel => Page.Locator("//span[@id='invoice-csv-file-label']");
+    private ILocator PdfFileLabel => Page.Locator("//span[@id='invoice-pdf-file-label']");
     private ILocator ImportSection => Page.Locator("//div[@class='form-file-picker']");
     private ILocator ChooseFileBtn => Page.Locator("//label[normalize-space()='Choose file']");
-    private ILocator FileInput => Page.Locator("#invoice-csv-file");
+    private ILocator CsvFileInput => Page.Locator("#invoice-csv-file");
+    private ILocator PdfFileInput => Page.Locator("#invoice-pdf-file");
     private ILocator ImportBtn => Page.Locator("//button[normalize-space()='Import']");
     private ILocator AlertMessage => Page.Locator("//span[@role='alert']");
 
@@ -22,6 +24,14 @@ public class ImportInvoicePage : BasePage
         var invoicesPage = new InvoicesPage(Page);
         await invoicesPage.OpenAsync();
         await invoicesPage.ClickImportCSVBtnAsync();
+        await WaitForLoadedAsync();
+    }
+
+    public async Task OpenPdfAsync()
+    {
+        var invoicesPage = new InvoicesPage(Page);
+        await invoicesPage.OpenAsync();
+        await invoicesPage.ClickImportPDFBtnAsync();
         await WaitForLoadedAsync();
     }
 
@@ -46,6 +56,7 @@ public class ImportInvoicePage : BasePage
     public Task<bool> IsImportMessageVisibleAsync() => ImportMessage.IsVisibleAsync();
     public Task<bool> IsBackBtnVisibleAsync() => BackBtn.IsVisibleAsync();
     public Task<bool> IsCsvFileLabelVisibleAsync() => CsvFileLabel.IsVisibleAsync();
+    public Task<bool> IsPdfFileLabelVisibleAsync() => PdfFileLabel.IsVisibleAsync();
     public Task<bool> IsImportSectionVisibleAsync() => ImportSection.IsVisibleAsync();
     public Task<bool> IsChooseFileBtnVisibleAsync() => ChooseFileBtn.IsVisibleAsync();
     public Task<bool> IsImportBtnVisibleAsync() => ImportBtn.IsVisibleAsync();
@@ -53,19 +64,23 @@ public class ImportInvoicePage : BasePage
 
     public async Task UploadCsvFileAsync(string fileName)
     {
-        var filePath = Path.Combine(AppContext.BaseDirectory, "TestData", fileName);
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException($"Test data file was not found: {filePath}");
-
-        await FileInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached });
-        await FileInput.SetInputFilesAsync(filePath);
+        var filePath = ResolveTestDataPath(fileName);
+        await CsvFileInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached });
+        await CsvFileInput.SetInputFilesAsync(filePath);
         await ImportBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await Assertions.Expect(ImportBtn).ToBeEnabledAsync();
     }
 
+    public async Task UploadPdfFileAsync(string fileName)
+    {
+        var filePath = ResolveTestDataPath(fileName);
+        await PdfFileInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached });
+        await PdfFileInput.SetInputFilesAsync(filePath);
+    }
+
     public async Task ClickImportBtnAsync()
     {
-        await ImportBtn.ClickAsync();
+        await ImportBtn.ClickAsync(new LocatorClickOptions { Force = true });
     }
 
     public async Task<InvoicesPage> ImportCsvAsync(string fileName)
@@ -106,10 +121,54 @@ public class ImportInvoicePage : BasePage
         return invoicesPage;
     }
 
+    public async Task ImportPdfAsync(string fileName, string expectedToasterMessage)
+    {
+        await UploadPdfFileAsync(fileName);
+        await ImportBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Assertions.Expect(ImportBtn).ToBeEnabledAsync(new LocatorAssertionsToBeEnabledOptions
+        {
+            Timeout = 30_000,
+        });
+
+        var toasterTask = GetToasterMessageAsync(expectedToasterMessage);
+        var alertTask = AlertMessage.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 60_000,
+        });
+
+        await ImportBtn.ClickAsync();
+
+        var completed = await Task.WhenAny(toasterTask, alertTask);
+        if (completed == alertTask)
+        {
+            await alertTask;
+            var alert = (await AlertMessage.InnerTextAsync()).Trim();
+            if (!alert.Contains(expectedToasterMessage, StringComparison.Ordinal))
+                throw new InvalidOperationException($"PDF import failed with alert: {alert}");
+            return;
+        }
+
+        await toasterTask;
+    }
+
     public async Task<string> GetAlertMessageAsync()
     {
         await AlertMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         return (await AlertMessage.InnerTextAsync()).Trim();
+    }
+
+    public async Task<string> GetToasterMessageAsync(string expectedText)
+    {
+        var toast = Page.Locator(
+            $"//*[contains(@class,'toast') or contains(@class,'toaster') or contains(@class,'alert--success') or @role='status']" +
+            $"[contains(normalize-space(.), \"{expectedText}\")]");
+        await toast.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 60_000,
+        });
+        return (await toast.First.InnerTextAsync()).Trim();
     }
 
     public async Task<InvoicesPage> ClickBackBtnAsync()
@@ -125,5 +184,22 @@ public class ImportInvoicePage : BasePage
         var invoicesPage = new InvoicesPage(Page);
         await invoicesPage.GetTitleAsync();
         return invoicesPage;
+    }
+
+    private static string ResolveTestDataPath(string fileName)
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "TestData", fileName),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "TestData", fileName)),
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        throw new FileNotFoundException($"Test data file was not found: {fileName}");
     }
 }

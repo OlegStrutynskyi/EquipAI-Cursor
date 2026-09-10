@@ -79,15 +79,15 @@ public class InvoicesPage : BasePage
         return importInvoicePage;
     }
 
-    public async Task<ImportPDFInvoicePage> ClickImportPDFBtnAsync()
+    public async Task<ImportInvoicePage> ClickImportPDFBtnAsync()
     {
         await ImportPDFBtn.ClickAsync();
         await Page.WaitForURLAsync(
             url => url.Contains("/invoices/", StringComparison.OrdinalIgnoreCase)
                    && url.Contains("pdf", StringComparison.OrdinalIgnoreCase));
-        var importPDFInvoicePage = new ImportPDFInvoicePage(Page);
-        await importPDFInvoicePage.WaitForLoadedAsync();
-        return importPDFInvoicePage;
+        var importInvoicePage = new ImportInvoicePage(Page);
+        await importInvoicePage.WaitForLoadedAsync();
+        return importInvoicePage;
     }
 
     public async Task<ViewInvoicePage> ClickViewBtnAsync(string invoiceNumber)
