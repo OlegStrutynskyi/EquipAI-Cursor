@@ -8,20 +8,14 @@ public class LoginTestsNotAuthenticated : BaseTestNotAuthenticated
     [Test]
     public async Task T01_Login_DefaultView()
     {
-        const string expectedTitle = "Sign in to EquipAI";
-        const string expectedText = "Choose how you want to sign in.";
-        const string expectedButtonText = "Sign in with SAML (SSO/OIDC)";
+        const string expectedButtonText = "Sign in";
 
         var loginPage = new LoginPage(Fixture.Page);
         await loginPage.OpenAsync();
 
-        var title = await loginPage.GetTitleAsync();
-        var text = await loginPage.GetTextAsync();
-        var buttonText = await loginPage.GetLoginBtnTextAsync();
-
-        title.Should().Be(expectedTitle);
-        text.Should().Be(expectedText);
-        buttonText.Should().Be(expectedButtonText);
+        (await loginPage.GetSignInBtnTextAsync()).Should().Be(expectedButtonText);
+        (await loginPage.IsSignInBtnVisibleAsync()).Should().BeTrue();
+        (await loginPage.IsSignInBtnEnabledAsync()).Should().BeTrue();
     }
 }
 

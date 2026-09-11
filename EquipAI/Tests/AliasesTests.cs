@@ -11,7 +11,7 @@ public class AliasesTests : BaseTest
     {
         const string expectedPageTitle = "Aliases";
         const string expectedMessage =
-            "Manage import-time synonyms. Unit aliases are global (invoice ingestion and factor catalogs). Emission-type aliases are scoped by context — invoice ingestion vs EPA/DEFRA catalog mapping. Telemetry project aliases map vendor project names during telemetry import.";
+            "Manage import-time synonyms. Unit aliases are global (invoice ingestion and factor catalogs). Emission-type aliases are scoped by context — invoice ingestion vs EPA/DEFRA catalog mapping. Project aliases map vendor project names during import.";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();

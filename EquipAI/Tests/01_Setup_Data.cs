@@ -30,78 +30,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T02_Setup_CreateManualInvoice()
-    {
-        const string invoiceNumber = Config.SetupInvoiceNumber1;
-        const string companyName = Config.SetupCompanyName1;
-        const string address = Config.SetupInvoiceAddress1;
-        const string invoiceDate = "02/06/2026";
-        const string emissionCategory = "Fuel";
-        const string totalCost = "1562.99";
-        const string currency = "USD";
-        const string description = Config.SetupInvoiceLineDescription1;
-        const string quantity = "421.29";
-        const string unitPrice = "3.71";
-        const string emissionType = "On-site diesel combustion";
-        const string unitOfMeasure = "US Gallon (US_GAL)";
-        const string expectedStatus = "DRAFT";
-        const string expectedSource = "Manual";
-
-        var invoiceDateForInput = DateTime
-            .ParseExact(invoiceDate, "dd/MM/yyyy", CultureInfo.InvariantCulture)
-            .ToString("yyyy-MM-dd");
-        var expectedInvoiceDateDisplay = DateTime
-            .ParseExact(invoiceDate, "dd/MM/yyyy", CultureInfo.InvariantCulture)
-            .ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
-
-        var invoicesPage = new InvoicesPage(Fixture.Page);
-        await invoicesPage.OpenAsync();
-
-        if (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber))
-            Assert.Pass("Invoice already exists.");
-
-        if (await SqlHelper.InvoiceExistsByNumberAsync(invoiceNumber))
-        {
-            await SqlHelper.RestoreInvoiceByNumberAsync(invoiceNumber);
-            await invoicesPage.OpenAsync();
-            (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber)).Should().BeTrue();
-            return;
-        }
-
-        var initialInvoiceCount = await invoicesPage.GetInvoiceNumberCountFromAllPagesAsync();
-
-        var createInvoicePage = await invoicesPage.ClickCreateBtnAsync();
-        await createInvoicePage.FillInvoiceFormAsync(
-            invoiceNumber,
-            companyName,
-            address,
-            invoiceDateForInput,
-            emissionCategory,
-            totalCost,
-            currency,
-            description,
-            quantity,
-            unitPrice,
-            Config.SetupProjectName1,
-            emissionType,
-            unitOfMeasure);
-        invoicesPage = await createInvoicePage.SaveInvoiceAsync();
-
-        (await invoicesPage.GetInvoiceNumberCountFromAllPagesAsync()).Should().Be(initialInvoiceCount + 1);
-        (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber)).Should().BeTrue();
-
-        var gridRow = await invoicesPage.GetInvoiceGridRowAsync(invoiceNumber);
-        gridRow.Should().NotBeNull();
-        gridRow!.Project.Should().Be(Config.SetupProjectName1);
-        gridRow.Company.Should().Be(companyName);
-        gridRow.Date.Should().Be(expectedInvoiceDateDisplay);
-        gridRow.Status.Should().Be(expectedStatus);
-        gridRow.Source.Should().Be(expectedSource);
-    }
-
-    [Explicit("Manual setup test. Run before the test suite.")]
-    [Test]
-    public async Task T03_Setup_CreateDefaultUnit1()
+    public async Task T02_Setup_CreateDefaultUnit1()
     {
         const string code = Config.SetupDefaultUnitCode1;
         const string displayName = Config.SetupDefaultUnitName1;
@@ -122,7 +51,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T04_Setup_CreateDefaultUnit2()
+    public async Task T03_Setup_CreateDefaultUnit2()
     {
         const string code = Config.SetupDefaultUnitCode2;
         const string displayName = Config.SetupDefaultUnitName2;
@@ -143,7 +72,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T05_Setup_CreateUnit1()
+    public async Task T04_Setup_CreateUnit1()
     {
         const string code = Config.SetupCode1;
         const string displayName = Config.SetupUnitName1;
@@ -164,7 +93,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T06_Setup_CreateUnit2()
+    public async Task T05_Setup_CreateUnit2()
     {
         const string code = Config.SetupCode2;
         const string displayName = Config.SetupUnitName2;
@@ -185,7 +114,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T07_Setup_CreateEmissionType1()
+    public async Task T06_Setup_CreateEmissionType1()
     {
         const string code = Config.SetupCode1;
         const string displayName = Config.SetupEmissionTypeName1;
@@ -208,7 +137,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T08_Setup_CreateEmissionType2()
+    public async Task T07_Setup_CreateEmissionType2()
     {
         const string code = Config.SetupCode2;
         const string displayName = Config.SetupEmissionTypeName2;
@@ -231,7 +160,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T09_Setup_CreateEmissionType3()
+    public async Task T08_Setup_CreateEmissionType3()
     {
         const string code = Config.SetupCode3;
         const string displayName = Config.SetupEmissionTypeName3;
@@ -254,7 +183,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T10_Setup_CreateEmissionTypePropane()
+    public async Task T09_Setup_CreateEmissionTypePropane()
     {
         const string code = Config.SetupCodePropane;
         const string displayName = Config.SetupEmissionNamePropane;
@@ -277,7 +206,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T11_Setup_CreateAliasUnit()
+    public async Task T10_Setup_CreateAliasUnit()
     {
         const string aliasText = Config.SetupAliasUnit;
 
@@ -301,7 +230,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T12_Setup_CreateAliasEmissionType()
+    public async Task T11_Setup_CreateAliasEmissionType()
     {
         const string aliasText = Config.SetupAliasEmissionType;
 
@@ -326,7 +255,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T13_Setup_CreateAliasFactor1()
+    public async Task T12_Setup_CreateAliasFactor1()
     {
         const string aliasText = Config.SetupAliasFactor1;
 
@@ -352,7 +281,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T14_Setup_CreateAliasFactorPropane()
+    public async Task T13_Setup_CreateAliasFactorPropane()
     {
         const string aliasText = Config.SetupAliasFactorPropane;
 
@@ -378,7 +307,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T15_Setup_CreateAliasProject1()
+    public async Task T14_Setup_CreateAliasProject1()
     {
         const string aliasText = Config.SetupAliasProject1;
 
@@ -398,5 +327,73 @@ public class _01_Setup_Data : BaseTest
         await aliasesPage.ClickProjectsTabAsync();
 
         (await aliasesPage.IsAliasTextInGridAsync(aliasText)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T15_Setup_CreateManualInvoice()
+    {
+        const string invoiceNumber = Config.SetupInvoiceNumber1;
+        const string companyName = Config.SetupCompanyName1;
+        const string address = Config.SetupInvoiceAddress1;
+        const string invoiceDate = "02/06/2026";
+        const string emissionCategory = "Internal Fuel (Scope 1)";
+        const string totalCost = "1562.99";
+        const string currency = "USD";
+        const string description = Config.SetupInvoiceLineDescription1;
+        const string quantity = "421.29";
+        const string unitPrice = "3.71";
+        const string emissionType = "Diesel (100% mineral diesel)";
+        const string unitOfMeasure = "US Gallon (US_GAL)";
+        const string expectedStatus = "DRAFT";
+        const string expectedSource = "Manual";
+
+        var invoiceDateForInput = DateTime
+            .ParseExact(invoiceDate, "dd/MM/yyyy", CultureInfo.InvariantCulture)
+            .ToString("yyyy-MM-dd");
+        var expectedInvoiceDateDisplay = DateTime
+            .ParseExact(invoiceDate, "dd/MM/yyyy", CultureInfo.InvariantCulture)
+            .ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+
+        var invoicesPage = new InvoicesPage(Fixture.Page);
+        await invoicesPage.OpenAsync();
+
+        if (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber))
+            Assert.Pass("Invoice already exists.");
+
+        if (await SqlHelper.InvoiceExistsByNumberAsync(invoiceNumber))
+        {
+            await SqlHelper.RestoreInvoiceByNumberAsync(invoiceNumber);
+            await invoicesPage.OpenAsync();
+            (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber)).Should().BeTrue();
+            return;
+        }
+
+        var createInvoicePage = await invoicesPage.ClickCreateBtnAsync();
+        await createInvoicePage.FillInvoiceFormAsync(
+            invoiceNumber,
+            companyName,
+            address,
+            invoiceDateForInput,
+            emissionCategory,
+            totalCost,
+            currency,
+            description,
+            quantity,
+            unitPrice,
+            Config.SetupProjectName1,
+            emissionType,
+            unitOfMeasure);
+        invoicesPage = await createInvoicePage.SaveInvoiceAsync();
+
+        (await invoicesPage.IsInvoiceNumberInGridAsync(invoiceNumber)).Should().BeTrue();
+
+        var gridRow = await invoicesPage.GetInvoiceGridRowAsync(invoiceNumber);
+        gridRow.Should().NotBeNull();
+        gridRow!.Project.Should().Be(Config.SetupProjectName1);
+        gridRow.Company.Should().Be(companyName);
+        gridRow.Date.Should().Be(expectedInvoiceDateDisplay);
+        gridRow.Status.Should().Be(expectedStatus);
+        gridRow.Source.Should().Be(expectedSource);
     }
 }

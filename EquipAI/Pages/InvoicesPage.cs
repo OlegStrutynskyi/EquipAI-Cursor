@@ -31,6 +31,9 @@ public class InvoicesPage : BasePage
         await Page.GotoAsync(Config.BaseUrl + "invoices");
         await InvoicesTitle.WaitForAsync();
         await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[2][normalize-space()!='']")
+            .First
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     public async Task<string> GetTitleAsync()
@@ -92,78 +95,26 @@ public class InvoicesPage : BasePage
 
     public async Task<ViewInvoicePage> ClickViewBtnAsync(string invoiceNumber)
     {
-        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await WaitForPaginationStableAsync();
+        var row = await FindInvoiceRowAcrossPagesAsync(invoiceNumber)
+            ?? throw new InvalidOperationException($"Invoice '{invoiceNumber}' was not found in the grid.");
 
-        while (true)
-        {
-            var row = await FindInvoiceRowOnCurrentPageAsync(invoiceNumber);
-            if (row is not null)
-            {
-                var viewBtn = row.GetByRole(AriaRole.Button, new() { Name = "View" });
-                await viewBtn.ClickAsync();
+        await row.GetByRole(AriaRole.Button, new() { Name = "View" }).ClickAsync();
 
-                var viewInvoicePage = new ViewInvoicePage(Page);
-                await viewInvoicePage.GetTitleAsync();
-                return viewInvoicePage;
-            }
-
-            if (!await IsPaginationButtonEnabledAsync(NextBtn))
-                break;
-
-            try
-            {
-                await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
-            }
-
-            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
-        }
-
-        throw new InvalidOperationException($"Invoice '{invoiceNumber}' was not found in the grid.");
+        var viewInvoicePage = new ViewInvoicePage(Page);
+        await viewInvoicePage.GetTitleAsync();
+        return viewInvoicePage;
     }
 
     public async Task<EditInvoicePage> ClickEditBtnAsync(string invoiceNumber)
     {
-        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await WaitForPaginationStableAsync();
+        var row = await FindInvoiceRowAcrossPagesAsync(invoiceNumber)
+            ?? throw new InvalidOperationException($"Invoice '{invoiceNumber}' was not found in the grid.");
 
-        while (true)
-        {
-            var row = await FindInvoiceRowOnCurrentPageAsync(invoiceNumber);
-            if (row is not null)
-            {
-                var editBtn = row.GetByRole(AriaRole.Button, new() { Name = "Edit" });
-                await editBtn.ClickAsync();
+        await row.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
 
-                var editInvoicePage = new EditInvoicePage(Page);
-                await editInvoicePage.WaitForLoadedAsync();
-                return editInvoicePage;
-            }
-
-            if (!await IsPaginationButtonEnabledAsync(NextBtn))
-                break;
-
-            try
-            {
-                await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
-            }
-
-            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
-        }
-
-        throw new InvalidOperationException($"Invoice '{invoiceNumber}' was not found in the grid.");
+        var editInvoicePage = new EditInvoicePage(Page);
+        await editInvoicePage.WaitForLoadedAsync();
+        return editInvoicePage;
     }
 
     public async Task<bool> IsEditBtnVisibleForInvoiceAsync(string invoiceNumber)
@@ -325,6 +276,9 @@ public class InvoicesPage : BasePage
             }
 
             await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[2][normalize-space()!='']")
+                .First
+                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
             await WaitForPaginationStableAsync();
         }
 
@@ -368,16 +322,20 @@ public class InvoicesPage : BasePage
 
     private static async Task<bool> IsPaginationButtonEnabledAsync(ILocator button)
     {
-        if (!await button.IsVisibleAsync())
+        if (await button.CountAsync() == 0 || !await button.IsVisibleAsync())
             return false;
 
-        if (await button.GetAttributeAsync("disabled") is not null)
-            return false;
-
-        return await button.IsEnabledAsync();
+        return await button.EvaluateAsync<bool>(
+            """
+            el => !(
+              el.disabled
+              || el.hasAttribute('disabled')
+              || el.getAttribute('aria-disabled') === 'true'
+              || el.classList.contains('disabled')
+            )
+            """);
     }
 }
-
 public sealed class InvoiceGridRow
 {
     public required string Project { get; init; }

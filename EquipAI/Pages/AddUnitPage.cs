@@ -18,6 +18,10 @@ public class AddUnitPage : UnitFormPage
     public async Task<UnitsPage> CreateUnitAsync()
     {
         await CreateUnitBtn.ClickAsync();
-        return await ReturnToUnitsAsync();
+        await Page.WaitForURLAsync("**/admin/units");
+        await Page.ReloadAsync();
+        var unitsPage = new UnitsPage(Page);
+        await unitsPage.WaitForLoadedAsync();
+        return unitsPage;
     }
 }

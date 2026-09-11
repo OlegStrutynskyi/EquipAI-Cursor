@@ -8,13 +8,12 @@ public class LoginPage : BasePage
     public LoginPage(IPage page) : base(page) { }
 
     private ILocator LoginTitle => Page.Locator("//h1").First;
-    private ILocator LoginText => Page.Locator("//p[contains(text(),'Choose')]");
-    private ILocator LoginBtn => Page.Locator("//button[contains(text(),'Sign in')]");
+    private ILocator SignInBtn => Page.Locator("//button[contains(@class,'login__action')]");
 
     public async Task OpenAsync()
     {
         await Page.GotoAsync(Config.BaseUrl + "login");
-        await LoginTitle.WaitForAsync();
+        await SignInBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     public async Task<string> GetTitleAsync()
@@ -23,17 +22,15 @@ public class LoginPage : BasePage
         return (await LoginTitle.TextContentAsync()) ?? string.Empty;
     }
 
-    public async Task<string> GetTextAsync()
+    public async Task<string> GetSignInBtnTextAsync()
     {
-        await LoginText.WaitForAsync();
-        return (await LoginText.TextContentAsync()) ?? string.Empty;
+        await SignInBtn.WaitForAsync();
+        return (await SignInBtn.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
-    public async Task<string> GetLoginBtnTextAsync()
-    {
-        await LoginBtn.WaitForAsync();
-        return (await LoginBtn.TextContentAsync())?.Trim() ?? string.Empty;
-    }
+    public Task<bool> IsSignInBtnVisibleAsync() => SignInBtn.IsVisibleAsync();
 
-    public Task ClickLoginBtnAsync() => LoginBtn.ClickAsync();
+    public async Task<bool> IsSignInBtnEnabledAsync() => await SignInBtn.IsEnabledAsync();
+
+    public Task ClickLoginBtnAsync() => SignInBtn.ClickAsync();
 }

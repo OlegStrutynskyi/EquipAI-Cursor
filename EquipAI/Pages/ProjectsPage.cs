@@ -26,10 +26,9 @@ public class ProjectsPage : BasePage
     {
         await PageTitle.WaitForAsync();
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Grid.Locator("tbody tr").First.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
+        await Grid.Locator("xpath=.//tbody/tr/td[normalize-space()!='']")
+            .First
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     public async Task<IReadOnlyList<(string Code, string Name)>> GetAllCodesAndNamesAsync()

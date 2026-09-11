@@ -16,14 +16,14 @@ public class EditInvoiceTests : BaseTest
         const string expectedAddress = Config.SetupInvoiceAddress1;
         const string expectedProject = Config.SetupProjectName1;
         const string expectedInvoiceDate = "2026-06-02";
-        const string expectedCategory = "Fuel";
+        const string expectedCategory = "Internal Fuel (Scope 1)";
         const string expectedTotalCost = "1562.99";
         const string expectedCurrency = "USD";
         const string expectedDescription = Config.SetupInvoiceLineDescription1;
         const string expectedQuantity = "421.29";
         const string expectedUnitPrice = "3.71";
         const string expectedCost = "1562.99";
-        const string expectedEmissionType = "On-site diesel combustion";
+        const string expectedEmissionType = "Diesel (100% mineral diesel)";
         const string expectedUnit = "US Gallon (US_GAL)";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);

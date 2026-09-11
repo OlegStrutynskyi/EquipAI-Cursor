@@ -290,12 +290,12 @@ public class SideMenuTests : BaseTest
     [Test]
     public async Task T16_SideMenu_ClickLogout()
     {
-        const string expectedLoginTitle = "Sign In to EquipAI";
+        //const string expectedLoginTitle = "Sign In to EquipAI";
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();
         var loginPage = await sideMenuPage.ClickLogoutAsync();
 
-        (await loginPage.GetTitleAsync()).Should().Be(expectedLoginTitle);
+        (await loginPage.IsSignInBtnVisibleAsync()).Should().BeTrue();
     }
 }

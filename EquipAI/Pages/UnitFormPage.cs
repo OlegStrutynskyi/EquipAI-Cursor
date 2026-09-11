@@ -16,7 +16,7 @@ public abstract class UnitFormPage : BasePage
     protected ILocator ScaleInput => Page.Locator("//input[@id='unit-scale']");
     protected ILocator ScaleHelpMessage => Page.Locator("//input[@id='unit-scale']/following-sibling::p");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
-    protected ILocator AlertMessage => Page.Locator("//p[@role='alert']");
+    protected ILocator AlertMessage => Page.Locator("//div[@class='alert__content']");
 
     public Task<bool> IsCodeInputVisibleAsync() => CodeInput.IsVisibleAsync();
     public Task<bool> IsDisplayNameInputVisibleAsync() => DisplayNameInput.IsVisibleAsync();

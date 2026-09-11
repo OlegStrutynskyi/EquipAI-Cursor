@@ -199,8 +199,8 @@ public class EmissionTypesTests : BaseTest
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var codePrefix = $"Code{stamp}";
         var displayNamePrefix = $"Type{stamp}";
-        var code = codePrefix + GenerateRandomString(64 - codePrefix.Length);
-        var displayName = displayNamePrefix + GenerateRandomString(256 - displayNamePrefix.Length);
+        var code = codePrefix + GenerateRandomAlphanumericString(64 - codePrefix.Length);
+        var displayName = displayNamePrefix + GenerateRandomAlphanumericString(256 - displayNamePrefix.Length);
 
         try
         {
@@ -347,13 +347,14 @@ public class EmissionTypesTests : BaseTest
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var codePrefix = $"Code{stamp}";
         var displayNamePrefix = $"Type{stamp}";
-        var code = codePrefix + GenerateRandomString(64 - codePrefix.Length);
-        var displayName = displayNamePrefix + GenerateRandomString(256 - displayNamePrefix.Length);
+        var code = codePrefix + GenerateRandomAlphanumericString(64 - codePrefix.Length);
+        var displayName = displayNamePrefix + GenerateRandomAlphanumericString(256 - displayNamePrefix.Length);
         var expectedDefaultUnit = $"{Config.SetupDefaultUnitCode2} — {Config.SetupDefaultUnitName2}";
         object? emissionTypeId = null;
 
         try
         {
+            await SqlHelper.RestoreEmissionTypeByCodeAsync(Config.SetupCode1);
             emissionTypeId = await SqlHelper.GetEmissionTypeIdByCodeAsync(Config.SetupCode1);
 
             var emissionTypesPage = new EmissionTypesPage(Fixture.Page);

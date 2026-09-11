@@ -11,13 +11,13 @@ public class ViewInvoiceTests : BaseTest
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedAddress = Config.SetupInvoiceAddress1;
-        const string expectedCategory = "Fuel";
+        const string expectedCategory = "Internal Fuel";
         const string expectedTotal = "1,562.99 USD";
         const string expectedDescription = Config.SetupInvoiceLineDescription1;
         const string expectedQty = "421.29";
         const string expectedUnitPrice = "3.71";
         const string expectedCost = "1,562.99";
-        const string expectedEmissionType = "On-site diesel combustion";
+        const string expectedEmissionType = "Diesel (100% mineral diesel)";
         const string expectedUnit = "US Gallon (US_GAL)";
         const string expectedGridStatus = "DRAFT";
         const string expectedViewStatus = "Draft";

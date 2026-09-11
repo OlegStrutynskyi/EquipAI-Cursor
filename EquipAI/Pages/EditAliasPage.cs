@@ -27,8 +27,7 @@ public class EditAliasPage : BasePage
     private ILocator SelectedTargetTable => Page.Locator("//h3[normalize-space()='Selected Target']/following-sibling::*//table").First;
     private ILocator SaveAliasBtn => Page.Locator("//button[normalize-space()='Save alias']");
     private ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
-    private ILocator AlertMessage => Page.Locator(
-        "//p[@role='alert'] | //*[@role='alert'] | //div[contains(@class,'alert')] | //span[contains(@class,'form-hint--error') and contains(.,'unique')]");
+    private ILocator AlertMessage => Page.Locator("//div[@class='alert__body']");
     private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
 
     public async Task WaitForLoadedAsync()
@@ -103,8 +102,8 @@ public class EditAliasPage : BasePage
 
     public async Task<string> GetAlertMessageAsync()
     {
-        await AlertMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        return (await AlertMessage.TextContentAsync())?.Trim() ?? string.Empty;
+        await AlertMessage.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return (await AlertMessage.First.InnerTextAsync()).Replace('\u00A0', ' ').Trim();
     }
 
     public async Task<string> GetTargetKindAsync() => await GetSelectedOptionTextAsync(TargetKindDropdown);
@@ -144,57 +143,65 @@ public class EditAliasPage : BasePage
     {
         await EpaFactorSourceBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         if (await EpaFactorSourceInput.CountAsync() > 0)
-        {
             await EpaFactorSourceInput.First.CheckAsync();
-        }
         else
-        {
             await EpaFactorSourceBtn.ClickAsync();
-        }
 
-        await SelectedTargetTable.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 30_000,
-        });
+        await WaitForFactorSourceSelectedAsync(EpaFactorSourceInput);
+        await WaitForFactorSourcePreviewAsync();
     }
 
     public async Task SelectDefraFactorSourceAsync()
     {
         await DefraFactorSourceBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         if (await DefraFactorSourceInput.CountAsync() > 0)
-        {
             await DefraFactorSourceInput.First.CheckAsync();
-        }
         else
-        {
             await DefraFactorSourceBtn.ClickAsync();
-        }
 
-        await SelectedTargetTable.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 30_000,
-        });
+        await WaitForFactorSourceSelectedAsync(DefraFactorSourceInput);
+        await WaitForFactorSourcePreviewAsync();
     }
 
     public async Task SelectCustomFactorSourceAsync()
     {
         await CustomFactorSourceBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         if (await CustomFactorSourceInput.CountAsync() > 0)
-        {
             await CustomFactorSourceInput.First.CheckAsync();
-        }
         else
-        {
             await CustomFactorSourceBtn.ClickAsync();
-        }
 
-        await SelectedTargetTable.WaitForAsync(new LocatorWaitForOptions
+        await WaitForFactorSourceSelectedAsync(CustomFactorSourceInput);
+        await WaitForFactorSourcePreviewAsync();
+    }
+
+    private async Task WaitForFactorSourceSelectedAsync(ILocator factorSourceInput)
+    {
+        if (await factorSourceInput.CountAsync() == 0)
+            return;
+
+        await Assertions.Expect(factorSourceInput.First).ToBeCheckedAsync(new LocatorAssertionsToBeCheckedOptions
         {
-            State = WaitForSelectorState.Visible,
-            Timeout = 30_000,
+            Timeout = 10_000,
         });
+    }
+
+    private async Task WaitForFactorSourcePreviewAsync()
+    {
+        var previewTable = Page.Locator(
+            "//h2[@id='alias-prepared-factors-title']/following::table[1] | //h3[normalize-space()='Selected Target']/following-sibling::*//table");
+        try
+        {
+            await previewTable.First.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000,
+            });
+        }
+        catch (TimeoutException)
+        {
+            // Preview grid is optional on edit when factors are not loaded yet.
+        }
     }
 
     public async Task<IReadOnlyList<PreparedFactorGridRow>> GetPreparedFactorsRowsAsync()

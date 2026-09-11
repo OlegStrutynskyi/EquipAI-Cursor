@@ -41,6 +41,12 @@ public class BaseTest
         return new string(Enumerable.Range(0, length).Select(_ => chars[Random.Shared.Next(chars.Length)]).ToArray());
     }
 
+    protected static string GenerateRandomAlphanumericString(int length)
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        return new string(Enumerable.Range(0, length).Select(_ => chars[Random.Shared.Next(chars.Length)]).ToArray());
+    }
+
     protected static Task SetUserCapabilitiesAndLoginAsync(PlaywrightFixture fixture, int capabilities) =>
         SetUserCapabilitiesAndLoginAsync(fixture, Config.MicrosoftEmail, capabilities);
 

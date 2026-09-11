@@ -176,8 +176,8 @@ public class UnitsTests : BaseTest
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
         var codePrefix = $"Code{stamp}";
         var displayNamePrefix = $"Unit{stamp}";
-        var code = codePrefix + GenerateRandomString(32 - codePrefix.Length);
-        var displayName = displayNamePrefix + GenerateRandomString(128 - displayNamePrefix.Length);
+        var code = codePrefix + GenerateRandomAlphanumericString(32 - codePrefix.Length);
+        var displayName = displayNamePrefix + GenerateRandomAlphanumericString(128 - displayNamePrefix.Length);
 
         try
         {
@@ -423,7 +423,7 @@ public class UnitsTests : BaseTest
         await emissionTypesPage.OpenAsync();
 
         if (!await emissionTypesPage.IsDefaultUnitInGridAsync(expectedDefaultUnit))
-            Assert.Fail("Setup is not complete. Run test 'T07_Setup_CreateEmissionType1'.");
+            Assert.Fail("Setup is not complete. Run test 'T06_Setup_CreateEmissionType1'.");
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();

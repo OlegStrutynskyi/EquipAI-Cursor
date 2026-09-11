@@ -30,7 +30,10 @@ public class EditEmissionTypePage : EmissionTypeFormPage
     public async Task<EmissionTypesPage> SaveEmissionTypeAsync()
     {
         await SaveEmissionTypeBtn.ClickAsync();
-        return await ReturnToEmissionTypesAsync();
+        var emissionTypesPage = await ReturnToEmissionTypesAsync();
+        await Page.ReloadAsync();
+        await emissionTypesPage.WaitForLoadedAsync();
+        return emissionTypesPage;
     }
 
     public Task<bool> IsSaveEmissionTypeBtnVisibleAsync() => SaveEmissionTypeBtn.IsVisibleAsync();
