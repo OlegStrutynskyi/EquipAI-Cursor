@@ -100,6 +100,10 @@ public class EditEmissionCategoryPage : BasePage
     public async Task<EmissionCategoriesPage> SaveCategoryAsync()
     {
         await SaveCategoryBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url => url.Contains("/admin/emission-categories", StringComparison.OrdinalIgnoreCase)
+                   && !url.Contains("/edit", StringComparison.OrdinalIgnoreCase),
+            new PageWaitForURLOptions { Timeout = 60_000 });
         var emissionCategoriesPage = new EmissionCategoriesPage(Page);
         await emissionCategoriesPage.WaitForLoadedAsync();
         return emissionCategoriesPage;

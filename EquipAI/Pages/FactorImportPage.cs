@@ -178,7 +178,7 @@ public class FactorImportPage : BasePage
         await ImportResultLabel.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
-            Timeout = 60_000,
+            Timeout = 180_000,
         });
     }
 

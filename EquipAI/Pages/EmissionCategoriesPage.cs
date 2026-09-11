@@ -25,10 +25,12 @@ public class EmissionCategoriesPage : BasePage
     {
         await PageTitle.WaitForAsync();
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Grid.Locator("tbody tr").First.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-        });
+        await Grid.Locator("xpath=.//tbody/tr/td[normalize-space()!='']")
+            .First
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Grid.Locator("tbody tr").First
+            .GetByRole(AriaRole.Button, new() { Name = "Edit" })
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     public async Task<string> GetMessageAsync()
@@ -70,8 +72,18 @@ public class EmissionCategoriesPage : BasePage
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         var row = Grid.Locator(
             $"xpath=.//tbody/tr[td[1][normalize-space()='{displayName}'] and td[2][normalize-space()='{ghgScope}']]");
-        if (await row.CountAsync() == 0)
+        try
+        {
+            await row.First.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 15_000,
+            });
+        }
+        catch (TimeoutException)
+        {
             return false;
+        }
 
         return await row.First.GetByRole(AriaRole.Button, new() { Name = "Edit" }).IsVisibleAsync();
     }

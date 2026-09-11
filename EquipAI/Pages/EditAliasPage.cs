@@ -19,6 +19,7 @@ public class EditAliasPage : BasePage
     private ILocator EpaFactorSourceInput => Page.Locator("//label[normalize-space()='EPA']//input | //input[@type='radio' and (@value='EPA' or @value='epa')]");
     private ILocator DefraFactorSourceInput => Page.Locator("//label[normalize-space()='DEFRA']//input | //input[@type='radio' and (@value='DEFRA' or @value='defra')]");
     private ILocator CustomFactorSourceInput => Page.Locator("//label[normalize-space()='Custom']//input | //input[@type='radio' and (@value='Custom' or @value='CUSTOM' or @value='custom')]");
+    private ILocator EpaFactorSourceBtn => Page.Locator("//label[normalize-space()='EPA']");
     private ILocator DefraFactorSourceBtn => Page.Locator("//label[normalize-space()='DEFRA']");
     private ILocator CustomFactorSourceBtn => Page.Locator("//label[normalize-space()='Custom']");
     private ILocator PreparedFactorsPreviewText => Page.Locator("//h2[@id='alias-prepared-factors-title']");
@@ -124,6 +125,12 @@ public class EditAliasPage : BasePage
         return await EpaFactorSourceInput.First.IsCheckedAsync();
     }
 
+    public async Task<bool> IsDefraFactorSourceSelectedAsync()
+    {
+        await DefraFactorSourceInput.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return await DefraFactorSourceInput.First.IsCheckedAsync();
+    }
+
     public async Task<bool> IsCustomFactorSourceSelectedAsync()
     {
         if (await CustomFactorSourceInput.CountAsync() == 0)
@@ -133,16 +140,42 @@ public class EditAliasPage : BasePage
         return await CustomFactorSourceInput.First.IsCheckedAsync();
     }
 
+    public async Task SelectEpaFactorSourceAsync()
+    {
+        await EpaFactorSourceBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await EpaFactorSourceInput.CountAsync() > 0)
+        {
+            await EpaFactorSourceInput.First.CheckAsync();
+        }
+        else
+        {
+            await EpaFactorSourceBtn.ClickAsync();
+        }
+
+        await SelectedTargetTable.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+    }
+
     public async Task SelectDefraFactorSourceAsync()
     {
         await DefraFactorSourceBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         if (await DefraFactorSourceInput.CountAsync() > 0)
         {
             await DefraFactorSourceInput.First.CheckAsync();
-            return;
+        }
+        else
+        {
+            await DefraFactorSourceBtn.ClickAsync();
         }
 
-        await DefraFactorSourceBtn.ClickAsync();
+        await SelectedTargetTable.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
     }
 
     public async Task SelectCustomFactorSourceAsync()

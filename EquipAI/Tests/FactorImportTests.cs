@@ -261,6 +261,194 @@ public class FactorImportTests : BaseTest
         }
     }
 
+    [Test]
+    public async Task T17_FactorImport_EPA_IncorrectSheetName()
+    {
+        const string expectedAlert = "EPA workbook must contain a sheet named 'Emission Factors Hub'.";
+
+        var factorImportPage = new FactorImportPage(Fixture.Page);
+        await factorImportPage.OpenAsync();
+        await factorImportPage.SelectSourceAsync("EPA");
+        await factorImportPage.UploadFileAsync("Factor_EPA_2001_IncorrectSheetName.xlsx");
+        await factorImportPage.ClickUploadBtnAsync();
+
+        (await factorImportPage.GetAlertBodyTextAsync()).Should().Be(expectedAlert);
+    }
+
+    [Test]
+    public async Task T18_FactorImport_EPA_Success()
+    {
+        const string fileName = "Factor_EPA_2001_Correct.xlsx";
+        const string expectedOutcome = "Created";
+        const string expectedSource = "EPA";
+        const string expectedYear = "2001";
+        const string expectedLineCount = "63";
+        const string expectedLibrary = "factors-2001";
+        var expectedCreatedDate = DateTime.Now.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+        string? batchId = null;
+
+        try
+        {
+            await SqlHelper.DeleteCustomFactorImportByYearAsync(2001);
+
+            var factorImportPage = new FactorImportPage(Fixture.Page);
+            await factorImportPage.OpenAsync();
+            await factorImportPage.SelectSourceAsync("EPA");
+            await factorImportPage.UploadFileAsync(fileName);
+            await factorImportPage.ClickUploadAndWaitForResultAsync();
+
+            (await factorImportPage.IsImportResultLabelVisibleAsync()).Should().BeTrue();
+            (await factorImportPage.GetResultOutcomeAsync()).Should().Be(expectedOutcome);
+            (await factorImportPage.GetResultSourceAsync()).Should().Be(expectedSource);
+            (await factorImportPage.GetResultYearAsync()).Should().Be(expectedYear);
+            (await factorImportPage.GetResultLineCountAsync()).Should().Be(expectedLineCount);
+            (await factorImportPage.GetResultLibraryAsync()).Should().Be(expectedLibrary);
+
+            batchId = await factorImportPage.GetResultBatchIdAsync();
+            batchId.Should().NotBeNullOrWhiteSpace();
+
+            var batchRow = await factorImportPage.GetBatchGridRowByIdAsync(batchId!);
+            batchRow.Should().NotBeNull();
+            batchRow!.Source.Should().Be(expectedSource);
+            batchRow.Year.Should().Be(expectedYear);
+            batchRow.Library.Should().Be(expectedLibrary);
+            batchRow.Lines.Should().Be(expectedLineCount);
+            batchRow.Created.Should().StartWith(expectedCreatedDate);
+
+            var aliasesPage = new AliasesPage(Fixture.Page);
+            await aliasesPage.OpenAsync();
+            await aliasesPage.ClickEmissionTypesTabAsync();
+
+            var propaneAlias = await aliasesPage.GetEmissionTypeAliasGridRowAsync("Propane");
+            propaneAlias.Should().NotBeNull();
+            propaneAlias!.Context.Should().Be("Catalog Factor Mapping");
+
+            var editAliasPage = await aliasesPage.ClickEditBtnAsync("Catalog Factor Mapping", "Propane");
+
+            IReadOnlyList<PreparedFactorGridRow> factorRows;
+            if (await editAliasPage.IsEpaFactorSourceSelectedAsync())
+            {
+                factorRows = await editAliasPage.GetPreparedFactorsRowsAsync();
+            }
+            else
+            {
+                await editAliasPage.SelectEpaFactorSourceAsync();
+                factorRows = await editAliasPage.GetSelectedTargetFactorRowsAsync();
+            }
+
+            var propaneFactor = factorRows.FirstOrDefault(r =>
+                r.Year == expectedYear
+                && r.Unit.Contains("US Gallon", StringComparison.OrdinalIgnoreCase)
+                && r.SourceFileLine == "72");
+            propaneFactor.Should().NotBeNull();
+            propaneFactor!.TCo2ePerActivityUnit.Should().Be("0.005742");
+            propaneFactor.TCo2.Should().Be("0.00572");
+            propaneFactor.TCh4.Should().Be("0.000007");
+            propaneFactor.TN2o.Should().Be("0.000015");
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(batchId))
+                await SqlHelper.DeleteCustomFactorImportAsync(batchId);
+            else
+                await SqlHelper.DeleteCustomFactorImportByYearAsync(2001);
+        }
+    }
+
+    [Test]
+    public async Task T19_FactorImport_DEFRA_IncorrectSheetName()
+    {
+        const string expectedAlert = "DEFRA flat file must contain a sheet named 'Factors by Category'.";
+
+        var factorImportPage = new FactorImportPage(Fixture.Page);
+        await factorImportPage.OpenAsync();
+        await factorImportPage.SelectSourceAsync("DEFRA");
+        await factorImportPage.UploadFileAsync("Factor_DEFRA_2001_IncorrectSheetName.xlsx");
+        await factorImportPage.ClickUploadBtnAsync();
+
+        (await factorImportPage.GetAlertBodyTextAsync()).Should().Be(expectedAlert);
+    }
+
+    [Test]
+    public async Task T20_FactorImport_DEFRA_Success()
+    {
+        const string fileName = "Factor_DEFRA_2001_Correct.xlsx";
+        const string expectedOutcome = "Created";
+        const string expectedSource = "DEFRA";
+        const string expectedYear = "2001";
+        const string expectedLineCount = "513";
+        const string expectedLibrary = "factors-2001";
+        var expectedCreatedDate = DateTime.Now.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+        string? batchId = null;
+
+        try
+        {
+            await SqlHelper.DeleteCustomFactorImportByYearAsync(2001);
+
+            var factorImportPage = new FactorImportPage(Fixture.Page);
+            await factorImportPage.OpenAsync();
+            await factorImportPage.SelectSourceAsync("DEFRA");
+            await factorImportPage.UploadFileAsync(fileName);
+            await factorImportPage.ClickUploadAndWaitForResultAsync();
+
+            (await factorImportPage.IsImportResultLabelVisibleAsync()).Should().BeTrue();
+            (await factorImportPage.GetResultOutcomeAsync()).Should().Be(expectedOutcome);
+            (await factorImportPage.GetResultSourceAsync()).Should().Be(expectedSource);
+            (await factorImportPage.GetResultYearAsync()).Should().Be(expectedYear);
+            (await factorImportPage.GetResultLineCountAsync()).Should().Be(expectedLineCount);
+            (await factorImportPage.GetResultLibraryAsync()).Should().Be(expectedLibrary);
+
+            batchId = await factorImportPage.GetResultBatchIdAsync();
+            batchId.Should().NotBeNullOrWhiteSpace();
+
+            var batchRow = await factorImportPage.GetBatchGridRowByIdAsync(batchId!);
+            batchRow.Should().NotBeNull();
+            batchRow!.Source.Should().Be(expectedSource);
+            batchRow.Year.Should().Be(expectedYear);
+            batchRow.Library.Should().Be(expectedLibrary);
+            batchRow.Lines.Should().Be(expectedLineCount);
+            batchRow.Created.Should().StartWith(expectedCreatedDate);
+
+            var aliasesPage = new AliasesPage(Fixture.Page);
+            await aliasesPage.OpenAsync();
+            await aliasesPage.ClickEmissionTypesTabAsync();
+
+            var propaneAlias = await aliasesPage.GetEmissionTypeAliasGridRowAsync("Propane");
+            propaneAlias.Should().NotBeNull();
+            propaneAlias!.Context.Should().Be("Catalog Factor Mapping");
+
+            var editAliasPage = await aliasesPage.ClickEditBtnAsync("Catalog Factor Mapping", "Propane");
+
+            IReadOnlyList<PreparedFactorGridRow> factorRows;
+            if (await editAliasPage.IsDefraFactorSourceSelectedAsync())
+            {
+                factorRows = await editAliasPage.GetPreparedFactorsRowsAsync();
+            }
+            else
+            {
+                await editAliasPage.SelectDefraFactorSourceAsync();
+                factorRows = await editAliasPage.GetSelectedTargetFactorRowsAsync();
+            }
+
+            var propaneFactor = factorRows.FirstOrDefault(r =>
+                r.Year == expectedYear
+                && r.Unit.Contains("US Gallon", StringComparison.OrdinalIgnoreCase)
+                && r.SourceFileLine == "123");
+            propaneFactor.Should().NotBeNull();
+            propaneFactor!.TCo2ePerActivityUnit.Should().Be("0.005843");
+            propaneFactor.TCo2.Should().Be("0.005835");
+            propaneFactor.TCh4.Should().Be("0.000005");
+            propaneFactor.TN2o.Should().Be("0.000003");
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(batchId))
+                await SqlHelper.DeleteCustomFactorImportAsync(batchId);
+            else
+                await SqlHelper.DeleteCustomFactorImportByYearAsync(2001);
+        }
+    }
+
     private async Task AssertCustomHeaderErrorAsync(string fileName)
     {
         const string expectedAlert =
