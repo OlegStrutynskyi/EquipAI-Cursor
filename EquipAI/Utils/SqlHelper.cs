@@ -1094,4 +1094,312 @@ public static class SqlHelper
         command.Parameters.AddWithValue("@aliasText", aliasText);
         await command.ExecuteNonQueryAsync();
     }
+
+    public static async Task<decimal> GetTotalCarbonEmissionsTonnesAsync(int year)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            DECLARE @PeriodStart date = DATEFROMPARTS(@Year, 1, 1);
+            DECLARE @PeriodEnd   date = IIF(@Year = YEAR(GETUTCDATE()),
+                                            CAST(GETUTCDATE() AS date),
+                                            DATEFROMPARTS(@Year, 12, 31));
+
+            WITH ActivityTotals AS (
+                SELECT
+                    a.CategoryId,
+                    COALESCE(SUM(a.Quantity * ef.Co2eTonnesPerActivityUnit), 0) AS Co2eTonnes
+                FROM projects.Project AS p
+                INNER JOIN emissions.Activity AS a
+                    ON a.ProjectId = p.Id AND a.IsDeleted = 0
+                    AND a.ActivityDate >= @PeriodStart
+                    AND a.ActivityDate <= @PeriodEnd
+                LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
+                LEFT JOIN factors.FactorLibraryVersion AS flv
+                    ON flv.IsDeleted = 0
+                    AND flv.Year = COALESCE(
+                        (
+                            SELECT TOP (1) flvExact.Year
+                            FROM factors.FactorLibraryVersion AS flvExact
+                            WHERE flvExact.IsDeleted = 0
+                              AND flvExact.Year = YEAR(a.ActivityDate)
+                              AND EXISTS (
+                                  SELECT 1
+                                  FROM factors.EmissionFactor AS efExact
+                                  WHERE efExact.FactorLibraryVersionId = flvExact.Id
+                                    AND efExact.IsDeleted = 0)
+                        ),
+                        (
+                            SELECT MAX(flvLatest.Year)
+                            FROM factors.FactorLibraryVersion AS flvLatest
+                            WHERE flvLatest.IsDeleted = 0
+                              AND EXISTS (
+                                  SELECT 1
+                                  FROM factors.EmissionFactor AS efLatest
+                                  WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
+                                    AND efLatest.IsDeleted = 0)
+                        ))
+                LEFT JOIN factors.EmissionFactor AS ef
+                    ON ef.FactorLibraryVersionId = flv.Id
+                    AND ef.TypeId = t.Id
+                    AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
+                    AND ef.IsDeleted = 0
+                WHERE p.IsDeleted = 0
+                GROUP BY a.CategoryId
+            )
+            SELECT
+                COALESCE(SUM(totals.Co2eTonnes), 0) AS Co2eTonnes
+            FROM emissions.EmissionCategory AS ec
+            LEFT JOIN ActivityTotals AS totals ON totals.CategoryId = ec.Id
+            WHERE ec.IsDeleted = 0;
+            """,
+            connection);
+        command.Parameters.AddWithValue("@Year", year);
+
+        var result = await command.ExecuteScalarAsync();
+        return result is null or DBNull ? 0m : Convert.ToDecimal(result);
+    }
+
+    public static async Task<decimal> GetCarbonEmissionsTonnesByScopeAsync(int year, int ghgScope)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            DECLARE @PeriodStart date = DATEFROMPARTS(@Year, 1, 1);
+            DECLARE @PeriodEnd   date = IIF(@Year = YEAR(GETUTCDATE()),
+                                            CAST(GETUTCDATE() AS date),
+                                            DATEFROMPARTS(@Year, 12, 31));
+
+            WITH ActivityTotals AS (
+                SELECT
+                    a.CategoryId,
+                    COALESCE(SUM(a.Quantity * ef.Co2eTonnesPerActivityUnit), 0) AS Co2eTonnes
+                FROM projects.Project AS p
+                INNER JOIN emissions.Activity AS a
+                    ON a.ProjectId = p.Id AND a.IsDeleted = 0
+                    AND a.ActivityDate >= @PeriodStart
+                    AND a.ActivityDate <= @PeriodEnd
+                LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
+                LEFT JOIN factors.FactorLibraryVersion AS flv
+                    ON flv.IsDeleted = 0
+                    AND flv.Year = COALESCE(
+                        (
+                            SELECT TOP (1) flvExact.Year
+                            FROM factors.FactorLibraryVersion AS flvExact
+                            WHERE flvExact.IsDeleted = 0
+                              AND flvExact.Year = YEAR(a.ActivityDate)
+                              AND EXISTS (
+                                  SELECT 1
+                                  FROM factors.EmissionFactor AS efExact
+                                  WHERE efExact.FactorLibraryVersionId = flvExact.Id
+                                    AND efExact.IsDeleted = 0)
+                        ),
+                        (
+                            SELECT MAX(flvLatest.Year)
+                            FROM factors.FactorLibraryVersion AS flvLatest
+                            WHERE flvLatest.IsDeleted = 0
+                              AND EXISTS (
+                                  SELECT 1
+                                  FROM factors.EmissionFactor AS efLatest
+                                  WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
+                                    AND efLatest.IsDeleted = 0)
+                        ))
+                LEFT JOIN factors.EmissionFactor AS ef
+                    ON ef.FactorLibraryVersionId = flv.Id
+                    AND ef.TypeId = t.Id
+                    AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
+                    AND ef.IsDeleted = 0
+                WHERE p.IsDeleted = 0
+                GROUP BY a.CategoryId
+            )
+            SELECT COALESCE(SUM(COALESCE(totals.Co2eTonnes, 0)), 0) AS Co2eTonnes
+            FROM emissions.EmissionCategory AS ec
+            LEFT JOIN ActivityTotals AS totals ON totals.CategoryId = ec.Id
+            WHERE ec.IsDeleted = 0 AND ec.GhgScope = @GhgScope;
+            """,
+            connection);
+        command.Parameters.AddWithValue("@Year", year);
+        command.Parameters.AddWithValue("@GhgScope", ghgScope);
+
+        var result = await command.ExecuteScalarAsync();
+        return result is null or DBNull ? 0m : Convert.ToDecimal(result);
+    }
+
+    public static async Task<int> GetTotalActiveProjectsCountAsync()
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT COUNT(*)
+            FROM [projects].[Project]
+            WHERE IsActive = 1 AND IsDeleted = 0
+            """,
+            connection);
+
+        var result = await command.ExecuteScalarAsync();
+        return result is null or DBNull ? 0 : Convert.ToInt32(result);
+    }
+
+    public static async Task<int> GetReportingActiveProjectsCountAsync()
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT COALESCE(SUM(CASE WHEN reporting.ProjectId IS NOT NULL THEN 1 ELSE 0 END), 0) AS Reporting
+            FROM projects.Project AS p
+            LEFT JOIN (
+                SELECT DISTINCT a.ProjectId
+                FROM emissions.Activity AS a
+                WHERE a.IsDeleted = 0
+            ) AS reporting ON reporting.ProjectId = p.Id
+            WHERE p.IsDeleted = 0
+              AND p.IsActive = 1
+            """,
+            connection);
+
+        var result = await command.ExecuteScalarAsync();
+        return result is null or DBNull ? 0 : Convert.ToInt32(result);
+    }
+
+    public static async Task<IReadOnlyList<object>> GetInactiveProjectIdsAsync()
+    {
+        var ids = new List<object>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT Id
+            FROM [projects].[Project]
+            WHERE IsActive = 0
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            if (!reader.IsDBNull(0))
+                ids.Add(reader.GetValue(0));
+        }
+
+        return ids;
+    }
+
+    public static async Task DeactivateAllProjectsAsync()
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "UPDATE [projects].[Project] SET IsActive = 0",
+            connection);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task RestoreActiveProjectsExceptAsync(IReadOnlyList<object> inactiveProjectIds)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        if (inactiveProjectIds.Count == 0)
+        {
+            await using var restoreAllCommand = new SqlCommand(
+                "UPDATE [projects].[Project] SET IsActive = 1",
+                connection);
+            await restoreAllCommand.ExecuteNonQueryAsync();
+            return;
+        }
+
+        var parameterNames = inactiveProjectIds
+            .Select((_, index) => $"@id{index}")
+            .ToList();
+        await using var command = new SqlCommand(
+            $"""
+            UPDATE [projects].[Project]
+            SET IsActive = 1
+            WHERE Id NOT IN ({string.Join(", ", parameterNames)})
+            """,
+            connection);
+
+        for (var i = 0; i < inactiveProjectIds.Count; i++)
+            command.Parameters.AddWithValue(parameterNames[i], inactiveProjectIds[i]);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task<IReadOnlyList<ActiveProjectEmissionsRow>> GetTopActiveProjectsByEmissionsAsync(int limit = 8)
+    {
+        var rows = new List<ActiveProjectEmissionsRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT TOP (@Limit)
+                p.Name,
+                COALESCE(SUM(a.Quantity * ef.Co2eTonnesPerActivityUnit), 0) AS TotalCo2eTonnes
+            FROM projects.Project AS p
+            LEFT JOIN emissions.Activity AS a
+                ON a.ProjectId = p.Id AND a.IsDeleted = 0
+            LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
+            LEFT JOIN factors.FactorLibraryVersion AS flv
+                ON flv.IsDeleted = 0
+                AND flv.Year = COALESCE(
+                    (
+                        SELECT TOP (1) flvExact.Year
+                        FROM factors.FactorLibraryVersion AS flvExact
+                        WHERE flvExact.IsDeleted = 0
+                          AND flvExact.Year = YEAR(a.ActivityDate)
+                          AND EXISTS (
+                              SELECT 1
+                              FROM factors.EmissionFactor AS efExact
+                              WHERE efExact.FactorLibraryVersionId = flvExact.Id
+                                AND efExact.IsDeleted = 0)
+                    ),
+                    (
+                        SELECT MAX(flvLatest.Year)
+                        FROM factors.FactorLibraryVersion AS flvLatest
+                        WHERE flvLatest.IsDeleted = 0
+                          AND EXISTS (
+                              SELECT 1
+                              FROM factors.EmissionFactor AS efLatest
+                              WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
+                                AND efLatest.IsDeleted = 0)
+                    ))
+            LEFT JOIN factors.EmissionFactor AS ef
+                ON ef.FactorLibraryVersionId = flv.Id
+                AND ef.TypeId = t.Id
+                AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
+                AND ef.IsDeleted = 0
+            WHERE p.IsDeleted = 0
+              AND p.IsActive = 1
+            GROUP BY p.Id, p.Code, p.Name, p.ProjectType, p.StartDate, p.CompletionDate
+            HAVING COUNT(a.Id) > 0
+            ORDER BY TotalCo2eTonnes DESC, p.Name ASC;
+            """,
+            connection);
+        command.Parameters.AddWithValue("@Limit", limit);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var name = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var tonnes = reader.IsDBNull(1) ? 0m : reader.GetDecimal(1);
+            rows.Add(new ActiveProjectEmissionsRow(name, tonnes));
+        }
+
+        return rows;
+    }
 }
+
+public sealed record ActiveProjectEmissionsRow(string Name, decimal TotalCo2eTonnes);
