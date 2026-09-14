@@ -46,6 +46,8 @@ public class SideMenuPage : BasePage
         await AccountNav.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
+    public Task<bool> IsSideMenuVisibleAsync() => PrimaryNav.IsVisibleAsync();
+
     public async Task<IReadOnlyList<string>> GetLinkTextsAsync()
     {
         await PrimaryNav.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
