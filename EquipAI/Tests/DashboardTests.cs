@@ -255,6 +255,266 @@ public class DashboardTests : BaseTest
         (await projectsPage.GetPageTitleAsync()).Should().Be(expectedTitle);
     }
 
+    [Test]
+    public async Task T16_Dashboard_TotalEmissionsByScope_View()
+    {
+        const string expectedLabel = "Total Carbon Emissions by Scope";
+        const string expectedMessage = "Yearly tCO2e vs. Baseline";
+
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        (await dashboardPage.GetTotalEmissionsByScopeLabelAsync()).Should().Be(expectedLabel);
+        (await dashboardPage.GetTotalEmissionsByScopeMessageAsync()).Should().Be(expectedMessage);
+        (await dashboardPage.IsYearLabelVisibleAsync()).Should().BeTrue();
+        (await dashboardPage.IsYearDropdownVisibleAsync()).Should().BeTrue();
+        (await dashboardPage.IsScope1BtnVisibleAsync()).Should().BeTrue();
+        (await dashboardPage.IsScope2BtnVisibleAsync()).Should().BeTrue();
+        (await dashboardPage.IsScope3BtnVisibleAsync()).Should().BeTrue();
+        (await dashboardPage.IsChartVisibleAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T17_Dashboard_TotalEmissionsByScope_YearDropdown()
+    {
+        var expectedYears = await SqlHelper.GetActivityYearsAsync();
+
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        var actualYears = await dashboardPage.GetYearDropdownOptionsAsync();
+        actualYears.Should().Equal(expectedYears);
+    }
+
+    [Test]
+    public async Task T18_Dashboard_TotalEmissionsByScope_ChartCurrentYearScope1()
+    {
+        var year = DateTime.UtcNow.Year;
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+        await AssertChartScopeMatchesDbAsync(
+            dashboardPage,
+            year,
+            scope: 1,
+            dashboardPage.ClickScope1BtnAsync);
+    }
+
+    [Test]
+    public async Task T19_Dashboard_TotalEmissionsByScope_ChartCurrentYearScope2()
+    {
+        var year = DateTime.UtcNow.Year;
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+        await AssertChartScopeMatchesDbAsync(
+            dashboardPage,
+            year,
+            scope: 2,
+            dashboardPage.ClickScope2BtnAsync);
+    }
+
+    [Test]
+    public async Task T20_Dashboard_TotalEmissionsByScope_ChartCurrentYearScope3()
+    {
+        var year = DateTime.UtcNow.Year;
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+        await AssertChartScopeMatchesDbAsync(
+            dashboardPage,
+            year,
+            scope: 3,
+            dashboardPage.ClickScope3BtnAsync);
+    }
+
+    [Test]
+    public async Task T21_Dashboard_TotalEmissionsByScope_ChartNextYearOptionScope1()
+    {
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        var yearOptions = await dashboardPage.GetYearDropdownOptionsAsync();
+        var yearOption = GetNextYearOptionAfterCurrent(yearOptions);
+        if (yearOption is null)
+            Assert.Pass("No next year option after current year");
+
+        var year = int.Parse(yearOption, CultureInfo.InvariantCulture);
+        await AssertChartScopeMatchesDbAsync(
+            dashboardPage,
+            year,
+            scope: 1,
+            dashboardPage.ClickScope1BtnAsync,
+            yearOption);
+    }
+
+    [Test]
+    public async Task T22_Dashboard_TotalEmissionsByScope_ChartNextYearOptionScope2()
+    {
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        var yearOptions = await dashboardPage.GetYearDropdownOptionsAsync();
+        var yearOption = GetNextYearOptionAfterCurrent(yearOptions);
+        if (yearOption is null)
+            Assert.Pass("No next year option after current year");
+
+        var year = int.Parse(yearOption, CultureInfo.InvariantCulture);
+        await AssertChartScopeMatchesDbAsync(
+            dashboardPage,
+            year,
+            scope: 2,
+            dashboardPage.ClickScope2BtnAsync,
+            yearOption);
+    }
+
+    [Test]
+    public async Task T23_Dashboard_TotalEmissionsByScope_ChartNextYearOptionScope3()
+    {
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        var yearOptions = await dashboardPage.GetYearDropdownOptionsAsync();
+        var yearOption = GetNextYearOptionAfterCurrent(yearOptions);
+        if (yearOption is null)
+            Assert.Pass("No next year option after current year");
+
+        var year = int.Parse(yearOption, CultureInfo.InvariantCulture);
+        await AssertChartScopeMatchesDbAsync(
+            dashboardPage,
+            year,
+            scope: 3,
+            dashboardPage.ClickScope3BtnAsync,
+            yearOption);
+    }
+
+    [Test]
+    public async Task T24_Dashboard_EmissionsByCategory_View()
+    {
+        const string expectedLabel = "Carbon Emissions by Category";
+        const string expectedMessage = "Representation of all the Scopes present on EquipAI";
+
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        (await dashboardPage.GetEmissionsByCategoryLabelAsync()).Should().Be(expectedLabel);
+        (await dashboardPage.GetEmissionsByCategoryMessageAsync()).Should().Be(expectedMessage);
+        (await dashboardPage.IsScope1CardVisibleAsync()).Should().BeTrue();
+        (await dashboardPage.IsScope2CardVisibleAsync()).Should().BeTrue();
+        (await dashboardPage.IsScope3CardVisibleAsync()).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T25_Dashboard_EmissionsByCategory_Scope1Card()
+    {
+        const string expectedTitle = "Scope 1";
+
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        var selectedYearText = await dashboardPage.GetSelectedChartYearAsync();
+        var year = int.Parse(selectedYearText, CultureInfo.InvariantCulture);
+        var expectedRows = await SqlHelper.GetEmissionsByCategoryAsync(year, ghgScope: 1);
+        var expectedNames = expectedRows.Select(row => row.CategoryName).ToList();
+        var expectedValues = expectedRows.Select(row => FormatCategoryEmissionsValue(row.Co2eTonnes)).ToList();
+
+        (await dashboardPage.GetScope1TitleAsync()).Should().Be(expectedTitle);
+        (await dashboardPage.GetScope1CategoryNamesAsync()).Should().Equal(expectedNames);
+        (await dashboardPage.GetScope1CategoryValuesAsync()).Should().Equal(expectedValues);
+    }
+
+    [Test]
+    public async Task T26_Dashboard_EmissionsByCategory_Scope2Card()
+    {
+        const string expectedTitle = "Scope 2";
+
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        var selectedYearText = await dashboardPage.GetSelectedChartYearAsync();
+        var year = int.Parse(selectedYearText, CultureInfo.InvariantCulture);
+        var expectedRows = await SqlHelper.GetEmissionsByCategoryAsync(year, ghgScope: 2);
+        var expectedNames = expectedRows.Select(row => row.CategoryName).ToList();
+        var expectedValues = expectedRows.Select(row => FormatCategoryEmissionsValue(row.Co2eTonnes)).ToList();
+
+        (await dashboardPage.GetScope2TitleAsync()).Should().Be(expectedTitle);
+        (await dashboardPage.GetScope2CategoryNamesAsync()).Should().Equal(expectedNames);
+        (await dashboardPage.GetScope2CategoryValuesAsync()).Should().Equal(expectedValues);
+    }
+
+    [Test]
+    public async Task T27_Dashboard_EmissionsByCategory_Scope3Card()
+    {
+        const string expectedTitle = "Scope 3";
+
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        var selectedYearText = await dashboardPage.GetSelectedChartYearAsync();
+        var year = int.Parse(selectedYearText, CultureInfo.InvariantCulture);
+        var expectedRows = await SqlHelper.GetEmissionsByCategoryAsync(year, ghgScope: 3);
+        var expectedNames = expectedRows.Select(row => row.CategoryName).ToList();
+        var expectedValues = expectedRows.Select(row => FormatCategoryEmissionsValue(row.Co2eTonnes)).ToList();
+
+        (await dashboardPage.GetScope3TitleAsync()).Should().Be(expectedTitle);
+        (await dashboardPage.GetScope3CategoryNamesAsync()).Should().Equal(expectedNames);
+        (await dashboardPage.GetScope3CategoryValuesAsync()).Should().Equal(expectedValues);
+    }
+
+    private static async Task AssertChartScopeMatchesDbAsync(
+        DashboardPage dashboardPage,
+        int year,
+        int scope,
+        Func<Task> clickScopeAsync,
+        string? yearOption = null)
+    {
+        var expectedRows = await SqlHelper.GetChartScopeMonthlyEmissionsAsync(year, scope);
+        if (expectedRows.Count == 0)
+            Assert.Pass("No data for this Scope");
+
+        await dashboardPage.SelectYearAsync(yearOption ?? year.ToString(CultureInfo.InvariantCulture));
+        await clickScopeAsync();
+
+        if (!await dashboardPage.HasChartLineAsync())
+            Assert.Pass("No data for this Scope");
+
+        var chartValuesByMonth = await dashboardPage.GetChartMonthlyTonnesAsync();
+        if (chartValuesByMonth.Count == 0 || chartValuesByMonth.Values.All(value => value == 0m))
+            Assert.Pass("No data for this Scope");
+
+        foreach (var row in expectedRows)
+        {
+            chartValuesByMonth.Should().ContainKey(row.Month);
+            var actualValue = chartValuesByMonth[row.Month];
+            var expectedValue = RoundToChartDisplayPrecision(row.Co2eTonnes, actualValue);
+            actualValue.Should().Be(expectedValue, $"month {row.Month}");
+        }
+    }
+
+    private static decimal RoundToChartDisplayPrecision(decimal databaseValue, decimal chartValue)
+    {
+        var chartText = chartValue.ToString(CultureInfo.InvariantCulture);
+        var separatorIndex = chartText.IndexOf('.');
+        var decimals = separatorIndex < 0 ? 0 : chartText.Length - separatorIndex - 1;
+        return Math.Round(databaseValue, decimals, MidpointRounding.AwayFromZero);
+    }
+
+    private static string? GetNextYearOptionAfterCurrent(IReadOnlyList<string> yearOptions)
+    {
+        var currentYear = DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
+        var currentIndex = -1;
+        for (var i = 0; i < yearOptions.Count; i++)
+        {
+            if (!yearOptions[i].Equals(currentYear, StringComparison.Ordinal))
+                continue;
+
+            currentIndex = i;
+            break;
+        }
+
+        if (currentIndex < 0 || currentIndex >= yearOptions.Count - 1)
+            return null;
+
+        return yearOptions[currentIndex + 1];
+    }
+
     private static decimal ParseMetricValueToOneDecimal(string valueText)
     {
         var normalized = valueText
@@ -292,4 +552,7 @@ public class DashboardTests : BaseTest
             ? decimal.Truncate(rounded).ToString("#,##0", CultureInfo.InvariantCulture)
             : rounded.ToString("#,##0.0", CultureInfo.InvariantCulture);
     }
+
+    private static string FormatCategoryEmissionsValue(decimal tonnes) =>
+        FormatProjectTonnesValue(tonnes) + " tCO2e";
 }
