@@ -277,7 +277,11 @@ public class DashboardTests : BaseTest
     [Test]
     public async Task T17_Dashboard_TotalEmissionsByScope_YearDropdown()
     {
-        var expectedYears = await SqlHelper.GetActivityYearsAsync();
+        var currentYear = DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
+        var dbYears = (await SqlHelper.GetActivityYearsAsync()).ToList();
+        var expectedYears = dbYears.Contains(currentYear, StringComparer.Ordinal)
+            ? dbYears
+            : new[] { currentYear }.Concat(dbYears).ToList();
 
         var dashboardPage = new DashboardPage(Fixture.Page);
         await dashboardPage.OpenAsync();

@@ -1411,7 +1411,7 @@ public static class SqlHelper
         await using var command = new SqlCommand(
             """
             SELECT DISTINCT YEAR(ActivityDate) AS ActivityYear
-            FROM [emissions].[Activity]
+            FROM [emissions].[Activity] WHERE IsDeleted=0
             ORDER BY ActivityYear DESC
             """,
             connection);
