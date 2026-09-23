@@ -35,6 +35,14 @@ public class ImportInvoicePage : BasePage
         await WaitForLoadedAsync();
     }
 
+    public async Task OpenUtilityBillAsync()
+    {
+        var invoicesPage = new InvoicesPage(Page);
+        await invoicesPage.OpenAsync();
+        await invoicesPage.ClickImportUtilityBillBtnAsync();
+        await WaitForLoadedAsync();
+    }
+
     public async Task WaitForLoadedAsync()
     {
         await ImportTitle.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });

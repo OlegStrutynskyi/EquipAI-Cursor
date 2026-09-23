@@ -11,6 +11,9 @@ public class InvoicesPage : BasePage
     private ILocator InvoicesMessage => Page.Locator("//p[@class='page-header__lead']");
     private ILocator ImportCSVBtn => Page.Locator("//a[normalize-space()='Import CSV']");
     private ILocator ImportPDFBtn => Page.Locator("//a[normalize-space()='Import PDF']");
+    private ILocator ImportUtilityBillBtn => Page.Locator("//a[normalize-space()='Import Utility Bill']");
+    private ILocator FuelInvoicesTab => Page.Locator("//button[normalize-space()='Fuel Invoices'] | //a[normalize-space()='Fuel Invoices']");
+    private ILocator UtilityBillsTab => Page.Locator("//button[normalize-space()='Utility Bills'] | //a[normalize-space()='Utility Bills']");
     private ILocator CreateBtn => Page.Locator("//a[normalize-space()='Create']");
     private ILocator InvoicesGrid => Page.Locator("//table[contains(@class,'table')]");
     private ILocator InvoicesGridProject => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[1]");
@@ -52,8 +55,28 @@ public class InvoicesPage : BasePage
     public Task<bool> IsInvoicesMessageVisibleAsync() => InvoicesMessage.IsVisibleAsync();
     public Task<bool> IsImportCSVBtnVisibleAsync() => ImportCSVBtn.IsVisibleAsync();
     public Task<bool> IsImportPDFBtnVisibleAsync() => ImportPDFBtn.IsVisibleAsync();
+    public Task<bool> IsImportUtilityBillBtnVisibleAsync() => ImportUtilityBillBtn.IsVisibleAsync();
     public Task<bool> IsCreateBtnVisibleAsync() => CreateBtn.IsVisibleAsync();
     public Task<bool> IsInvoicesGridVisibleAsync() => InvoicesGrid.IsVisibleAsync();
+
+    public async Task SelectUtilityBillsTabAsync()
+    {
+        await UtilityBillsTab.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await UtilityBillsTab.First.ClickAsync();
+        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[1][normalize-space()!='']")
+            .First
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForPaginationStableAsync();
+    }
+
+    public async Task SelectFuelInvoicesTabAsync()
+    {
+        await FuelInvoicesTab.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await FuelInvoicesTab.First.ClickAsync();
+        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForPaginationStableAsync();
+    }
 
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {
@@ -88,6 +111,16 @@ public class InvoicesPage : BasePage
         await Page.WaitForURLAsync(
             url => url.Contains("/invoices/", StringComparison.OrdinalIgnoreCase)
                    && url.Contains("pdf", StringComparison.OrdinalIgnoreCase));
+        var importInvoicePage = new ImportInvoicePage(Page);
+        await importInvoicePage.WaitForLoadedAsync();
+        return importInvoicePage;
+    }
+
+    public async Task<ImportInvoicePage> ClickImportUtilityBillBtnAsync()
+    {
+        await ImportUtilityBillBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url => url.Contains("/invoices/import-utility-bill", StringComparison.OrdinalIgnoreCase));
         var importInvoicePage = new ImportInvoicePage(Page);
         await importInvoicePage.WaitForLoadedAsync();
         return importInvoicePage;
@@ -216,6 +249,73 @@ public class InvoicesPage : BasePage
         };
     }
 
+    public async Task<UtilityBillGridRow?> GetUtilityBillGridRowAsync(string company, string importDate)
+    {
+        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForPaginationStableAsync();
+
+        while (await IsPaginationButtonEnabledAsync(PreviousBtn))
+        {
+            try
+            {
+                await PreviousBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
+            }
+            catch (TimeoutException)
+            {
+                break;
+            }
+
+            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await WaitForPaginationStableAsync();
+        }
+
+        while (true)
+        {
+            var rows = InvoicesGrid.Locator("tbody tr");
+            var rowCount = await rows.CountAsync();
+
+            for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
+            {
+                var row = rows.Nth(rowIndex);
+                var cells = row.Locator("td");
+                var currentCompany = (await cells.Nth(1).InnerTextAsync()).Trim();
+                var currentImportDate = (await cells.Nth(4).InnerTextAsync()).Trim();
+
+                if (currentCompany.Equals(company, StringComparison.Ordinal)
+                    && currentImportDate.Equals(importDate, StringComparison.Ordinal))
+                {
+                    return new UtilityBillGridRow
+                    {
+                        Project = (await cells.Nth(0).InnerTextAsync()).Trim(),
+                        Company = currentCompany,
+                        Date = (await cells.Nth(2).InnerTextAsync()).Trim(),
+                        Status = (await cells.Nth(3).InnerTextAsync()).Trim(),
+                        ImportDate = currentImportDate,
+                        ApproveRejectDate = (await cells.Nth(5).InnerTextAsync()).Trim(),
+                        Source = (await cells.Nth(6).InnerTextAsync()).Trim(),
+                    };
+                }
+            }
+
+            if (!await IsPaginationButtonEnabledAsync(NextBtn))
+                break;
+
+            try
+            {
+                await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
+            }
+            catch (TimeoutException)
+            {
+                break;
+            }
+
+            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await WaitForPaginationStableAsync();
+        }
+
+        return null;
+    }
+
     private async Task<InvoiceGridRow?> FindInvoiceGridRowOnCurrentPageAsync(string invoiceNumber)
     {
         var row = await FindInvoiceRowOnCurrentPageAsync(invoiceNumber);
@@ -340,6 +440,17 @@ public sealed class InvoiceGridRow
 {
     public required string Project { get; init; }
     public required string InvoiceNumber { get; init; }
+    public required string Company { get; init; }
+    public required string Date { get; init; }
+    public required string Status { get; init; }
+    public required string ImportDate { get; init; }
+    public required string ApproveRejectDate { get; init; }
+    public required string Source { get; init; }
+}
+
+public sealed class UtilityBillGridRow
+{
+    public required string Project { get; init; }
     public required string Company { get; init; }
     public required string Date { get; init; }
     public required string Status { get; init; }

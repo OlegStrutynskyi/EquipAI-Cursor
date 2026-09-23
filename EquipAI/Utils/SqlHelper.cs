@@ -443,6 +443,105 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
+    public static async Task DeleteImportedInvoiceByPdfFileAsync(string fileName)
+    {
+        var filePath = ResolveTestDataPath(fileName);
+        var fileBytes = await File.ReadAllBytesAsync(filePath);
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fileBytes)).ToLowerInvariant();
+        var likeFileName = EscapeLikePattern(fileName);
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        var sourceIds = new List<object>();
+        await using (var getSourcesCommand = new SqlCommand(
+            """
+            SELECT [Id]
+            FROM [sources].[ActivitySource]
+            WHERE [SourceType] = 'AiInvoice'
+              AND (
+                    [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
+                 OR [OriginalDocumentBlobUrl] LIKE '%' + @fileName + '%' ESCAPE '\'
+              )
+            """,
+            connection))
+        {
+            getSourcesCommand.Parameters.AddWithValue("@hash", hash);
+            getSourcesCommand.Parameters.AddWithValue("@fileName", likeFileName);
+            await using var reader = await getSourcesCommand.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                sourceIds.Add(reader.GetValue(0));
+        }
+
+        foreach (var sourceId in sourceIds)
+        {
+            object? invoiceId = null;
+            await using (var getInvoiceCommand = new SqlCommand(
+                """
+                SELECT [Id]
+                FROM [invoices].[Invoice]
+                WHERE [SourceId] = @sourceId
+                """,
+                connection))
+            {
+                getInvoiceCommand.Parameters.AddWithValue("@sourceId", sourceId);
+                invoiceId = await getInvoiceCommand.ExecuteScalarAsync();
+            }
+
+            if (invoiceId is not null && invoiceId is not DBNull)
+            {
+                await using (var deleteLineRecognitionsCommand = new SqlCommand(
+                    """
+                    DELETE FROM [ingestion].[InvoiceLineRecognition]
+                    WHERE [InvoiceLineItemId] IN (
+                        SELECT [Id] FROM [invoices].[InvoiceLineItem] WHERE [InvoiceId] = @invoiceId
+                    )
+                    """,
+                    connection))
+                {
+                    deleteLineRecognitionsCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+                    await deleteLineRecognitionsCommand.ExecuteNonQueryAsync();
+                }
+
+                await using (var deleteInvoiceRecognitionCommand = new SqlCommand(
+                    "DELETE FROM [ingestion].[InvoiceRecognition] WHERE [InvoiceId] = @invoiceId",
+                    connection))
+                {
+                    deleteInvoiceRecognitionCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+                    await deleteInvoiceRecognitionCommand.ExecuteNonQueryAsync();
+                }
+
+                await using (var deleteLineItemsCommand = new SqlCommand(
+                    "DELETE FROM [invoices].[InvoiceLineItem] WHERE InvoiceId = @invoiceId",
+                    connection))
+                {
+                    deleteLineItemsCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+                    await deleteLineItemsCommand.ExecuteNonQueryAsync();
+                }
+
+                await using var deleteInvoiceCommand = new SqlCommand(
+                    "DELETE FROM [invoices].[Invoice] WHERE Id = @invoiceId",
+                    connection);
+                deleteInvoiceCommand.Parameters.AddWithValue("@invoiceId", invoiceId);
+                await deleteInvoiceCommand.ExecuteNonQueryAsync();
+            }
+
+            await using (var deleteActivitiesCommand = new SqlCommand(
+                "DELETE FROM [emissions].[Activity] WHERE [SourceId] = @sourceId",
+                connection))
+            {
+                deleteActivitiesCommand.Parameters.AddWithValue("@sourceId", sourceId);
+                await deleteActivitiesCommand.ExecuteNonQueryAsync();
+            }
+
+            await using var deleteActivitySourceCommand = new SqlCommand(
+                "DELETE FROM [sources].[ActivitySource] WHERE Id = @sourceId",
+                connection);
+            deleteActivitySourceCommand.Parameters.AddWithValue("@sourceId", sourceId);
+            await deleteActivitySourceCommand.ExecuteNonQueryAsync();
+        }
+    }
+
     public static async Task DeleteTelemetryByExternalReferenceAsync(string externalReferenceId)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
