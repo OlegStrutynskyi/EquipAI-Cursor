@@ -106,15 +106,15 @@ public class TelemetryPage : BasePage
             row.EquipmentTag.Equals(equipmentTag, StringComparison.Ordinal));
     }
 
-    public async Task<ImportTelemetryPage> ClickImportBtnAsync()
+    public async Task<ImportPage> ClickImportBtnAsync()
     {
         await ImportBtn.ClickAsync();
         await Page.WaitForURLAsync(
             url => url.Contains("/telemetry", StringComparison.OrdinalIgnoreCase)
                    && url.Contains("import", StringComparison.OrdinalIgnoreCase));
-        var importTelemetryPage = new ImportTelemetryPage(Page);
-        await importTelemetryPage.WaitForLoadedAsync();
-        return importTelemetryPage;
+        var importPage = new ImportPage(Page);
+        await importPage.WaitForLoadedAsync();
+        return importPage;
     }
 
     public async Task<string> GetMonthFieldValueAsync()

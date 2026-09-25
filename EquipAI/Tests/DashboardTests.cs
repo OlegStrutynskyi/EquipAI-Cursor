@@ -10,7 +10,7 @@ public class DashboardTests : BaseTest
     [Test]
     public async Task T01_Dashboard_DefaultView()
     {
-        const string expectedTitle = "Haskell Enterprise Overview";
+        const string expectedTitle = "Company Dashboard";
         const string expectedSubtitle = "Global sustainability tracking across every project site.";
 
         var dashboardPage = new DashboardPage(Fixture.Page);

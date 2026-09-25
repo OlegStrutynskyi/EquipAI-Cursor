@@ -14,28 +14,28 @@ public class ImportUtilityBillTests : BaseTest
         const string expectedMessage =
             "Upload a single utility-bill PDF. It is read automatically and appears in the list as a draft invoice once processing finishes.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenUtilityBillAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenUtilityBillAsync();
 
-        (await importInvoicePage.GetTitleAsync()).Should().Be(expectedTitle);
-        (await importInvoicePage.GetMessageAsync()).Should().Be(expectedMessage);
-        (await importInvoicePage.IsBackBtnVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsPdfFileLabelVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportSectionVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportBtnVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportBtnEnabledAsync()).Should().BeFalse();
+        (await importPage.GetTitleAsync()).Should().Be(expectedTitle);
+        (await importPage.GetMessageAsync()).Should().Be(expectedMessage);
+        (await importPage.IsBackBtnVisibleAsync()).Should().BeTrue();
+        (await importPage.IsPdfFileLabelVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportSectionVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportBtnVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportBtnEnabledAsync()).Should().BeFalse();
     }
 
     [Test]
     public async Task T02_ImportUtilityBill_ClickBackBtn()
     {
-        const string expectedTitle = "Invoices";
+        const string expectedTitle = "Utility Bill Upload";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenUtilityBillAsync();
-        var invoicesPage = await importInvoicePage.ClickBackBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenUtilityBillAsync();
+        var utilityBillUploadPage = await importPage.ClickBackToUtilityBillUploadAsync();
 
-        (await invoicesPage.GetTitleAsync()).Should().Be(expectedTitle);
+        (await utilityBillUploadPage.GetTitleAsync()).Should().Be(expectedTitle);
     }
 
     [Test]
@@ -43,12 +43,12 @@ public class ImportUtilityBillTests : BaseTest
     {
         const string expectedAlertMessage = "Only .pdf files are accepted.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenUtilityBillAsync();
-        await importInvoicePage.UploadPdfFileAsync("scv-invoice-correct.csv");
-        await importInvoicePage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenUtilityBillAsync();
+        await importPage.UploadPdfFileAsync("scv-invoice-correct.csv");
+        await importPage.ClickImportBtnAsync();
 
-        (await importInvoicePage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+        (await importPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
     }
 
     [Test]
@@ -66,9 +66,9 @@ public class ImportUtilityBillTests : BaseTest
             await SqlHelper.DeleteImportedInvoiceByPdfFileAsync(fileName);
             await SqlHelper.DeleteActivitySourceByPdfFileAsync(fileName);
 
-            var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-            await importInvoicePage.OpenUtilityBillAsync();
-            await importInvoicePage.ImportPdfAsync(fileName, expectedToasterMessage);
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenUtilityBillAsync();
+            await importPage.ImportPdfAsync(fileName, expectedToasterMessage);
 
             var invoicesPage = new InvoicesPage(Fixture.Page);
             var deadline = DateTime.UtcNow.AddMinutes(10);
@@ -116,17 +116,17 @@ public class ImportUtilityBillTests : BaseTest
             await SqlHelper.DeleteImportedInvoiceByPdfFileAsync(fileName);
             await SqlHelper.DeleteActivitySourceByPdfFileAsync(fileName);
 
-            var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-            await importInvoicePage.OpenUtilityBillAsync();
-            await importInvoicePage.ImportPdfAsync(fileName, expectedToasterMessage);
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenUtilityBillAsync();
+            await importPage.ImportPdfAsync(fileName, expectedToasterMessage);
 
             var invoicesPage = new InvoicesPage(Fixture.Page);
             await invoicesPage.OpenAsync();
-            var importInvoicePage2 = await invoicesPage.ClickImportUtilityBillBtnAsync();
-            await importInvoicePage2.UploadPdfFileAsync(fileName);
-            await importInvoicePage2.ClickImportBtnAsync();
+            var ImportPage2 = await invoicesPage.ClickImportUtilityBillBtnAsync();
+            await ImportPage2.UploadPdfFileAsync(fileName);
+            await ImportPage2.ClickImportBtnAsync();
 
-            (await importInvoicePage2.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+            (await ImportPage2.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
         }
         finally
         {

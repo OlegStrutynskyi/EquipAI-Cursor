@@ -14,26 +14,26 @@ public class ImportCSVInvoiceTests : BaseTest
         const string expectedMessage =
             "Upload a CSV file. After import you can edit the draft invoice before approval.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenAsync();
 
-        (await importInvoicePage.GetTitleAsync()).Should().Be(expectedTitle);
-        (await importInvoicePage.GetMessageAsync()).Should().Be(expectedMessage);
-        (await importInvoicePage.IsBackBtnVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsCsvFileLabelVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportSectionVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportBtnVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportBtnEnabledAsync()).Should().BeFalse();
+        (await importPage.GetTitleAsync()).Should().Be(expectedTitle);
+        (await importPage.GetMessageAsync()).Should().Be(expectedMessage);
+        (await importPage.IsBackBtnVisibleAsync()).Should().BeTrue();
+        (await importPage.IsCsvFileLabelVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportSectionVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportBtnVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportBtnEnabledAsync()).Should().BeFalse();
     }
 
     [Test]
     public async Task T02_ImportCSVInvoice_ClickBackBtn()
     {
-        const string expectedTitle = "Invoices";
+        const string expectedTitle = "Invoice Upload";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenAsync();
-        var invoicesPage = await importInvoicePage.ClickBackBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenAsync();
+        var invoicesPage = await importPage.ClickBackToInvoicesAsync();
 
         (await invoicesPage.GetTitleAsync()).Should().Be(expectedTitle);
     }
@@ -43,12 +43,12 @@ public class ImportCSVInvoiceTests : BaseTest
     {
         const string expectedAlertMessage = "Only .csv files are accepted.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenAsync();
-        await importInvoicePage.UploadCsvFileAsync("SC_Fuels_3.pdf");
-        await importInvoicePage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenAsync();
+        await importPage.UploadCsvFileAsync("SC_Fuels_3.pdf");
+        await importPage.ClickImportBtnAsync();
 
-        var actualAlertMessage = (await importInvoicePage.GetAlertMessageAsync()).Trim();
+        var actualAlertMessage = (await importPage.GetAlertMessageAsync()).Trim();
         actualAlertMessage.Should().Be(expectedAlertMessage);
     }
 
@@ -57,12 +57,12 @@ public class ImportCSVInvoiceTests : BaseTest
     {
         var expectedAlertMessage = "CSV file must contain at least one line item row.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenAsync();
-        await importInvoicePage.UploadCsvFileAsync("scv-invoice-only-headers.csv");
-        await importInvoicePage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenAsync();
+        await importPage.UploadCsvFileAsync("scv-invoice-only-headers.csv");
+        await importPage.ClickImportBtnAsync();
 
-        var actualAlertMessage = (await importInvoicePage.GetAlertMessageAsync()).Trim();
+        var actualAlertMessage = (await importPage.GetAlertMessageAsync()).Trim();
         actualAlertMessage.Should().Be(expectedAlertMessage);
     }
 
@@ -71,12 +71,12 @@ public class ImportCSVInvoiceTests : BaseTest
     {
         var expectedAlertMessage = "InvoiceNumber is required on row 1.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenAsync();
-        await importInvoicePage.UploadCsvFileAsync("scv-invoice-no-invoice-number.csv");
-        await importInvoicePage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenAsync();
+        await importPage.UploadCsvFileAsync("scv-invoice-no-invoice-number.csv");
+        await importPage.ClickImportBtnAsync();
 
-        var actualAlertMessage = (await importInvoicePage.GetAlertMessageAsync()).Trim();
+        var actualAlertMessage = (await importPage.GetAlertMessageAsync()).Trim();
         actualAlertMessage.Should().Be(expectedAlertMessage);
     }
 
@@ -85,12 +85,12 @@ public class ImportCSVInvoiceTests : BaseTest
     {
         var expectedAlertMessage = "ProjectCode is required on row 1.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenAsync();
-        await importInvoicePage.UploadCsvFileAsync("scv-invoice-no-project.csv");
-        await importInvoicePage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenAsync();
+        await importPage.UploadCsvFileAsync("scv-invoice-no-project.csv");
+        await importPage.ClickImportBtnAsync();
 
-        var actualAlertMessage = (await importInvoicePage.GetAlertMessageAsync()).Trim();
+        var actualAlertMessage = (await importPage.GetAlertMessageAsync()).Trim();
         actualAlertMessage.Should().Be(expectedAlertMessage);
     }
 
@@ -167,9 +167,9 @@ public class ImportCSVInvoiceTests : BaseTest
             await SqlHelper.DeleteImportedInvoiceByInvoiceNumberAsync(invoiceNumber);
             await SqlHelper.DeleteActivitySourceByCsvFileAsync("scv-invoice-correct.csv");
 
-            var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-            await importInvoicePage.OpenAsync();
-            var invoicesPage = await importInvoicePage.ImportCsvAsync("scv-invoice-correct.csv");
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenAsync();
+            var invoicesPage = await importPage.ImportCsvAsync("scv-invoice-correct.csv");
 
             (await invoicesPage.GetTitleAsync()).Should().Be(expectedPageTitle);
 
@@ -202,14 +202,14 @@ public class ImportCSVInvoiceTests : BaseTest
             await SqlHelper.DeleteImportedInvoiceByInvoiceNumberAsync(invoiceNumber);
             await SqlHelper.DeleteActivitySourceByCsvFileAsync(fileName);
 
-            var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-            await importInvoicePage.OpenAsync();
-            var invoicesPage = await importInvoicePage.ImportCsvAsync(fileName);
-            var importInvoicePage2 = await invoicesPage.ClickImportCSVBtnAsync();
-            await importInvoicePage2.UploadCsvFileAsync(fileName);
-            await importInvoicePage2.ClickImportBtnAsync();
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenAsync();
+            var invoicesPage = await importPage.ImportCsvAsync(fileName);
+            var ImportPage2 = await invoicesPage.ClickImportCSVBtnAsync();
+            await ImportPage2.UploadCsvFileAsync(fileName);
+            await ImportPage2.ClickImportBtnAsync();
 
-            (await importInvoicePage2.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+            (await ImportPage2.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
         }
         finally
         {
@@ -220,12 +220,12 @@ public class ImportCSVInvoiceTests : BaseTest
 
     private async Task AssertImportAlertAsync(string fileName, string expectedAlertMessage)
     {
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenAsync();
-        await importInvoicePage.UploadCsvFileAsync(fileName);
-        await importInvoicePage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenAsync();
+        await importPage.UploadCsvFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        var actualAlertMessage = (await importInvoicePage.GetAlertMessageAsync())
+        var actualAlertMessage = (await importPage.GetAlertMessageAsync())
             .Replace("\r\n", "\n")
             .Trim();
         actualAlertMessage.Should().Be(expectedAlertMessage.Replace("\r\n", "\n").Trim());

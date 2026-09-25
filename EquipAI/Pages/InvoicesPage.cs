@@ -96,34 +96,35 @@ public class InvoicesPage : BasePage
         return new CreateInvoicePage(Page);
     }
 
-    public async Task<ImportInvoicePage> ClickImportCSVBtnAsync()
+    public async Task<ImportPage> ClickImportCSVBtnAsync()
     {
         await ImportCSVBtn.ClickAsync();
         await Page.WaitForURLAsync("**/invoices/import**");
-        var importInvoicePage = new ImportInvoicePage(Page);
-        await importInvoicePage.WaitForLoadedAsync();
-        return importInvoicePage;
+        var importPage = new ImportPage(Page);
+        await importPage.WaitForLoadedAsync();
+        return importPage;
     }
 
-    public async Task<ImportInvoicePage> ClickImportPDFBtnAsync()
+    public async Task<ImportPage> ClickImportPDFBtnAsync()
     {
         await ImportPDFBtn.ClickAsync();
         await Page.WaitForURLAsync(
             url => url.Contains("/invoices/", StringComparison.OrdinalIgnoreCase)
                    && url.Contains("pdf", StringComparison.OrdinalIgnoreCase));
-        var importInvoicePage = new ImportInvoicePage(Page);
-        await importInvoicePage.WaitForLoadedAsync();
-        return importInvoicePage;
+        var importPage = new ImportPage(Page);
+        await importPage.WaitForLoadedAsync();
+        return importPage;
     }
 
-    public async Task<ImportInvoicePage> ClickImportUtilityBillBtnAsync()
+    public async Task<ImportPage> ClickImportUtilityBillBtnAsync()
     {
         await ImportUtilityBillBtn.ClickAsync();
         await Page.WaitForURLAsync(
-            url => url.Contains("/invoices/import-utility-bill", StringComparison.OrdinalIgnoreCase));
-        var importInvoicePage = new ImportInvoicePage(Page);
-        await importInvoicePage.WaitForLoadedAsync();
-        return importInvoicePage;
+            url => url.Contains("/invoices/import-utility-bill", StringComparison.OrdinalIgnoreCase)
+                   || url.Contains("/utility-bills/import", StringComparison.OrdinalIgnoreCase));
+        var importPage = new ImportPage(Page);
+        await importPage.WaitForLoadedAsync();
+        return importPage;
     }
 
     public async Task<ViewInvoicePage> ClickViewBtnAsync(string invoiceNumber)

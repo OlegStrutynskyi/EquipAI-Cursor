@@ -11,17 +11,19 @@ public class SideMenuPage : BasePage
     private ILocator AccountNav => Page.GetByRole(AriaRole.Navigation, new() { Name = "Account" });
     private ILocator NavItems => Page.Locator(".nav-item");
 
-    private ILocator EnterpriseLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Enterprise" });
-    private ILocator InvoicesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Invoices" });
-    private ILocator TelemetryLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Telemetry" });
-    private ILocator UsersLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Users" });
+    private ILocator CompanyDashboardLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Company Dashboard" });
     private ILocator ProjectsLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Projects" });
-    private ILocator UnitsLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Units" });
-    private ILocator EmissionTypesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission types" });
-    private ILocator EmissionCategoriesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission categories" });
+    private ILocator EmissionHubLink => PrimaryNav.Locator(".nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission Hub" });
+    private ILocator EmissionCategoriesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission Categories" });
+    private ILocator FactorImportLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Factor Import" });
+    private ILocator EmissionTypesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission Types" });
     private ILocator AliasesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Aliases" });
-    private ILocator FactorImportLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Factor import" });
     private ILocator DataHubLink => PrimaryNav.Locator(".nav-item").Filter(new LocatorFilterOptions { HasTextString = "Data Hub" });
+    private ILocator InvoiceUploadLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Invoice Upload" });
+    private ILocator TelemetryUploadLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Telemetry Upload" });
+    private ILocator UtilityBillUploadLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Utility Bill Upload" });
+    private ILocator UnitsLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Units" });
+    private ILocator UsersLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Users" });
     private ILocator DarkModeLink => Page.Locator("label.nav-item--theme, label.nav-item")
         .Filter(new LocatorFilterOptions { HasTextString = "Dark Mode" });
     private ILocator DarkModeToggle => Page.Locator("input[aria-label='Toggle dark mode']");
@@ -64,36 +66,77 @@ public class SideMenuPage : BasePage
         return await link.CountAsync() > 0 && await link.First.IsVisibleAsync();
     }
 
-    public Task ClickEnterpriseAsync() => ClickLinkAsync(EnterpriseLink);
-
-    public async Task ClickInvoicesAsync()
-    {
-        await EnsureDataHubExpandedForAsync(InvoicesLink);
-        await ClickLinkAsync(InvoicesLink);
-    }
-
-    public async Task ClickTelemetryAsync()
-    {
-        await EnsureDataHubExpandedForAsync(TelemetryLink);
-        await ClickLinkAsync(TelemetryLink);
-    }
-
-    public Task ClickUsersAsync() => ClickLinkAsync(UsersLink);
+    public Task ClickCompanyDashboardAsync() => ClickLinkAsync(CompanyDashboardLink);
     public Task ClickProjectsAsync() => ClickLinkAsync(ProjectsLink);
     public Task ClickUnitsAsync() => ClickLinkAsync(UnitsLink);
-    public Task ClickEmissionTypesAsync() => ClickLinkAsync(EmissionTypesLink);
-    public Task ClickEmissionCategoriesAsync() => ClickLinkAsync(EmissionCategoriesLink);
-    public Task ClickAliasesAsync() => ClickLinkAsync(AliasesLink);
+    public Task ClickUsersAsync() => ClickLinkAsync(UsersLink);
+
+    public async Task ClickEmissionTypesAsync()
+    {
+        await EnsureEmissionHubExpandedForAsync(EmissionTypesLink);
+        await ClickLinkAsync(EmissionTypesLink);
+    }
+
+    public async Task ClickEmissionCategoriesAsync()
+    {
+        await EnsureEmissionHubExpandedForAsync(EmissionCategoriesLink);
+        await ClickLinkAsync(EmissionCategoriesLink);
+    }
+
+    public async Task ClickAliasesAsync()
+    {
+        await EnsureEmissionHubExpandedForAsync(AliasesLink);
+        await ClickLinkAsync(AliasesLink);
+    }
 
     public async Task ClickFactorImportAsync()
     {
-        await EnsureDataHubExpandedForAsync(FactorImportLink);
+        await EnsureEmissionHubExpandedForAsync(FactorImportLink);
         await ClickLinkAsync(FactorImportLink);
     }
 
-    public async Task ClickDataHubAsync()
+    public async Task ClickInvoiceUploadAsync()
     {
-        await DataHubLink.First.EvaluateAsync(
+        await EnsureDataHubExpandedForAsync(InvoiceUploadLink);
+        await ClickLinkAsync(InvoiceUploadLink);
+    }
+
+    public async Task ClickTelemetryUploadAsync()
+    {
+        await EnsureDataHubExpandedForAsync(TelemetryUploadLink);
+        await ClickLinkAsync(TelemetryUploadLink);
+    }
+
+    public async Task ClickUtilityBillUploadAsync()
+    {
+        await EnsureDataHubExpandedForAsync(UtilityBillUploadLink);
+        await ClickLinkAsync(UtilityBillUploadLink);
+    }
+
+    public Task ClickEmissionHubAsync() => ClickNavGroupAsync(EmissionHubLink);
+    public Task ClickDataHubAsync() => ClickNavGroupAsync(DataHubLink);
+
+    private async Task EnsureEmissionHubExpandedForAsync(ILocator link)
+    {
+        if (await link.CountAsync() > 0 && await link.First.IsVisibleAsync())
+            return;
+
+        await ClickEmissionHubAsync();
+        await link.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    private async Task EnsureDataHubExpandedForAsync(ILocator link)
+    {
+        if (await link.CountAsync() > 0 && await link.First.IsVisibleAsync())
+            return;
+
+        await ClickDataHubAsync();
+        await link.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    private async Task ClickNavGroupAsync(ILocator groupLink)
+    {
+        await groupLink.First.EvaluateAsync(
             """
             element => {
               let parent = element.parentElement;
@@ -107,15 +150,6 @@ public class SideMenuPage : BasePage
               element.click();
             }
             """);
-    }
-
-    private async Task EnsureDataHubExpandedForAsync(ILocator link)
-    {
-        if (await link.CountAsync() > 0 && await link.First.IsVisibleAsync())
-            return;
-
-        await ClickDataHubAsync();
-        await link.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
     public async Task ClickDarkModeAsync()

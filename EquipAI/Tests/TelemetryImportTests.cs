@@ -14,26 +14,26 @@ public class TelemetryImportTests : BaseTest
         const string expectedMessage =
             "Upload an Excel (.xlsx) file named CompanyName_Month_Year.xlsx (example: Herc_07_26.xlsx). Review the recognized rows, Month/Year, and Company before saving.";
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
 
-        (await importTelemetryPage.GetTitleAsync()).Should().Be(expectedTitle);
-        (await importTelemetryPage.GetMessageAsync()).Should().Be(expectedMessage);
-        (await importTelemetryPage.IsBackBtnVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.IsExcelFileLabelVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.IsImportBtnVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.IsImportBtnEnabledAsync()).Should().BeFalse();
+        (await importPage.GetTitleAsync()).Should().Be(expectedTitle);
+        (await importPage.GetMessageAsync()).Should().Be(expectedMessage);
+        (await importPage.IsBackBtnVisibleAsync()).Should().BeTrue();
+        (await importPage.IsExcelFileLabelVisibleAsync()).Should().BeTrue();
+        (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportBtnVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportBtnEnabledAsync()).Should().BeFalse();
     }
 
     [Test]
     public async Task T02_TelemetryImport_ClickBackBtn()
     {
-        const string expectedTitle = "Telemetry";
+        const string expectedTitle = "Telemetry Upload";
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        var telemetryPage = await importTelemetryPage.ClickBackBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        var telemetryPage = await importPage.ClickBackToTelemetryAsync();
 
         (await telemetryPage.GetTitleAsync()).Should().Be(expectedTitle);
     }
@@ -87,12 +87,12 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T09_TelemetryImport_Herc_NoHours()
     {
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync("Herc_08_26_no_Hours.xlsx");
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync("Herc_08_26_no_Hours.xlsx");
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
@@ -100,13 +100,13 @@ public class TelemetryImportTests : BaseTest
     {
         const string expectedMonthYear = "--------- ----";
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync("Herc_no_MonthYear.xlsx");
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync("Herc_no_MonthYear.xlsx");
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
     }
 
     [Test]
@@ -123,16 +123,16 @@ public class TelemetryImportTests : BaseTest
         {
             await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-            var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-            await importTelemetryPage.OpenAsync();
-            await importTelemetryPage.UploadFileAsync(fileName);
-            await importTelemetryPage.ClickImportBtnAsync();
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenTelemetryAsync();
+            await importPage.UploadFileAsync(fileName);
+            await importPage.ClickImportBtnAsync();
 
-            (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-            (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-            (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+            (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+            (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+            (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-            var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+            var previewRows = await importPage.GetPreviewRowsAsync();
             previewRows.Should().HaveCount(2);
             previewRows[0].RowNumber.Should().Be("3");
             previewRows[0].EquipmentTag.Should().Be("111-2222");
@@ -147,8 +147,8 @@ public class TelemetryImportTests : BaseTest
             previewRows[1].OperatingHours.Should().Be("1.32");
             previewRows[1].FuelType.Should().Be(expectedFuelType);
 
-            var telemetryPage = await importTelemetryPage.ClickSaveBtnAsync();
-            (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry");
+            var telemetryPage = await importPage.ClickSaveBtnAsync();
+            (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry Upload");
             (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
 
             var gridRows = await telemetryPage.GetGridRowsAsync();
@@ -185,16 +185,16 @@ public class TelemetryImportTests : BaseTest
 
         await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-        (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-        var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+        var previewRows = await importPage.GetPreviewRowsAsync();
         previewRows.Should().HaveCount(2);
         previewRows[0].RowNumber.Should().Be("3");
         previewRows[0].EquipmentTag.Should().Be("111-2222");
@@ -209,14 +209,14 @@ public class TelemetryImportTests : BaseTest
         previewRows[1].OperatingHours.Should().Be("1.32");
         previewRows[1].FuelType.Should().Be(expectedFuelType);
 
-        await importTelemetryPage.ClickCancelBtnAsync();
+        await importPage.ClickCancelBtnAsync();
 
-        (await importTelemetryPage.IsReportingMonthVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsCompanyVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsPreviewGridVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
+        (await importPage.IsReportingMonthVisibleAsync()).Should().BeFalse();
+        (await importPage.IsCompanyVisibleAsync()).Should().BeFalse();
+        (await importPage.IsPreviewGridVisibleAsync()).Should().BeFalse();
+        (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
-        var telemetryPage = await importTelemetryPage.ClickBackBtnAsync();
+        var telemetryPage = await importPage.ClickBackToTelemetryAsync();
         await telemetryPage.SetMonthAsync("2026-08");
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
@@ -235,20 +235,20 @@ public class TelemetryImportTests : BaseTest
 
         await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-        (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-        await importTelemetryPage.ClearReportingMonthAsync();
-        await importTelemetryPage.ClearCompanyAsync();
-        await importTelemetryPage.ClickSaveExpectingValidationAsync();
+        await importPage.ClearReportingMonthAsync();
+        await importPage.ClearCompanyAsync();
+        await importPage.ClickSaveExpectingValidationAsync();
 
-        (await importTelemetryPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
-        (await importTelemetryPage.GetCompanyErrorAsync()).Should().Be(expectedCompanyError);
+        (await importPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
+        (await importPage.GetCompanyErrorAsync()).Should().Be(expectedCompanyError);
     }
 
     [Test]
@@ -297,12 +297,12 @@ public class TelemetryImportTests : BaseTest
             Fuel Type: —
             """.Replace("\r\n", "\n").Trim();
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+        var previewRows = await importPage.GetPreviewRowsAsync();
         previewRows.Should().HaveCount(2);
         previewRows[0].RowNumber.Should().Be("3");
         previewRows[0].EquipmentTag.Should().Be("111-2222");
@@ -317,9 +317,9 @@ public class TelemetryImportTests : BaseTest
         previewRows[1].OperatingHours.Should().Be(expectedFuelType);
         previewRows[1].FuelType.Should().Be(expectedFuelType);
 
-        (await importTelemetryPage.IsUnrecognizedRowsAlertVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.GetValidationLeadAsync()).Should().Be(expectedValidationLead);
-        (await importTelemetryPage.GetValidationListTextAsync()).Should().Be(expectedValidationList);
+        (await importPage.IsUnrecognizedRowsAlertVisibleAsync()).Should().BeTrue();
+        (await importPage.GetValidationLeadAsync()).Should().Be(expectedValidationLead);
+        (await importPage.GetValidationListTextAsync()).Should().Be(expectedValidationList);
     }
 
     [Test]
@@ -365,23 +365,23 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T20_TelemetryImport_JCB_NoHours()
     {
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync("JCB_08_26_no_Hours.xlsx");
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync("JCB_08_26_no_Hours.xlsx");
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
     public async Task T21_TelemetryImport_JCB_NoFuelType()
     {
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync("JCB_08_26_no_FuelType.xlsx");
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync("JCB_08_26_no_FuelType.xlsx");
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
@@ -397,16 +397,16 @@ public class TelemetryImportTests : BaseTest
         {
             await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-            var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-            await importTelemetryPage.OpenAsync();
-            await importTelemetryPage.UploadFileAsync(fileName);
-            await importTelemetryPage.ClickImportBtnAsync();
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenTelemetryAsync();
+            await importPage.UploadFileAsync(fileName);
+            await importPage.ClickImportBtnAsync();
 
-            (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-            (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-            (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+            (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+            (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+            (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-            var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+            var previewRows = await importPage.GetPreviewRowsAsync();
             previewRows.Should().HaveCount(2);
             previewRows[0].RowNumber.Should().Be("3");
             previewRows[0].EquipmentTag.Should().Be("111-2222");
@@ -421,8 +421,8 @@ public class TelemetryImportTests : BaseTest
             previewRows[1].OperatingHours.Should().Be("1.32");
             previewRows[1].FuelType.Should().Be("D");
 
-            var telemetryPage = await importTelemetryPage.ClickSaveBtnAsync();
-            (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry");
+            var telemetryPage = await importPage.ClickSaveBtnAsync();
+            (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry Upload");
             (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
 
             var gridRows = await telemetryPage.GetGridRowsAsync();
@@ -458,16 +458,16 @@ public class TelemetryImportTests : BaseTest
 
         await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-        (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-        var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+        var previewRows = await importPage.GetPreviewRowsAsync();
         previewRows.Should().HaveCount(2);
         previewRows[0].RowNumber.Should().Be("3");
         previewRows[0].EquipmentTag.Should().Be("111-2222");
@@ -482,14 +482,14 @@ public class TelemetryImportTests : BaseTest
         previewRows[1].OperatingHours.Should().Be("1.32");
         previewRows[1].FuelType.Should().Be("D");
 
-        await importTelemetryPage.ClickCancelBtnAsync();
+        await importPage.ClickCancelBtnAsync();
 
-        (await importTelemetryPage.IsReportingMonthVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsCompanyVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsPreviewGridVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
+        (await importPage.IsReportingMonthVisibleAsync()).Should().BeFalse();
+        (await importPage.IsCompanyVisibleAsync()).Should().BeFalse();
+        (await importPage.IsPreviewGridVisibleAsync()).Should().BeFalse();
+        (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
-        var telemetryPage = await importTelemetryPage.ClickBackBtnAsync();
+        var telemetryPage = await importPage.ClickBackToTelemetryAsync();
         await telemetryPage.SetMonthAsync("2026-08");
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
@@ -508,20 +508,20 @@ public class TelemetryImportTests : BaseTest
 
         await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-        (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-        await importTelemetryPage.ClearReportingMonthAsync();
-        await importTelemetryPage.ClearCompanyAsync();
-        await importTelemetryPage.ClickSaveExpectingValidationAsync();
+        await importPage.ClearReportingMonthAsync();
+        await importPage.ClearCompanyAsync();
+        await importPage.ClickSaveExpectingValidationAsync();
 
-        (await importTelemetryPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
-        (await importTelemetryPage.GetCompanyErrorAsync()).Should().Be(expectedCompanyError);
+        (await importPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
+        (await importPage.GetCompanyErrorAsync()).Should().Be(expectedCompanyError);
     }
 
     [Test]
@@ -570,12 +570,12 @@ public class TelemetryImportTests : BaseTest
             Fuel Type: D
             """.Replace("\r\n", "\n").Trim();
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+        var previewRows = await importPage.GetPreviewRowsAsync();
         previewRows.Should().HaveCount(4);
         previewRows[0].RowNumber.Should().Be("2");
         previewRows[0].EquipmentTag.Should().Be("111-2222");
@@ -602,9 +602,9 @@ public class TelemetryImportTests : BaseTest
         previewRows[3].OperatingHours.Should().Be("22.52");
         previewRows[3].FuelType.Should().Be(expectedFuelType);
 
-        (await importTelemetryPage.IsUnrecognizedRowsAlertVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.GetValidationLeadAsync()).Should().Be(expectedValidationLead);
-        (await importTelemetryPage.GetValidationListTextAsync()).Should().Be(expectedValidationList);
+        (await importPage.IsUnrecognizedRowsAlertVisibleAsync()).Should().BeTrue();
+        (await importPage.GetValidationLeadAsync()).Should().Be(expectedValidationLead);
+        (await importPage.GetValidationListTextAsync()).Should().Be(expectedValidationList);
     }
 
     [Test]
@@ -650,23 +650,23 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T31_TelemetryImport_Custom_NoHours()
     {
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync("Custom_08_26_no_Hours.xlsx");
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync("Custom_08_26_no_Hours.xlsx");
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
     public async Task T32_TelemetryImport_Custom_NoFuelType()
     {
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync("Custom_08_26_no_FuelType.xlsx");
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync("Custom_08_26_no_FuelType.xlsx");
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
@@ -690,16 +690,16 @@ public class TelemetryImportTests : BaseTest
         {
             await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-            var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-            await importTelemetryPage.OpenAsync();
-            await importTelemetryPage.UploadFileAsync(fileName);
-            await importTelemetryPage.ClickImportBtnAsync();
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenTelemetryAsync();
+            await importPage.UploadFileAsync(fileName);
+            await importPage.ClickImportBtnAsync();
 
-            (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-            (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-            (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+            (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+            (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+            (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-            var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+            var previewRows = await importPage.GetPreviewRowsAsync();
             previewRows.Should().HaveCount(2);
             previewRows[0].RowNumber.Should().Be("2");
             previewRows[0].EquipmentTag.Should().Be("111-2221");
@@ -714,8 +714,8 @@ public class TelemetryImportTests : BaseTest
             previewRows[1].OperatingHours.Should().Be("1.32");
             previewRows[1].FuelType.Should().Be("D");
 
-            var telemetryPage = await importTelemetryPage.ClickSaveBtnAsync();
-            (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry");
+            var telemetryPage = await importPage.ClickSaveBtnAsync();
+            (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry Upload");
             (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
 
             var gridRows = await telemetryPage.GetGridRowsAsync();
@@ -751,16 +751,16 @@ public class TelemetryImportTests : BaseTest
 
         await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-        (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-        var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+        var previewRows = await importPage.GetPreviewRowsAsync();
         previewRows.Should().HaveCount(2);
         previewRows[0].RowNumber.Should().Be("2");
         previewRows[0].EquipmentTag.Should().Be("111-2221");
@@ -775,14 +775,14 @@ public class TelemetryImportTests : BaseTest
         previewRows[1].OperatingHours.Should().Be("1.32");
         previewRows[1].FuelType.Should().Be("D");
 
-        await importTelemetryPage.ClickCancelBtnAsync();
+        await importPage.ClickCancelBtnAsync();
 
-        (await importTelemetryPage.IsReportingMonthVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsCompanyVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsPreviewGridVisibleAsync()).Should().BeFalse();
-        (await importTelemetryPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
+        (await importPage.IsReportingMonthVisibleAsync()).Should().BeFalse();
+        (await importPage.IsCompanyVisibleAsync()).Should().BeFalse();
+        (await importPage.IsPreviewGridVisibleAsync()).Should().BeFalse();
+        (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
-        var telemetryPage = await importTelemetryPage.ClickBackBtnAsync();
+        var telemetryPage = await importPage.ClickBackToTelemetryAsync();
         await telemetryPage.SetMonthAsync("2026-08");
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
@@ -801,20 +801,20 @@ public class TelemetryImportTests : BaseTest
 
         await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
-        (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-        await importTelemetryPage.ClearReportingMonthAsync();
-        await importTelemetryPage.ClearCompanyAsync();
-        await importTelemetryPage.ClickSaveExpectingValidationAsync();
+        await importPage.ClearReportingMonthAsync();
+        await importPage.ClearCompanyAsync();
+        await importPage.ClickSaveExpectingValidationAsync();
 
-        (await importTelemetryPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
-        (await importTelemetryPage.GetCompanyErrorAsync()).Should().Be(expectedCompanyError);
+        (await importPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
+        (await importPage.GetCompanyErrorAsync()).Should().Be(expectedCompanyError);
     }
 
     [Test]
@@ -881,12 +881,12 @@ public class TelemetryImportTests : BaseTest
             Fuel Type: —
             """.Replace("\r\n", "\n").Trim();
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+        var previewRows = await importPage.GetPreviewRowsAsync();
         previewRows.Should().HaveCount(4);
         previewRows[0].RowNumber.Should().Be("5");
         previewRows[0].EquipmentTag.Should().Be("111-2224");
@@ -913,9 +913,9 @@ public class TelemetryImportTests : BaseTest
         previewRows[3].OperatingHours.Should().Be("1.32");
         previewRows[3].FuelType.Should().Be("D");
 
-        (await importTelemetryPage.IsUnrecognizedRowsAlertVisibleAsync()).Should().BeTrue();
-        (await importTelemetryPage.GetValidationLeadAsync()).Should().Be(expectedValidationLead);
-        (await importTelemetryPage.GetValidationListTextAsync()).Should().Be(expectedValidationList);
+        (await importPage.IsUnrecognizedRowsAlertVisibleAsync()).Should().BeTrue();
+        (await importPage.GetValidationLeadAsync()).Should().Be(expectedValidationLead);
+        (await importPage.GetValidationListTextAsync()).Should().Be(expectedValidationList);
     }
 
     [Test]
@@ -931,22 +931,22 @@ public class TelemetryImportTests : BaseTest
         {
             await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
-            var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-            await importTelemetryPage.OpenAsync();
-            await importTelemetryPage.UploadFileAsync(fileName);
-            await importTelemetryPage.ClickImportBtnAsync();
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenTelemetryAsync();
+            await importPage.UploadFileAsync(fileName);
+            await importPage.ClickImportBtnAsync();
 
-            (await importTelemetryPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-            (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(initialMonthYear);
-            (await importTelemetryPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
+            (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+            (await importPage.GetReportingMonthValueAsync()).Should().Be(initialMonthYear);
+            (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
-            await importTelemetryPage.SetReportingMonthAsync(changedMonthValue);
-            (await importTelemetryPage.GetReportingMonthValueAsync()).Should().Be(changedMonthYear);
+            await importPage.SetReportingMonthAsync(changedMonthValue);
+            (await importPage.GetReportingMonthValueAsync()).Should().Be(changedMonthYear);
 
-            var selectedLocation = await importTelemetryPage.SelectRandomDifferentLocationForRowAsync(0);
+            var selectedLocation = await importPage.SelectRandomDifferentLocationForRowAsync(0);
 
-            var telemetryPage = await importTelemetryPage.ClickSaveBtnAsync();
-            (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry");
+            var telemetryPage = await importPage.ClickSaveBtnAsync();
+            (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry Upload");
 
             await telemetryPage.SetMonthAsync(changedMonthValue);
             (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(changedMonthYear);
@@ -979,14 +979,14 @@ public class TelemetryImportTests : BaseTest
             "2 rows could not be matched to a location from the Location column and will be saved under the corporate fallback location unless you choose a location from the dropdown. Add a project alias to attribute them automatically.";
         const string expectedLocation = "000000 — Haskell";
 
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.GetAlertBodyTextAsync()).Should().Be(expectedAlert);
+        (await importPage.GetAlertBodyTextAsync()).Should().Be(expectedAlert);
 
-        var previewRows = await importTelemetryPage.GetPreviewRowsAsync();
+        var previewRows = await importPage.GetPreviewRowsAsync();
         previewRows.Should().HaveCount(2);
         previewRows[0].LocationText.Should().Be(expectedLocation);
         previewRows[1].LocationText.Should().Be(expectedLocation);
@@ -994,11 +994,11 @@ public class TelemetryImportTests : BaseTest
 
     private async Task AssertImportAlertAsync(string fileName, string expectedAlertMessage)
     {
-        var importTelemetryPage = new ImportTelemetryPage(Fixture.Page);
-        await importTelemetryPage.OpenAsync();
-        await importTelemetryPage.UploadFileAsync(fileName);
-        await importTelemetryPage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+        (await importPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
     }
 }

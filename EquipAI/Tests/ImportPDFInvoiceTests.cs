@@ -14,26 +14,26 @@ public class ImportPDFInvoiceTests : BaseTest
         const string expectedMessage =
             "Upload a single PDF invoice. It is read automatically and appears in the list as a draft invoice once processing finishes.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenPdfAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenPdfAsync();
 
-        (await importInvoicePage.GetTitleAsync()).Should().Be(expectedTitle);
-        (await importInvoicePage.GetMessageAsync()).Should().Be(expectedMessage);
-        (await importInvoicePage.IsBackBtnVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsPdfFileLabelVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportSectionVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportBtnVisibleAsync()).Should().BeTrue();
-        (await importInvoicePage.IsImportBtnEnabledAsync()).Should().BeFalse();
+        (await importPage.GetTitleAsync()).Should().Be(expectedTitle);
+        (await importPage.GetMessageAsync()).Should().Be(expectedMessage);
+        (await importPage.IsBackBtnVisibleAsync()).Should().BeTrue();
+        (await importPage.IsPdfFileLabelVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportSectionVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportBtnVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportBtnEnabledAsync()).Should().BeFalse();
     }
 
     [Test]
     public async Task T02_ImportPDFInvoice_ClickBackBtn()
     {
-        const string expectedTitle = "Invoices";
+        const string expectedTitle = "Invoice Upload";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenPdfAsync();
-        var invoicesPage = await importInvoicePage.ClickBackBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenPdfAsync();
+        var invoicesPage = await importPage.ClickBackToInvoicesAsync();
 
         (await invoicesPage.GetTitleAsync()).Should().Be(expectedTitle);
     }
@@ -43,12 +43,12 @@ public class ImportPDFInvoiceTests : BaseTest
     {
         const string expectedAlertMessage = "Only .pdf files are accepted.";
 
-        var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-        await importInvoicePage.OpenPdfAsync();
-        await importInvoicePage.UploadPdfFileAsync("scv-invoice-correct.csv");
-        await importInvoicePage.ClickImportBtnAsync();
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenPdfAsync();
+        await importPage.UploadPdfFileAsync("scv-invoice-correct.csv");
+        await importPage.ClickImportBtnAsync();
 
-        (await importInvoicePage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+        (await importPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
     }
 
     [Test]
@@ -66,9 +66,9 @@ public class ImportPDFInvoiceTests : BaseTest
             await SqlHelper.DeletePdfBlobByFileAsync(fileName);
             await SqlHelper.DeleteActivitySourceByPdfFileAsync(fileName);
 
-            var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-            await importInvoicePage.OpenPdfAsync();
-            await importInvoicePage.ImportPdfAsync(fileName, expectedToasterMessage);
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenPdfAsync();
+            await importPage.ImportPdfAsync(fileName, expectedToasterMessage);
 
             var invoicesPage = new InvoicesPage(Fixture.Page);
             var deadline = DateTime.UtcNow.AddMinutes(10);
@@ -116,17 +116,17 @@ public class ImportPDFInvoiceTests : BaseTest
             await SqlHelper.DeletePdfBlobByFileAsync(fileName);
             await SqlHelper.DeleteActivitySourceByPdfFileAsync(fileName);
 
-            var importInvoicePage = new ImportInvoicePage(Fixture.Page);
-            await importInvoicePage.OpenPdfAsync();
-            await importInvoicePage.ImportPdfAsync(fileName, expectedToasterMessage);
+            var importPage = new ImportPage(Fixture.Page);
+            await importPage.OpenPdfAsync();
+            await importPage.ImportPdfAsync(fileName, expectedToasterMessage);
 
             var invoicesPage = new InvoicesPage(Fixture.Page);
             await invoicesPage.OpenAsync();
-            var importInvoicePage2 = await invoicesPage.ClickImportPDFBtnAsync();
-            await importInvoicePage2.UploadPdfFileAsync(fileName);
-            await importInvoicePage2.ClickImportBtnAsync();
+            var ImportPage2 = await invoicesPage.ClickImportPDFBtnAsync();
+            await ImportPage2.UploadPdfFileAsync(fileName);
+            await ImportPage2.ClickImportBtnAsync();
 
-            (await importInvoicePage2.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+            (await ImportPage2.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
         }
         finally
         {

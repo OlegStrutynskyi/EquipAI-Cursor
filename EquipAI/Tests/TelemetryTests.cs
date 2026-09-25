@@ -9,7 +9,7 @@ public class TelemetryTests : BaseTest
     [Test]
     public async Task T01_Telemetry_DefaultView()
     {
-        const string expectedTitle = "Telemetry";
+        const string expectedTitle = "Telemetry Upload";
         const string expectedMessage = "Browse imported equipment telemetry readings.";
         var expectedMonth = DateTime.Today.AddMonths(-1).ToString("yyyy-MM", CultureInfo.InvariantCulture);
 
@@ -32,9 +32,9 @@ public class TelemetryTests : BaseTest
 
         var telemetryPage = new TelemetryPage(Fixture.Page);
         await telemetryPage.OpenAsync();
-        var importTelemetryPage = await telemetryPage.ClickImportBtnAsync();
+        var ImportPage = await telemetryPage.ClickImportBtnAsync();
 
-        (await importTelemetryPage.GetTitleAsync()).Should().Be(expectedTitle);
+        (await ImportPage.GetTitleAsync()).Should().Be(expectedTitle);
     }
 
     [Test]

@@ -10,7 +10,7 @@ public class InvoicesTests : BaseTest
     [Test]
     public async Task T01_Invoices_DefaultView()
     {
-        const string expectedTitle = "Invoices";
+        const string expectedTitle = "Invoice Upload";
         const string expectedMessage = "Browse invoices and edit drafts before approval.";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
@@ -29,9 +29,9 @@ public class InvoicesTests : BaseTest
     {
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
-        var importInvoicePage = await invoicesPage.ClickImportCSVBtnAsync();
+        var importPage = await invoicesPage.ClickImportCSVBtnAsync();
 
-        (await importInvoicePage.IsImportTitleVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportTitleVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
@@ -39,9 +39,9 @@ public class InvoicesTests : BaseTest
     {
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
-        var importInvoicePage = await invoicesPage.ClickImportPDFBtnAsync();
+        var importPage = await invoicesPage.ClickImportPDFBtnAsync();
 
-        (await importInvoicePage.IsImportTitleVisibleAsync()).Should().BeTrue();
+        (await importPage.IsImportTitleVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
