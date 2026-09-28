@@ -227,7 +227,7 @@ public class FactorImportTests : BaseTest
             await aliasesPage.OpenAsync();
             await aliasesPage.ClickEmissionTypesTabAsync();
 
-            var propaneAlias = await aliasesPage.GetEmissionTypeAliasGridRowAsync("Propane");
+            var propaneAlias = await aliasesPage.GetEmissionTypeAliasGridRowAsync("Propane", "Catalog Factor Mapping");
             propaneAlias.Should().NotBeNull();
             propaneAlias!.Context.Should().Be("Catalog Factor Mapping");
 
@@ -319,7 +319,7 @@ public class FactorImportTests : BaseTest
             await aliasesPage.OpenAsync();
             await aliasesPage.ClickEmissionTypesTabAsync();
 
-            var propaneAlias = await aliasesPage.GetEmissionTypeAliasGridRowAsync("Propane");
+            var propaneAlias = await aliasesPage.GetEmissionTypeAliasGridRowAsync("Propane", "Catalog Factor Mapping");
             propaneAlias.Should().NotBeNull();
             propaneAlias!.Context.Should().Be("Catalog Factor Mapping");
 
@@ -413,7 +413,7 @@ public class FactorImportTests : BaseTest
             await aliasesPage.OpenAsync();
             await aliasesPage.ClickEmissionTypesTabAsync();
 
-            var propaneAlias = await aliasesPage.GetEmissionTypeAliasGridRowAsync("Propane");
+            var propaneAlias = await aliasesPage.GetEmissionTypeAliasGridRowAsync("Propane", "Catalog Factor Mapping");
             propaneAlias.Should().NotBeNull();
             propaneAlias!.Context.Should().Be("Catalog Factor Mapping");
 

@@ -431,7 +431,7 @@ public static class SqlHelper
         await using var command = new SqlCommand(
             """
             DELETE FROM [sources].[ActivitySource]
-            WHERE [SourceType] = 'AiInvoice'
+            WHERE [SourceType] IN ('AiInvoice', 'UtilityBill', 'AiUtilityBill')
               AND (
                     [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
                  OR [OriginalDocumentBlobUrl] LIKE '%' + @fileName + '%' ESCAPE '\'
@@ -458,7 +458,7 @@ public static class SqlHelper
             """
             SELECT [Id]
             FROM [sources].[ActivitySource]
-            WHERE [SourceType] = 'AiInvoice'
+            WHERE [SourceType] IN ('AiInvoice', 'UtilityBill', 'AiUtilityBill')
               AND (
                     [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
                  OR [OriginalDocumentBlobUrl] LIKE '%' + @fileName + '%' ESCAPE '\'
@@ -690,7 +690,7 @@ public static class SqlHelper
             """
             SELECT [OriginalDocumentBlobUrl]
             FROM [sources].[ActivitySource]
-            WHERE [SourceType] = 'AiInvoice'
+            WHERE [SourceType] IN ('AiInvoice', 'UtilityBill', 'AiUtilityBill')
               AND (
                     [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
                  OR [OriginalDocumentBlobUrl] LIKE '%' + @fileName + '%' ESCAPE '\'

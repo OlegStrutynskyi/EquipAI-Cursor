@@ -240,7 +240,7 @@ public class DashboardTests : BaseTest
         var projectName = await dashboardPage.GetFirstActiveProjectNameAsync();
         var projectDashboardPage = await dashboardPage.ClickFirstActiveProjectAsync();
 
-        (await projectDashboardPage.GetPageTitleAsync()).Should().Be(projectName);
+        (await projectDashboardPage.GetPageTitleAsync()).Should().Be($"{projectName} Overview");
     }
 
     [Test]
@@ -439,8 +439,10 @@ public class DashboardTests : BaseTest
         var expectedValues = expectedRows.Select(row => FormatCategoryEmissionsValue(row.Co2eTonnes)).ToList();
 
         (await dashboardPage.GetScope2TitleAsync()).Should().Be(expectedTitle);
-        (await dashboardPage.GetScope2CategoryNamesAsync()).Should().Equal(expectedNames);
-        (await dashboardPage.GetScope2CategoryValuesAsync()).Should().Equal(expectedValues);
+        var actualNames = await dashboardPage.GetScope2CategoryNamesAsync();
+        var actualValues = await dashboardPage.GetScope2CategoryValuesAsync();
+        actualNames.Zip(actualValues, (name, value) => (name, value))
+            .Should().BeEquivalentTo(expectedNames.Zip(expectedValues, (name, value) => (name, value)));
     }
 
     [Test]

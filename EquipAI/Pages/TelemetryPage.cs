@@ -14,7 +14,8 @@ public class TelemetryPage : BasePage
     private ILocator ImportBtn => Page.Locator("//a[normalize-space()='Import'] | //button[normalize-space()='Import']");
     private ILocator MonthLabel => Page.Locator("label[for='telemetry-month'] span.form-label");
     private ILocator MonthField => Page.Locator("#telemetry-month");
-    private ILocator Grid => Page.Locator("//table[contains(@class,'table')]");
+    private ILocator Grid => Page.Locator("table.table.telemetry-list__table, table.table")
+        .Locator("visible=true").First;
 
     public async Task OpenAsync()
     {
@@ -49,6 +50,7 @@ public class TelemetryPage : BasePage
     {
         await MonthField.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await MonthField.FillAsync(yearMonth);
+        await MonthField.BlurAsync();
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
@@ -66,27 +68,135 @@ public class TelemetryPage : BasePage
     public async Task<IReadOnlyList<TelemetryGridRow>> GetGridRowsAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var hasData = false;
+        try
+        {
+            var loading = Page.Locator(".table-wrapper--loading").First;
+            if (await loading.CountAsync() > 0)
+            {
+                await loading.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Detached,
+                    Timeout = 30_000,
+                });
+            }
+        }
+        catch (TimeoutException)
+        {
+        }
+
+        try
+        {
+            await Page.WaitForFunctionAsync(
+                """
+                () => [...document.querySelectorAll('table.table tbody tr')]
+                  .some(tr => {
+                    if (tr.closest('.table-wrapper--loading')) return false;
+                    if (tr.querySelector('.table__skeleton-bar')) return false;
+                    const cells = tr.querySelectorAll('td');
+                    return cells.length > 1 && (cells[1].innerText || '').trim().length > 0;
+                  })
+                """,
+                null,
+                new PageWaitForFunctionOptions { Timeout = 30_000 });
+            hasData = true;
+        }
+        catch (TimeoutException)
+        {
+            return Array.Empty<TelemetryGridRow>();
+        }
+
+        if (!hasData)
+            return Array.Empty<TelemetryGridRow>();
+
+        var nextBtn = Page.Locator("nav.pagination button").Filter(new LocatorFilterOptions { HasTextString = "Next" });
+        var previousBtn = Page.Locator("nav.pagination button").Filter(new LocatorFilterOptions { HasTextString = "Previous" });
+
+        while (await CanGoToAdjacentPageAsync(previousBtn))
+        {
+            await previousBtn.EvaluateAsync("el => el.click()");
+            await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        }
+
+        var result = new List<TelemetryGridRow>();
+        var seenTags = new HashSet<string>(StringComparer.Ordinal);
+        while (true)
+        {
+            foreach (var row in await GetGridRowsOnCurrentPageAsync())
+            {
+                if (seenTags.Add(row.EquipmentTag))
+                    result.Add(row);
+            }
+
+            if (!await CanGoToAdjacentPageAsync(nextBtn))
+                break;
+
+            var showingBefore = await TryGetShowingRangeAsync();
+            await nextBtn.EvaluateAsync("el => el.click()");
+            await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+            var pageChanged = false;
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline)
+            {
+                var showingAfter = await TryGetShowingRangeAsync();
+                if (showingBefore is not null
+                    && showingAfter is not null
+                    && showingAfter.Value.Start != showingBefore.Value.Start)
+                {
+                    pageChanged = true;
+                    break;
+                }
+
+                var pageTags = await GetGridRowsOnCurrentPageAsync();
+                if (pageTags.Any(r => !seenTags.Contains(r.EquipmentTag)))
+                {
+                    pageChanged = true;
+                    break;
+                }
+
+                await Page.WaitForTimeoutAsync(200);
+            }
+
+            if (!pageChanged)
+                break;
+        }
+
+        return result;
+    }
+
+    private async Task<IReadOnlyList<TelemetryGridRow>> GetGridRowsOnCurrentPageAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var rawRows = await Grid.EvaluateAsync<string[][]>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .map(tr => [...tr.querySelectorAll('td')]
+                .map(td => (td.innerText || '').replace(/\u00a0/g, ' ').trim()))
+              .filter(cells => cells.length > 1 && cells[1])
+            """);
+
         var headers = (await Grid.Locator("thead th").AllInnerTextsAsync())
             .Select(h => h.Replace('\u00A0', ' ').Trim().ToUpperInvariant())
             .ToList();
-        var rows = Grid.Locator("tbody tr");
-        var count = await rows.CountAsync();
-        var result = new List<TelemetryGridRow>();
 
-        for (var i = 0; i < count; i++)
+        var result = new List<TelemetryGridRow>();
+        foreach (var cells in rawRows)
         {
-            var cells = rows.Nth(i).Locator("td");
-            var cellCount = await cells.CountAsync();
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            for (var c = 0; c < cellCount && c < headers.Count; c++)
-            {
-                values[headers[c]] = (await cells.Nth(c).InnerTextAsync()).Replace('\u00A0', ' ').Trim();
-            }
+            for (var c = 0; c < cells.Length && c < headers.Count; c++)
+                values[headers[c]] = cells[c];
+
+            var equipmentTag = GetCell(values, "EQUIPMENT TAG");
+            if (string.IsNullOrWhiteSpace(equipmentTag))
+                continue;
 
             result.Add(new TelemetryGridRow
             {
                 Month = GetCell(values, "MONTH"),
-                EquipmentTag = GetCell(values, "EQUIPMENT TAG"),
+                EquipmentTag = equipmentTag,
                 EquipmentType = GetCell(values, "EQUIPMENT TYPE"),
                 Location = GetCell(values, "LOCATION", "LOCATION TEXT"),
                 OperatingHours = GetCell(values, "OPERATING HOURS"),
@@ -104,6 +214,83 @@ public class TelemetryPage : BasePage
         var rows = await GetGridRowsAsync();
         return rows.FirstOrDefault(row =>
             row.EquipmentTag.Equals(equipmentTag, StringComparison.Ordinal));
+    }
+
+    private async Task<bool> CanGoToAdjacentPageAsync(ILocator button)
+    {
+        if (await button.CountAsync() == 0 || !await button.IsVisibleAsync())
+            return false;
+
+        var isNext = (await button.InnerTextAsync()).Contains("Next", StringComparison.OrdinalIgnoreCase);
+        var showing = await TryGetShowingRangeAsync();
+        if (showing is not null)
+        {
+            return isNext
+                ? showing.Value.End < showing.Value.Total
+                : showing.Value.Start > 1;
+        }
+
+        var pages = await TryGetPagerPagesAsync();
+        if (pages is not null)
+        {
+            return isNext
+                ? pages.Value.Current < pages.Value.Total
+                : pages.Value.Current > 1;
+        }
+
+        // Last resort: click Next if the DOM says it's enabled (ignore Playwright disabled quirks).
+        return await button.EvaluateAsync<bool>(
+            "el => !el.disabled && el.getAttribute('aria-disabled') !== 'true'");
+    }
+
+    private async Task<(int Start, int End, int Total)?> TryGetShowingRangeAsync()
+    {
+        var info = Page.Locator("nav.pagination .pagination__info").First;
+        if (await info.CountAsync() == 0)
+            info = Page.Locator("nav.pagination").First;
+        if (await info.CountAsync() == 0)
+            return null;
+
+        var text = (await info.InnerTextAsync())
+            .Replace('\u00A0', ' ')
+            .Replace('–', '-')
+            .Replace('—', '-')
+            .Replace('−', '-')
+            .Replace('‐', '-');
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+        var match = System.Text.RegularExpressions.Regex.Match(
+            text,
+            @"Showing\s+(\d+)\s*-\s*(\d+)\s+of\s+(\d+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!match.Success)
+            return null;
+
+        return (
+            int.Parse(match.Groups[1].Value),
+            int.Parse(match.Groups[2].Value),
+            int.Parse(match.Groups[3].Value));
+    }
+
+    private async Task<(int Current, int Total)?> TryGetPagerPagesAsync()
+    {
+        var pager = Page.Locator("nav.pagination .pagination__status").First;
+        if (await pager.CountAsync() == 0)
+            pager = Page.Locator("nav.pagination").First;
+        if (await pager.CountAsync() == 0)
+            return null;
+
+        var text = System.Text.RegularExpressions.Regex.Replace(
+            (await pager.InnerTextAsync()).Replace('\u00A0', ' '),
+            @"\s+",
+            " ").Trim();
+        var match = System.Text.RegularExpressions.Regex.Match(
+            text,
+            @"Page\s+(\d+)\s+of\s+(\d+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!match.Success)
+            return null;
+
+        return (int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value));
     }
 
     public async Task<ImportPage> ClickImportBtnAsync()

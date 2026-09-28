@@ -414,7 +414,7 @@ public class AliasesTests : BaseTest
             (await aliasesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
             await aliasesPage.ClickEmissionTypesTabAsync();
 
-            var gridRow = await aliasesPage.GetEmissionTypeAliasGridRowAsync(aliasText);
+            var gridRow = await aliasesPage.GetEmissionTypeAliasGridRowAsync(aliasText, expectedContext);
             gridRow.Should().NotBeNull();
             gridRow!.Context.Should().Be(expectedContext);
             gridRow.AliasText.Should().Be(aliasText);

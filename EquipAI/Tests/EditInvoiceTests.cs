@@ -23,7 +23,7 @@ public class EditInvoiceTests : BaseTest
         const string expectedQuantity = "421.29";
         const string expectedUnitPrice = "3.71";
         const string expectedCost = "1562.99";
-        const string expectedEmissionType = "Diesel (100% mineral diesel)";
+        const string expectedEmissionType = "On-site diesel combustion";
         const string expectedUnit = "US Gallon (US_GAL)";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
@@ -65,7 +65,7 @@ public class EditInvoiceTests : BaseTest
     public async Task T02_EditInvoice_ClickBackBtn()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
-        const string expectedTitle = "Invoices";
+        const string expectedTitle = "Invoice Upload";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -145,7 +145,7 @@ public class EditInvoiceTests : BaseTest
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string cancelledInvoiceNumber = "Cancel updated";
-        const string expectedTitle = "Invoices";
+        const string expectedTitle = "Invoice Upload";
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();

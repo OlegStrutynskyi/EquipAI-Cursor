@@ -154,7 +154,7 @@ public class ImportCSVInvoiceTests : BaseTest
     public async Task T14_ImportCSVInvoice_Success()
     {
         const string invoiceNumber = "AUTOTEST-Import-1";
-        const string expectedPageTitle = "Invoices";
+        const string expectedPageTitle = "Invoice Upload";
         const string expectedProject = Config.SetupProjectName1;
         const string expectedCompany = "TestCompany1";
         const string expectedInvoiceDate = "Jan 7, 2026";

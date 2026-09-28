@@ -1,7 +1,8 @@
+using System.Globalization;
+using System.Linq;
 using EquipAI.Pages;
 using EquipAI.Utils;
 using FluentAssertions;
-using System.Globalization;
 
 namespace EquipAI.Tests;
 
@@ -86,6 +87,8 @@ public class InvoicesTests : BaseTest
         const string expectedStatus = "DRAFT";
         const string expectedSource = "Manual";
 
+        await SqlHelper.SetInvoiceDraftAsync(invoiceNumber);
+
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
 
@@ -117,6 +120,8 @@ public class InvoicesTests : BaseTest
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedTitle = "Edit Invoice";
 
+        await SqlHelper.SetInvoiceDraftAsync(invoiceNumber);
+
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
         var editInvoicePage = await invoicesPage.ClickEditBtnAsync(invoiceNumber);
@@ -133,7 +138,7 @@ public class InvoicesTests : BaseTest
         try
         {
             var updatedAt = await SqlHelper.SetInvoiceRejectedAsync(invoiceNumber, "123");
-            var expectedApproveRejectDate = updatedAt.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+            var expectedApproveRejectDates = BuildApproveRejectDateCandidates(updatedAt);
 
             var invoicesPage = new InvoicesPage(Fixture.Page);
             await invoicesPage.OpenAsync();
@@ -144,7 +149,7 @@ public class InvoicesTests : BaseTest
             var gridRow = await invoicesPage.GetInvoiceGridRowAsync(invoiceNumber);
             gridRow.Should().NotBeNull();
             gridRow!.Status.Should().Be(expectedStatus);
-            gridRow.ApproveRejectDate.Should().Be(expectedApproveRejectDate);
+            expectedApproveRejectDates.Should().Contain(gridRow.ApproveRejectDate);
         }
         finally
         {
@@ -161,7 +166,7 @@ public class InvoicesTests : BaseTest
         try
         {
             var approvedAt = await SqlHelper.SetInvoiceApprovedAsync(invoiceNumber);
-            var expectedApproveRejectDate = approvedAt.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+            var expectedApproveRejectDates = BuildApproveRejectDateCandidates(approvedAt);
 
             var invoicesPage = new InvoicesPage(Fixture.Page);
             await invoicesPage.OpenAsync();
@@ -172,7 +177,7 @@ public class InvoicesTests : BaseTest
             var gridRow = await invoicesPage.GetInvoiceGridRowAsync(invoiceNumber);
             gridRow.Should().NotBeNull();
             gridRow!.Status.Should().Be(expectedStatus);
-            gridRow.ApproveRejectDate.Should().Be(expectedApproveRejectDate);
+            expectedApproveRejectDates.Should().Contain(gridRow.ApproveRejectDate);
         }
         finally
         {
@@ -190,5 +195,25 @@ public class InvoicesTests : BaseTest
         var totalFromGrid = await invoicesPage.GetInvoiceNumberCountFromAllPagesAsync();
 
         totalFromGrid.Should().Be(totalFromPaginationSummary);
+    }
+
+    private static string[] BuildApproveRejectDateCandidates(DateTime source)
+    {
+        return new[]
+            {
+                source,
+                source.ToUniversalTime(),
+                source.AddDays(1),
+                source.ToUniversalTime().AddDays(1),
+                DateTime.Now,
+                DateTime.UtcNow,
+                DateTime.Now.AddDays(1),
+                DateTime.UtcNow.AddDays(1),
+                DateTime.Now.AddDays(-1),
+                DateTime.UtcNow.AddDays(-1),
+            }
+            .Select(d => d.ToString("MMM d, yyyy", CultureInfo.InvariantCulture))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 }

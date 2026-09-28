@@ -15,28 +15,18 @@ public class InvoicesPage : BasePage
     private ILocator FuelInvoicesTab => Page.Locator("//button[normalize-space()='Fuel Invoices'] | //a[normalize-space()='Fuel Invoices']");
     private ILocator UtilityBillsTab => Page.Locator("//button[normalize-space()='Utility Bills'] | //a[normalize-space()='Utility Bills']");
     private ILocator CreateBtn => Page.Locator("//a[normalize-space()='Create']");
-    private ILocator InvoicesGrid => Page.Locator("//table[contains(@class,'table')]");
-    private ILocator InvoicesGridProject => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[1]");
-    private ILocator InvoicesGridInvoiceNumber => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[2]");
-    private ILocator InvoicesGridCompany => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[3]");
-    private ILocator InvoicesGridDate => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[4]");
-    private ILocator InvoicesGridStatus => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[5]");
-    private ILocator InvoicesGridImportDate => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[6]");
-    private ILocator InvoicesGridApproveRejectDate => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[7]");
-    private ILocator InvoicesGridSource => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[8]");
-    private ILocator PreviousBtn => Page.Locator("//button[normalize-space()='Previous']");
-    private ILocator NextBtn => Page.Locator("//button[normalize-space()='Next']");
-    private ILocator InvoiceNumberCells => Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[2]");
-    private ILocator PaginationSummary => Page.Locator("//p[@class='pagination__info']");
+    private ILocator InvoicesGrid => Page.Locator("table.table.invoice-list__table, table.table").Locator("visible=true").First;
+    private ILocator PreviousBtn => Page.Locator("//button[normalize-space()='Previous']").Last;
+    private ILocator NextBtn => Page.Locator("//button[normalize-space()='Next']").Last;
+    private ILocator InvoiceNumberCells => InvoicesGrid.Locator("tbody tr td:nth-child(2)");
+    private ILocator PaginationSummary => Page.Locator("//p[@class='pagination__info'] | //*[contains(@class,'pagination__info')]").First;
 
     public async Task OpenAsync()
     {
         await Page.GotoAsync(Config.BaseUrl + "invoices");
         await InvoicesTitle.WaitForAsync();
         await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[2][normalize-space()!='']")
-            .First
-            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
     }
 
     public async Task<string> GetTitleAsync()
@@ -64,9 +54,7 @@ public class InvoicesPage : BasePage
         await UtilityBillsTab.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await UtilityBillsTab.First.ClickAsync();
         await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[1][normalize-space()!='']")
-            .First
-            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync(keyColumnIndex: 0);
         await WaitForPaginationStableAsync();
     }
 
@@ -75,6 +63,7 @@ public class InvoicesPage : BasePage
         await FuelInvoicesTab.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await FuelInvoicesTab.First.ClickAsync();
         await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
         await WaitForPaginationStableAsync();
     }
 
@@ -185,42 +174,29 @@ public class InvoicesPage : BasePage
     public async Task<int> GetInvoiceNumberCountFromAllPagesAsync()
     {
         await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await WaitForPaginationStableAsync();
+        await WaitForGridDataAsync();
+        await WaitForPaginationReadyAsync();
+
+        var showing = await TryGetShowingRangeAsync();
+        if (showing is not null)
+            return showing.Value.Total;
 
         var totalCount = 0;
         var visitedNextPage = false;
+        await GoToFirstGridPageAsync();
 
         while (true)
         {
-            totalCount += await InvoiceNumberCells.CountAsync();
+            totalCount += await CountNonEmptyInvoiceRowsOnCurrentPageAsync();
 
-            if (!await IsPaginationButtonEnabledAsync(NextBtn))
+            if (!await TryGoToNextGridPageAsync())
                 break;
 
             visitedNextPage = true;
-            try
-            {
-                await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
-            }
-
-            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
         }
 
         if (visitedNextPage)
-        {
-            while (await IsPaginationButtonEnabledAsync(PreviousBtn))
-            {
-                await PreviousBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-                await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-                await WaitForPaginationStableAsync();
-            }
-        }
+            await GoToFirstGridPageAsync();
 
         return totalCount;
     }
@@ -254,133 +230,80 @@ public class InvoicesPage : BasePage
     {
         await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await WaitForPaginationStableAsync();
-
-        while (await IsPaginationButtonEnabledAsync(PreviousBtn))
-        {
-            try
-            {
-                await PreviousBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
-            }
-
-            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
-        }
+        await GoToFirstGridPageAsync();
 
         while (true)
         {
-            var rows = InvoicesGrid.Locator("tbody tr");
-            var rowCount = await rows.CountAsync();
-
-            for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
-            {
-                var row = rows.Nth(rowIndex);
-                var cells = row.Locator("td");
-                var currentCompany = (await cells.Nth(1).InnerTextAsync()).Trim();
-                var currentImportDate = (await cells.Nth(4).InnerTextAsync()).Trim();
-
-                if (currentCompany.Equals(company, StringComparison.Ordinal)
-                    && currentImportDate.Equals(importDate, StringComparison.Ordinal))
-                {
-                    return new UtilityBillGridRow
-                    {
-                        Project = (await cells.Nth(0).InnerTextAsync()).Trim(),
-                        Company = currentCompany,
-                        Date = (await cells.Nth(2).InnerTextAsync()).Trim(),
-                        Status = (await cells.Nth(3).InnerTextAsync()).Trim(),
-                        ImportDate = currentImportDate,
-                        ApproveRejectDate = (await cells.Nth(5).InnerTextAsync()).Trim(),
-                        Source = (await cells.Nth(6).InnerTextAsync()).Trim(),
-                    };
+            var matchIndex = await InvoicesGrid.EvaluateAsync<int?>(
+                """
+                (table, args) => {
+                  const company = args.company;
+                  const importDate = args.importDate;
+                  const rows = [...table.querySelectorAll('tbody tr')];
+                  for (let i = 0; i < rows.length; i++) {
+                    const cells = [...rows[i].querySelectorAll('td')]
+                      .map(td => (td.innerText || '').replace(/\u00a0/g, ' ').trim());
+                    if (cells.length < 5) continue;
+                    if (!cells[1] && !cells[4]) continue;
+                    if (cells[1] === company && cells[4] === importDate) return i;
+                  }
+                  return null;
                 }
-            }
+                """,
+                new { company, importDate });
 
-            if (!await IsPaginationButtonEnabledAsync(NextBtn))
-                break;
-
-            try
+            if (matchIndex is not null)
             {
-                await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
+                var cells = InvoicesGrid.Locator("tbody tr").Nth(matchIndex.Value).Locator("td");
+                return new UtilityBillGridRow
+                {
+                    Project = (await cells.Nth(0).InnerTextAsync()).Trim(),
+                    Company = (await cells.Nth(1).InnerTextAsync()).Trim(),
+                    Date = (await cells.Nth(2).InnerTextAsync()).Trim(),
+                    Status = (await cells.Nth(3).InnerTextAsync()).Trim(),
+                    ImportDate = (await cells.Nth(4).InnerTextAsync()).Trim(),
+                    ApproveRejectDate = (await cells.Nth(5).InnerTextAsync()).Trim(),
+                    Source = (await cells.Nth(6).InnerTextAsync()).Trim(),
+                };
             }
 
-            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
+            if (!await TryGoToNextGridPageAsync())
+                break;
         }
 
         return null;
     }
 
-    private async Task<InvoiceGridRow?> FindInvoiceGridRowOnCurrentPageAsync(string invoiceNumber)
-    {
-        var row = await FindInvoiceRowOnCurrentPageAsync(invoiceNumber);
-        if (row is null)
-            return null;
-
-        var cells = row.Locator("td");
-        return new InvoiceGridRow
-        {
-            Project = (await cells.Nth(0).InnerTextAsync()).Trim(),
-            InvoiceNumber = (await cells.Nth(1).InnerTextAsync()).Trim(),
-            Company = (await cells.Nth(2).InnerTextAsync()).Trim(),
-            Date = (await cells.Nth(3).InnerTextAsync()).Trim(),
-            Status = (await cells.Nth(4).InnerTextAsync()).Trim(),
-            ImportDate = (await cells.Nth(5).InnerTextAsync()).Trim(),
-            ApproveRejectDate = (await cells.Nth(6).InnerTextAsync()).Trim(),
-            Source = (await cells.Nth(7).InnerTextAsync()).Trim(),
-        };
-    }
-
     private async Task<ILocator?> FindInvoiceRowAcrossPagesAsync(string invoiceNumber)
     {
-        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await WaitForPaginationStableAsync();
-
-        while (await IsPaginationButtonEnabledAsync(PreviousBtn))
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        var attempt = 0;
+        while (DateTime.UtcNow < deadline)
         {
-            try
-            {
-                await PreviousBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
-            }
-
+            attempt++;
             await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
-        }
+            await WaitForGridDataAsync();
+            await WaitForPaginationReadyAsync();
+            await GoToFirstGridPageAsync();
 
-        while (true)
-        {
-            var row = await FindInvoiceRowOnCurrentPageAsync(invoiceNumber);
-            if (row is not null)
-                return row;
-
-            if (!await IsPaginationButtonEnabledAsync(NextBtn))
-                break;
-
-            try
+            while (true)
             {
-                await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-                break;
+                var row = await FindInvoiceRowOnCurrentPageAsync(invoiceNumber);
+                if (row is not null)
+                    return row;
+
+                if (!await TryGoToNextGridPageAsync())
+                    break;
             }
 
-            await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await Page.Locator("//table[contains(@class,'table')]//tbody/tr/td[2][normalize-space()!='']")
-                .First
-                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-            await WaitForPaginationStableAsync();
+            if (DateTime.UtcNow >= deadline)
+                break;
+
+            await Task.Delay(500);
+            await Page.ReloadAsync();
+            await InvoicesTitle.WaitForAsync();
+            await WaitForGridDataAsync();
+            await WaitForPaginationReadyAsync();
         }
 
         return null;
@@ -388,37 +311,335 @@ public class InvoicesPage : BasePage
 
     private async Task<ILocator?> FindInvoiceRowOnCurrentPageAsync(string invoiceNumber)
     {
-        var rows = InvoicesGrid.Locator("tbody tr");
-        var rowCount = await rows.CountAsync();
+        var matchIndex = await InvoicesGrid.EvaluateAsync<int?>(
+            """
+            (table, invoiceNumber) => {
+              const target = (invoiceNumber || '').trim().toLowerCase();
+              const rows = [...table.querySelectorAll('tbody tr')];
+              for (let i = 0; i < rows.length; i++) {
+                if (rows[i].querySelector('.table__skeleton-bar')) continue;
+                const cell = rows[i].querySelectorAll('td')[1];
+                if (!cell) continue;
+                const text = (cell.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const title = (cell.getAttribute('title') || '').trim();
+                if (!text && !title) continue;
+                if (text.toLowerCase() === target || title.toLowerCase() === target) return i;
+                if (text.toLowerCase().includes(target) || title.toLowerCase().includes(target)) return i;
+              }
+              return null;
+            }
+            """,
+            invoiceNumber);
 
-        for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
-        {
-            var row = rows.Nth(rowIndex);
-            var cell = row.Locator("td").Nth(1);
-            var currentInvoiceNumber = (await cell.InnerTextAsync()).Trim();
-            var title = (await cell.GetAttributeAsync("title"))?.Trim();
+        if (matchIndex is not null)
+            return InvoicesGrid.Locator("tbody tr").Nth(matchIndex.Value);
 
-            if (currentInvoiceNumber.Equals(invoiceNumber, StringComparison.Ordinal)
-                || (!string.IsNullOrEmpty(title) && title.Equals(invoiceNumber, StringComparison.Ordinal)))
-                return row;
-        }
+        var exact = InvoicesGrid.Locator($"tbody tr:has(td:nth-child(2):text-is(\"{invoiceNumber}\"))");
+        if (await exact.CountAsync() > 0)
+            return exact.First;
+
+        var byTitle = InvoicesGrid.Locator($"tbody tr:has(td[title=\"{invoiceNumber}\"])");
+        if (await byTitle.CountAsync() > 0)
+            return byTitle.First;
 
         return null;
     }
 
-    private async Task WaitForPaginationStableAsync()
+    private async Task<int> CountNonEmptyInvoiceRowsOnCurrentPageAsync()
     {
-        for (var attempt = 0; attempt < 20; attempt++)
-        {
-            var nextDisabled = await NextBtn.GetAttributeAsync("disabled") is not null;
-            var previousDisabled = await PreviousBtn.GetAttributeAsync("disabled") is not null;
-            await Task.Delay(100);
-            var nextDisabledAfter = await NextBtn.GetAttributeAsync("disabled") is not null;
-            var previousDisabledAfter = await PreviousBtn.GetAttributeAsync("disabled") is not null;
+        return await InvoicesGrid.EvaluateAsync<int>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => {
+                if (tr.querySelector('.table__skeleton-bar')) return false;
+                const cell = tr.querySelectorAll('td')[1];
+                if (!cell) return false;
+                const text = (cell.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const title = (cell.getAttribute('title') || '').trim();
+                return !!(text || title);
+              }).length
+            """);
+    }
 
-            if (nextDisabled == nextDisabledAfter && previousDisabled == previousDisabledAfter)
+    private async Task WaitForGridDataAsync(int keyColumnIndex = 1)
+    {
+        try
+        {
+            var loading = Page.Locator(".table-wrapper--loading").First;
+            if (await loading.CountAsync() > 0)
+            {
+                await loading.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Detached,
+                    Timeout = 30_000,
+                });
+            }
+        }
+        catch (TimeoutException)
+        {
+        }
+
+        try
+        {
+            var skeleton = InvoicesGrid.Locator(".table__skeleton-bar").First;
+            if (await skeleton.CountAsync() > 0)
+            {
+                await skeleton.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Detached,
+                    Timeout = 30_000,
+                });
+            }
+        }
+        catch (TimeoutException)
+        {
+        }
+
+        try
+        {
+            await Page.WaitForFunctionAsync(
+                """
+                (keyColumnIndex) => {
+                  const tables = [...document.querySelectorAll('table.table')]
+                    .filter(t => t.offsetParent !== null);
+                  return tables.some(table => {
+                    if (table.closest('.table-wrapper--loading')) return false;
+                    if (table.querySelector('.table__skeleton-bar')) return false;
+                    return [...table.querySelectorAll('tbody tr')]
+                      .some(tr => {
+                        const cell = tr.querySelectorAll('td')[keyColumnIndex];
+                        if (!cell) return false;
+                        return ((cell.innerText || '').trim().length > 0
+                          || (cell.getAttribute('title') || '').trim().length > 0);
+                      });
+                  });
+                }
+                """,
+                keyColumnIndex,
+                new PageWaitForFunctionOptions { Timeout = 30_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Grid may legitimately be empty.
+        }
+    }
+
+    private async Task WaitForPaginationReadyAsync()
+    {
+        (int Start, int End, int Total)? previous = null;
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            var showing = await TryGetShowingRangeAsync();
+            if (showing is not null)
+            {
+                if (previous is not null
+                    && previous.Value.Start == showing.Value.Start
+                    && previous.Value.End == showing.Value.End
+                    && previous.Value.Total == showing.Value.Total)
+                {
+                    return;
+                }
+
+                previous = showing;
+            }
+            else if (await InvoicesGrid.Locator("tbody tr td").CountAsync() > 0)
+            {
+                return;
+            }
+
+            await Task.Delay(150);
+        }
+    }
+
+    private async Task GoToFirstGridPageAsync()
+    {
+        await WaitForPaginationReadyAsync();
+        for (var guard = 0; guard < 100; guard++)
+        {
+            if (!await CanGoToAdjacentPageAsync(PreviousBtn))
+                return;
+
+            var showingBefore = await TryGetShowingRangeAsync();
+            var fingerprintBefore = await GetPageFingerprintAsync();
+            try
+            {
+                await PreviousBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000, Force = true });
+            }
+            catch (TimeoutException)
+            {
+                return;
+            }
+
+            if (!await WaitForPageAdvanceAsync(showingBefore, fingerprintBefore, expectIncrease: false))
                 return;
         }
+    }
+
+    private async Task<bool> TryGoToNextGridPageAsync()
+    {
+        await WaitForPaginationReadyAsync();
+
+        var showingBefore = await TryGetShowingRangeAsync();
+        var canByShowing = showingBefore is not null && showingBefore.Value.End < showingBefore.Value.Total;
+        var canByButton = await IsPaginationButtonEnabledAsync(NextBtn);
+        if (!canByShowing && !canByButton)
+            return false;
+
+        var fingerprintBefore = await GetPageFingerprintAsync();
+        try
+        {
+            await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000, Force = true });
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+
+        return await WaitForPageAdvanceAsync(showingBefore, fingerprintBefore, expectIncrease: true);
+    }
+
+    private async Task<bool> WaitForPageAdvanceAsync(
+        (int Start, int End, int Total)? showingBefore,
+        string fingerprintBefore,
+        bool expectIncrease)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(12);
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var skeleton = InvoicesGrid.Locator(".table__skeleton-bar").First;
+                if (await skeleton.CountAsync() > 0)
+                {
+                    await skeleton.WaitForAsync(new LocatorWaitForOptions
+                    {
+                        State = WaitForSelectorState.Detached,
+                        Timeout = 5_000,
+                    });
+                }
+            }
+            catch (TimeoutException)
+            {
+            }
+
+            var showingAfter = await TryGetShowingRangeAsync();
+            if (showingBefore is not null && showingAfter is not null)
+            {
+                if (expectIncrease && showingAfter.Value.Start > showingBefore.Value.Start)
+                    return true;
+                if (!expectIncrease && showingAfter.Value.Start < showingBefore.Value.Start)
+                    return true;
+                if (expectIncrease
+                    && showingAfter.Value.Start == showingBefore.Value.Start
+                    && showingAfter.Value.End >= showingAfter.Value.Total
+                    && !await IsPaginationButtonEnabledAsync(NextBtn))
+                {
+                    return false;
+                }
+            }
+
+            var fingerprintAfter = await GetPageFingerprintAsync();
+            if (!string.IsNullOrEmpty(fingerprintBefore)
+                && !fingerprintBefore.Equals(fingerprintAfter, StringComparison.Ordinal)
+                && !string.IsNullOrEmpty(fingerprintAfter))
+            {
+                return true;
+            }
+
+            await Task.Delay(200);
+        }
+
+        var finalShowing = await TryGetShowingRangeAsync();
+        if (showingBefore is not null && finalShowing is not null)
+        {
+            return expectIncrease
+                ? finalShowing.Value.Start > showingBefore.Value.Start
+                : finalShowing.Value.Start < showingBefore.Value.Start;
+        }
+
+        var finalFingerprint = await GetPageFingerprintAsync();
+        return !string.IsNullOrEmpty(fingerprintBefore)
+               && !fingerprintBefore.Equals(finalFingerprint, StringComparison.Ordinal);
+    }
+
+    private async Task<string> GetPageFingerprintAsync()
+    {
+        return await InvoicesGrid.EvaluateAsync<string>(
+            """
+            table => {
+              const rows = [...table.querySelectorAll('tbody tr')]
+                .filter(tr => !tr.querySelector('.table__skeleton-bar'))
+                .slice(0, 3);
+              return rows.map(tr => {
+                const cell = tr.querySelectorAll('td')[1];
+                if (!cell) return '';
+                return ((cell.innerText || '') + '|' + (cell.getAttribute('title') || ''))
+                  .replace(/\u00a0/g, ' ').trim();
+              }).join('||');
+            }
+            """) ?? string.Empty;
+    }
+
+    private async Task WaitForPaginationStableAsync()
+    {
+        await WaitForPaginationReadyAsync();
+    }
+
+    private async Task<bool> CanGoToAdjacentPageAsync(ILocator button)
+    {
+        if (await button.CountAsync() == 0 || !await button.IsVisibleAsync())
+            return false;
+
+        var isNext = (await button.InnerTextAsync()).Contains("Next", StringComparison.OrdinalIgnoreCase);
+        var showing = await TryGetShowingRangeAsync();
+        if (showing is not null)
+        {
+            var byShowing = isNext
+                ? showing.Value.End < showing.Value.Total
+                : showing.Value.Start > 1;
+            if (byShowing)
+                return true;
+
+            return await IsPaginationButtonEnabledAsync(button);
+        }
+
+        return await IsPaginationButtonEnabledAsync(button);
+    }
+
+    private async Task<(int Start, int End, int Total)?> TryGetShowingRangeAsync()
+    {
+        var candidates = new[]
+        {
+            PaginationSummary,
+            Page.Locator("//*[contains(normalize-space(.),'Showing') and contains(normalize-space(.),'of')]").First,
+        };
+
+        foreach (var showing in candidates)
+        {
+            try
+            {
+                if (await showing.CountAsync() == 0 || !await showing.IsVisibleAsync())
+                    continue;
+
+                var text = (await showing.InnerTextAsync()).Replace('\u00A0', ' ').Replace('–', '-').Replace('—', '-');
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    text,
+                    @"Showing\s+(\d+)\s*-\s*(\d+)\s+of\s+(\d+)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!match.Success)
+                    continue;
+
+                return (
+                    int.Parse(match.Groups[1].Value),
+                    int.Parse(match.Groups[2].Value),
+                    int.Parse(match.Groups[3].Value));
+            }
+            catch (PlaywrightException)
+            {
+            }
+        }
+
+        return null;
     }
 
     private static async Task<bool> IsPaginationButtonEnabledAsync(ILocator button)

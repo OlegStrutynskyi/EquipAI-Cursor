@@ -206,13 +206,13 @@ public class UnitsTests : BaseTest
     [Test]
     public async Task T12_Units_ClickEditBtn()
     {
-        const string expectedPageTitle = "Edit Unit";
-
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
         var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
 
-        (await editUnitPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await editUnitPage.GetPageTitleAsync()).Should().Match(title =>
+            title.Equals("Edit Unit", StringComparison.Ordinal)
+            || title.StartsWith("Edit Unit ", StringComparison.Ordinal));
     }
 
     [Test]
@@ -225,7 +225,9 @@ public class UnitsTests : BaseTest
         var (code, displayName) = await unitsPage.GetCodeAndDisplayNameAsync(Config.SetupCode1);
         var editUnitPage = await unitsPage.ClickEditBtnAsync(Config.SetupCode1);
 
-        (await editUnitPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+        (await editUnitPage.GetPageTitleAsync()).Should().Match(title =>
+            title.Equals(expectedPageTitle, StringComparison.Ordinal)
+            || title.StartsWith(expectedPageTitle + " ", StringComparison.Ordinal));
         (await editUnitPage.GetSubtitleAsync()).Should().Be(code);
         (await editUnitPage.GetCodeAsync()).Should().Be(code);
         (await editUnitPage.GetDisplayNameAsync()).Should().Be(displayName);

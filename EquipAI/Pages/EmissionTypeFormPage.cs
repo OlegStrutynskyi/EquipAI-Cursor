@@ -17,7 +17,7 @@ public abstract class EmissionTypeFormPage : BasePage
     protected ILocator DefaultUnitError => Page.Locator("//label[normalize-space()='Default Unit of Measure']/following-sibling::span");
     protected ILocator DefaultCategoryError => Page.Locator("//label[normalize-space()='Default Emission Category']/following-sibling::span");
     protected ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
-    protected ILocator AlertMessage => Page.Locator("//div[@class='alert__body']");
+    protected ILocator AlertMessage => Page.Locator("//div[@class='alert__body'] | //div[@class='alert__content'] | //div[contains(@class,'alert')]//*[contains(@class,'alert__')]").First;
 
     public Task<bool> IsCodeInputVisibleAsync() => CodeInput.IsVisibleAsync();
     public Task<bool> IsDisplayNameInputVisibleAsync() => DisplayNameInput.IsVisibleAsync();

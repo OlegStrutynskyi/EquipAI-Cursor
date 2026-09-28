@@ -12,7 +12,11 @@ public class EditInvoicePage : InvoiceFormPage
     private ILocator RejectBtn => Page.Locator("//button[normalize-space()='Reject']");
     private ILocator SaveAsDraftBtn => Page.Locator("//button[normalize-space()='Save as Draft']");
     private ILocator DraftSavedMessage => Page.Locator(
-        "//div[@class='alert__body' and normalize-space()='Draft saved successfully.']");
+        "app-alert.alert--success, app-alert[tone='success'], .alert.alert--success")
+        .Filter(new LocatorFilterOptions { HasTextString = "Draft saved" })
+        .First;
+    private ILocator AnyAlertMessage => Page.Locator(
+        "app-alert, .alert__body, .alert__content, .alert__title").First;
     private ILocator Cost1Input => Page.Locator("//legend[normalize-space()='Line 1']/following-sibling::div//input[contains(@id,'cost')]");
     private ILocator Description2Input => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//input[contains(@id,'line-description')]");
     private ILocator Quantity2Input => Page.Locator("//legend[normalize-space()='Line 2']/following-sibling::div//input[contains(@id,'quantity')]");
@@ -93,7 +97,31 @@ public class EditInvoicePage : InvoiceFormPage
 
     public async Task WaitForDraftSavedMessageAsync()
     {
-        await DraftSavedMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        try
+        {
+            await DraftSavedMessage.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+        }
+        catch (TimeoutException)
+        {
+            var alertText = string.Empty;
+            try
+            {
+                if (await AnyAlertMessage.CountAsync() > 0 && await AnyAlertMessage.IsVisibleAsync())
+                    alertText = (await AnyAlertMessage.InnerTextAsync()).Trim();
+            }
+            catch (PlaywrightException)
+            {
+            }
+
+            throw new TimeoutException(
+                string.IsNullOrWhiteSpace(alertText)
+                    ? "Timed out waiting for 'Draft saved' confirmation."
+                    : $"Timed out waiting for 'Draft saved' confirmation. Visible alert: '{alertText}'");
+        }
     }
 
     public Task<bool> IsDraftSavedMessageVisibleAsync() => DraftSavedMessage.IsVisibleAsync();

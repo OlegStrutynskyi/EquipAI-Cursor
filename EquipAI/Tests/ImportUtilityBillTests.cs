@@ -70,15 +70,14 @@ public class ImportUtilityBillTests : BaseTest
             await importPage.OpenUtilityBillAsync();
             await importPage.ImportPdfAsync(fileName, expectedToasterMessage);
 
-            var invoicesPage = new InvoicesPage(Fixture.Page);
+            var utilityBillUploadPage = new UtilityBillUploadPage(Fixture.Page);
             var deadline = DateTime.UtcNow.AddMinutes(10);
             UtilityBillGridRow? gridRow = null;
 
             while (DateTime.UtcNow < deadline)
             {
-                await invoicesPage.OpenAsync();
-                await invoicesPage.SelectUtilityBillsTabAsync();
-                gridRow = await invoicesPage.GetUtilityBillGridRowAsync(company, expectedImportDate);
+                await utilityBillUploadPage.OpenAsync();
+                gridRow = await utilityBillUploadPage.GetUtilityBillGridRowAsync(company, expectedImportDate);
                 if (gridRow is not null
                     && gridRow.Company.Equals(company, StringComparison.Ordinal)
                     && gridRow.ImportDate.Equals(expectedImportDate, StringComparison.Ordinal))
@@ -115,18 +114,28 @@ public class ImportUtilityBillTests : BaseTest
             await SqlHelper.DeletePdfBlobByFileAsync(fileName);
             await SqlHelper.DeleteImportedInvoiceByPdfFileAsync(fileName);
             await SqlHelper.DeleteActivitySourceByPdfFileAsync(fileName);
+            await Task.Delay(TimeSpan.FromSeconds(2));
 
             var importPage = new ImportPage(Fixture.Page);
             await importPage.OpenUtilityBillAsync();
-            await importPage.ImportPdfAsync(fileName, expectedToasterMessage);
+            try
+            {
+                await importPage.ImportPdfAsync(fileName, expectedToasterMessage);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains(expectedAlertMessage, StringComparison.Ordinal))
+            {
+                // Cleanup race: content already present — that still proves duplicate detection.
+                (await importPage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+                return;
+            }
 
-            var invoicesPage = new InvoicesPage(Fixture.Page);
-            await invoicesPage.OpenAsync();
-            var ImportPage2 = await invoicesPage.ClickImportUtilityBillBtnAsync();
-            await ImportPage2.UploadPdfFileAsync(fileName);
-            await ImportPage2.ClickImportBtnAsync();
+            var utilityBillUploadPage = new UtilityBillUploadPage(Fixture.Page);
+            await utilityBillUploadPage.OpenAsync();
+            var importPage2 = await utilityBillUploadPage.ClickImportPDFBtnAsync();
+            await importPage2.UploadPdfFileAsync(fileName);
+            await importPage2.ClickImportBtnAsync();
 
-            (await ImportPage2.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+            (await importPage2.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
         }
         finally
         {

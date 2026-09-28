@@ -48,7 +48,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T04_TelemetryImport_Herc_OnlyHeaders()
     {
         await AssertImportAlertAsync(
-            "Herc_08_26_OnlyHeaders.xlsx",
+            "Herc_07_26_new_only_headers.xlsx",
             "Excel file must contain at least one telemetry row.");
     }
 
@@ -56,32 +56,40 @@ public class TelemetryImportTests : BaseTest
     public async Task T05_TelemetryImport_Herc_NoCatClass()
     {
         await AssertImportAlertAsync(
-            "Herc_08_26_no_CatClass.xlsx",
-            "Missing required column(s): Cat-Class.");
+            "Herc_07_26_new_no_Cat_Class.xlsx",
+            "Missing required column(s): Cat Class.");
     }
 
     [Test]
     public async Task T06_TelemetryImport_Herc_NoDescription()
     {
         await AssertImportAlertAsync(
-            "Herc_08_26_no_Description.xlsx",
-            "Missing required column(s): Description.");
+            "Herc_07_26_new_no_Cat_Class_Description.xlsx",
+            "Missing required column(s): Cat Class Description.");
     }
 
     [Test]
-    public async Task T07_TelemetryImport_Herc_NoJobNumber()
+    public async Task T07_TelemetryImport_Herc_NoJobName()
     {
         await AssertImportAlertAsync(
-            "Herc_08_26_no_JobNumber.xlsx",
-            "Missing required column(s): Job Number.");
+            "Herc_07_26_new_no_Job_Name.xlsx",
+            "Missing required column(s): Job Name.");
+    }
+
+    [Test]
+    public async Task T07_1_TelemetryImport_Herc_NoICNumber()
+    {
+        await AssertImportAlertAsync(
+            "Herc_07_26_new_no_IC_Number.xlsx",
+            "Missing required column(s): IC Number.");
     }
 
     [Test]
     public async Task T08_TelemetryImport_Herc_NoMultipleColumns()
     {
         await AssertImportAlertAsync(
-            "Herc_08_26_no_MultipleColumns.xlsx",
-            "Missing required column(s): Cat-Class, Description.");
+            "Herc_07_26_new_no_multiple_columns.xlsx",
+            "Missing required column(s): IC Number, Cat Class Description, Job Name.");
     }
 
     [Test]
@@ -89,7 +97,7 @@ public class TelemetryImportTests : BaseTest
     {
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
-        await importPage.UploadFileAsync("Herc_08_26_no_Hours.xlsx");
+        await importPage.UploadFileAsync("Herc_07_26_new_no_Hours.xlsx");
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
@@ -102,7 +110,7 @@ public class TelemetryImportTests : BaseTest
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
-        await importPage.UploadFileAsync("Herc_no_MonthYear.xlsx");
+        await importPage.UploadFileAsync("Herc_new_no_MonthYear.xlsx");
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
@@ -112,8 +120,8 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T11_TelemetryImport_Herc_SuccessImport()
     {
-        const string fileName = "Herc_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string fileName = "Herc_07_26_new_correct.xlsx";
+        const string expectedMonthYear = "July 2026";
         const string expectedCompany = "Herc";
         const string expectedFuelType = "—";
         const string expectedSource = "Herc";
@@ -134,37 +142,38 @@ public class TelemetryImportTests : BaseTest
 
             var previewRows = await importPage.GetPreviewRowsAsync();
             previewRows.Should().HaveCount(2);
-            previewRows[0].RowNumber.Should().Be("3");
-            previewRows[0].EquipmentTag.Should().Be("111-2222");
-            previewRows[0].EquipmentType.Should().Be("AUTOTEST DESCRIPTION 1");
-            previewRows[0].LocationText.Should().Be("BOEING SOUTH");
-            previewRows[0].OperatingHours.Should().Be("22.52");
+            previewRows[0].RowNumber.Should().Be("5");
+            previewRows[0].EquipmentTag.Should().Be("9207403");
+            previewRows[0].EquipmentType.Should().Be("920-7403 RUBBER DISCHARGE HOSE CAM CPLNG 2X50");
+            previewRows[0].LocationText.Should().Be("CITY CREEK WATER PLANT");
+            previewRows[0].OperatingHours.Should().Be("0");
             previewRows[0].FuelType.Should().Be(expectedFuelType);
-            previewRows[1].RowNumber.Should().Be("4");
-            previewRows[1].EquipmentTag.Should().Be("333-4444");
-            previewRows[1].EquipmentType.Should().Be("AUTOTEST DESCRIPTION 2");
-            previewRows[1].LocationText.Should().Be("JAN200");
-            previewRows[1].OperatingHours.Should().Be("1.32");
+            previewRows[1].RowNumber.Should().Be("6");
+            previewRows[1].EquipmentTag.Should().Be("800486519");
+            previewRows[1].EquipmentType.Should().Be("630-1265 CART UTV 4 PASSENGER GAS WITH CAB HVAC");
+            previewRows[1].LocationText.Should().Be("AMAZON RIDGELAND");
+            previewRows[1].OperatingHours.Should().Be("1.9");
             previewRows[1].FuelType.Should().Be(expectedFuelType);
 
             var telemetryPage = await importPage.ClickSaveBtnAsync();
             (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry Upload");
+            await telemetryPage.SetMonthAsync("2026-07");
             (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
 
             var gridRows = await telemetryPage.GetGridRowsAsync();
-            var row1 = gridRows.FirstOrDefault(r => r.EquipmentTag == "111-2222");
-            var row2 = gridRows.FirstOrDefault(r => r.EquipmentTag == "333-4444");
+            var row1 = gridRows.FirstOrDefault(r => r.EquipmentTag == "9207403");
+            var row2 = gridRows.FirstOrDefault(r => r.EquipmentTag == "800486519");
             row1.Should().NotBeNull();
             row2.Should().NotBeNull();
-            row1!.EquipmentType.Should().Be("AUTOTEST DESCRIPTION 1");
-            row1.Location.Should().Be("5300904001 — Boeing South Yard");
-            row1.OperatingHours.Should().Be("22.52");
+            row1!.EquipmentType.Should().Be("920-7403 RUBBER DISCHARGE HOSE CAM CPLNG 2X50");
+            row1.Location.Should().Be("6704204001 — City Creek Treatment Self Perf");
+            row1.OperatingHours.Should().Be("0");
             row1.FuelType.Should().Be(expectedFuelType);
             row1.ImportDate.Should().Be(expectedImportDate);
             row1.Source.Should().Be(expectedSource);
-            row2!.EquipmentType.Should().Be("AUTOTEST DESCRIPTION 2");
-            row2.Location.Should().Be("6000020001 — JAN200");
-            row2.OperatingHours.Should().Be("1.32");
+            row2!.EquipmentType.Should().Be("630-1265 CART UTV 4 PASSENGER GAS WITH CAB HVAC");
+            row2.Location.Should().Be("6000025001 — JAN200 - AWS Internal");
+            row2.OperatingHours.Should().Be("1.9");
             row2.FuelType.Should().Be(expectedFuelType);
             row2.ImportDate.Should().Be(expectedImportDate);
             row2.Source.Should().Be(expectedSource);
@@ -178,8 +187,8 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T12_TelemetryImport_Herc_CancelImport()
     {
-        const string fileName = "Herc_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string fileName = "Herc_07_26_new_correct.xlsx";
+        const string expectedMonthYear = "July 2026";
         const string expectedCompany = "Herc";
         const string expectedFuelType = "—";
 
@@ -196,17 +205,17 @@ public class TelemetryImportTests : BaseTest
 
         var previewRows = await importPage.GetPreviewRowsAsync();
         previewRows.Should().HaveCount(2);
-        previewRows[0].RowNumber.Should().Be("3");
-        previewRows[0].EquipmentTag.Should().Be("111-2222");
-        previewRows[0].EquipmentType.Should().Be("AUTOTEST DESCRIPTION 1");
-        previewRows[0].LocationText.Should().Be("BOEING SOUTH");
-        previewRows[0].OperatingHours.Should().Be("22.52");
+        previewRows[0].RowNumber.Should().Be("5");
+        previewRows[0].EquipmentTag.Should().Be("9207403");
+        previewRows[0].EquipmentType.Should().Be("920-7403 RUBBER DISCHARGE HOSE CAM CPLNG 2X50");
+        previewRows[0].LocationText.Should().Be("CITY CREEK WATER PLANT");
+        previewRows[0].OperatingHours.Should().Be("0");
         previewRows[0].FuelType.Should().Be(expectedFuelType);
-        previewRows[1].RowNumber.Should().Be("4");
-        previewRows[1].EquipmentTag.Should().Be("333-4444");
-        previewRows[1].EquipmentType.Should().Be("AUTOTEST DESCRIPTION 2");
-        previewRows[1].LocationText.Should().Be("JAN200");
-        previewRows[1].OperatingHours.Should().Be("1.32");
+        previewRows[1].RowNumber.Should().Be("6");
+        previewRows[1].EquipmentTag.Should().Be("800486519");
+        previewRows[1].EquipmentType.Should().Be("630-1265 CART UTV 4 PASSENGER GAS WITH CAB HVAC");
+        previewRows[1].LocationText.Should().Be("AMAZON RIDGELAND");
+        previewRows[1].OperatingHours.Should().Be("1.9");
         previewRows[1].FuelType.Should().Be(expectedFuelType);
 
         await importPage.ClickCancelBtnAsync();
@@ -217,18 +226,18 @@ public class TelemetryImportTests : BaseTest
         (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
         var telemetryPage = await importPage.ClickBackToTelemetryAsync();
-        await telemetryPage.SetMonthAsync("2026-08");
+        await telemetryPage.SetMonthAsync("2026-07");
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
-        (await telemetryPage.GetGridRowByEquipmentTagAsync("111-2222")).Should().BeNull();
-        (await telemetryPage.GetGridRowByEquipmentTagAsync("333-4444")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("9207403")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("800486519")).Should().BeNull();
     }
 
     [Test]
     public async Task T13_TelemetryImport_Herc_EmptyFields()
     {
-        const string fileName = "Herc_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string fileName = "Herc_07_26_new_correct.xlsx";
+        const string expectedMonthYear = "July 2026";
         const string expectedCompany = "Herc";
         const string expectedMonthYearError = "Month/Year is required.";
         const string expectedCompanyError = "Company is required.";
@@ -254,47 +263,56 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T14_TelemetryImport_Herc_MissingValues()
     {
-        const string fileName = "Herc_08_26_MissingValues.xlsx";
+        const string fileName = "Herc_07_26_new_missing_values.xlsx";
         const string expectedFuelType = "—";
         const string expectedValidationLead =
-            "Some rows were not fully recognized and are omitted from the table. Required columns: Cat-Class, Description, and Job Number.";
+            "They are omitted from the table. Required columns: IC Number, Cat Class and Cat Class Description, and Job Name.";
         var expectedValidationList = """
-            Row 4: Cat-Class is required.
-            Cat-Class: —
-            Description: AUTOTEST DESCRIPTION 2
-            Job Number: JAN200
-            Total Hours Used: 1.32
-            Fuel Type: —
-            Row 5: Description is required.
-            Cat-Class: 111-2222
-            Description: —
-            Job Number: BOEING SOUTH
-            Total Hours Used: 22.52
-            Fuel Type: —
-            Row 6: Job Number is required.
-            Cat-Class: 333-4444
-            Description: AUTOTEST DESCRIPTION 3
-            Job Number: —
-            Total Hours Used: 1.32
-            Fuel Type: —
-            Row 8: Cat-Class and Description are required.
-            Cat-Class: —
-            Description: —
-            Job Number: BOEING SOUTH
-            Total Hours Used: 22.52
-            Fuel Type: —
-            Row 9: Description and Job Number are required.
-            Cat-Class: 111-2222
-            Description: —
-            Job Number: —
-            Total Hours Used: 22.52
-            Fuel Type: —
-            Row 10: Cat-Class, Description, and Job Number are required.
-            Cat-Class: —
-            Description: —
-            Job Number: —
-            Total Hours Used: 22.52
-            Fuel Type: —
+            Row 9: IC Number is required.
+            IC Number: —
+            Cat Class and Cat Class Description: 405-1087 SCISSOR LIFT 19FT 32IN COMPACT LCS ELEC
+            Job Name: CITY CREEK WATER PLANT
+            Hr/Miles Out: 225.000
+            Row 10: Job Name is required.
+            IC Number: 800443474
+            Cat Class and Cat Class Description: 501-1100 100KW GENERATOR DSL
+            Job Name: —
+            Hr/Miles Out: 6278.100
+            Row 13: At least one of Cat Class and Cat Class Description should have value.
+            IC Number: 568801149
+            Cat Class and Cat Class Description: —
+            Job Name: CITY CREEK WATER PLANT
+            Hr/Miles Out: 3337.000
+            Row 14: IC Number is required.
+            IC Number: —
+            Cat Class and Cat Class Description: 20KW GENERATOR DSL
+            Job Name: CITY CREEK WTP
+            Hr/Miles Out: 2137.800
+            Row 15: Job Name is required.
+            IC Number: 9207403
+            Cat Class and Cat Class Description: 920-7403
+            Job Name: —
+            Hr/Miles Out: 0.000
+            Row 16: IC Number is required. At least one of Cat Class and Cat Class Description should have value.
+            IC Number: —
+            Cat Class and Cat Class Description: —
+            Job Name: AMAZON RIDGELAND
+            Hr/Miles Out: —
+            Row 17: IC Number is required. Job Name is required.
+            IC Number: —
+            Cat Class and Cat Class Description: 630-1265
+            Job Name: —
+            Hr/Miles Out: —
+            Row 18: IC Number is required. Job Name is required.
+            IC Number: —
+            Cat Class and Cat Class Description: 630-1265 CART UTV 4 PASSENGER GAS WITH CAB HVAC
+            Job Name: —
+            Hr/Miles Out: 1.600
+            Row 19: IC Number is required. At least one of Cat Class and Cat Class Description should have value. Job Name is required.
+            IC Number: —
+            Cat Class and Cat Class Description: —
+            Job Name: —
+            Hr/Miles Out: 1144.000
             """.Replace("\r\n", "\n").Trim();
 
         var importPage = new ImportPage(Fixture.Page);
@@ -303,19 +321,31 @@ public class TelemetryImportTests : BaseTest
         await importPage.ClickImportBtnAsync();
 
         var previewRows = await importPage.GetPreviewRowsAsync();
-        previewRows.Should().HaveCount(2);
-        previewRows[0].RowNumber.Should().Be("3");
-        previewRows[0].EquipmentTag.Should().Be("111-2222");
-        previewRows[0].EquipmentType.Should().Be("AUTOTEST DESCRIPTION 1");
-        previewRows[0].LocationText.Should().Be("BOEING SOUTH");
-        previewRows[0].OperatingHours.Should().Be("22.52");
+        previewRows.Should().HaveCount(4);
+        previewRows[0].RowNumber.Should().Be("6");
+        previewRows[0].EquipmentTag.Should().Be("210372663");
+        previewRows[0].EquipmentType.Should().Be("SCISSOR LIFT 40FT 47IN ELEC");
+        previewRows[0].LocationText.Should().Be("000000 — Haskell");
+        previewRows[0].OperatingHours.Should().Be("127");
         previewRows[0].FuelType.Should().Be(expectedFuelType);
         previewRows[1].RowNumber.Should().Be("7");
-        previewRows[1].EquipmentTag.Should().Be("444-5555");
-        previewRows[1].EquipmentType.Should().Be("AUTOTEST DESCRIPTION 4");
-        previewRows[1].LocationText.Should().Be("BOEING SOUTH");
-        previewRows[1].OperatingHours.Should().Be(expectedFuelType);
+        previewRows[1].EquipmentTag.Should().Be("800453796");
+        previewRows[1].EquipmentType.Should().Be("460-1085");
+        previewRows[1].LocationText.Should().Be("CITY CREEK WATER PLANT");
+        previewRows[1].OperatingHours.Should().Be("730.87");
         previewRows[1].FuelType.Should().Be(expectedFuelType);
+        previewRows[2].RowNumber.Should().Be("8");
+        previewRows[2].EquipmentTag.Should().Be("210342678");
+        previewRows[2].EquipmentType.Should().Be("405-1087 SCISSOR LIFT 19FT 32IN COMPACT LCS ELEC");
+        previewRows[2].LocationText.Should().Be("CITY CREEK WATER PLANT");
+        previewRows[2].OperatingHours.Should().Be(expectedFuelType);
+        previewRows[2].FuelType.Should().Be(expectedFuelType);
+        previewRows[3].RowNumber.Should().Be("12");
+        previewRows[3].EquipmentTag.Should().Be("800431523");
+        previewRows[3].EquipmentType.Should().Be("800-1080 PUMP TRASH 2IN GAS");
+        previewRows[3].LocationText.Should().Be("CITY CREEK WATER PLANT");
+        previewRows[3].OperatingHours.Should().Be("0");
+        previewRows[3].FuelType.Should().Be(expectedFuelType);
 
         (await importPage.IsUnrecognizedRowsAlertVisibleAsync()).Should().BeTrue();
         (await importPage.GetValidationLeadAsync()).Should().Be(expectedValidationLead);
@@ -326,70 +356,82 @@ public class TelemetryImportTests : BaseTest
     public async Task T15_TelemetryImport_JCB_OnlyHeaders()
     {
         await AssertImportAlertAsync(
-            "JCB_08_26_OnlyHeaders.xlsx",
+            "JCB_07_26_new_only_headers.xlsx",
             "Excel file must contain at least one telemetry row.");
     }
 
     [Test]
-    public async Task T16_TelemetryImport_JCB_NoEquipmentTag()
+    public async Task T16_TelemetryImport_JCB_NoIC()
     {
         await AssertImportAlertAsync(
-            "JCB_08_26_no_EquipmentTag.xlsx",
-            "Missing required column(s): Equipment Tag.");
+            "JCB_07_26_new_no_IC.xlsx",
+            "Missing required column(s): IC.");
     }
 
     [Test]
-    public async Task T17_TelemetryImport_JCB_NoEquipmentType()
+    public async Task T17_TelemetryImport_JCB_NoCatClass()
     {
         await AssertImportAlertAsync(
-            "JCB_08_26_no_EquipmentType.xlsx",
-            "Missing required column(s): Equipment Type.");
+            "JCB_07_26_new_no_Cat-Class.xlsx",
+            "Missing required column(s): Cat-Class.");
     }
 
     [Test]
-    public async Task T18_TelemetryImport_JCB_NoLocation()
+    public async Task T18_TelemetryImport_JCB_NoDescription()
     {
         await AssertImportAlertAsync(
-            "JCB_08_26_no_Location.xlsx",
-            "Missing required column(s): Location.");
+            "JCB_07_26_new_no_Description.xlsx",
+            "Missing required column(s): Description.");
     }
 
     [Test]
-    public async Task T19_TelemetryImport_JCB_NoMultipleColumns()
+    public async Task T19_TelemetryImport_JCB_NoJobName()
     {
         await AssertImportAlertAsync(
-            "JCB_08_26_no_MultipleColumns.xlsx",
-            "Missing required column(s): Equipment Tag, Equipment Type.");
+            "JCB_07_26_new_no_JobName.xlsx",
+            "Missing required column(s): Job Name.");
     }
 
     [Test]
-    public async Task T20_TelemetryImport_JCB_NoHours()
+    public async Task T20_TelemetryImport_JCB_NoMultipleColumns()
+    {
+        await AssertImportAlertAsync(
+            "JCB_07_26_new_no_multiple_columns.xlsx",
+            "Missing required column(s): IC Number, Cat Class, Cat Class Description.");
+    }
+
+    [Test]
+    public async Task T21_TelemetryImport_JCB_NoHours()
     {
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
-        await importPage.UploadFileAsync("JCB_08_26_no_Hours.xlsx");
+        await importPage.UploadFileAsync("JCB_07_26_new_no_Hours.xlsx");
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
     }
 
     [Test]
-    public async Task T21_TelemetryImport_JCB_NoFuelType()
+    public async Task T21_1_TelemetryImport_JCB_NoMonthYear()
     {
+        const string expectedMonthYear = "--------- ----";
+
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
-        await importPage.UploadFileAsync("JCB_08_26_no_FuelType.xlsx");
+        await importPage.UploadFileAsync("JCB_new_no_MonthYear.xlsx");
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
     }
 
     [Test]
     public async Task T22_TelemetryImport_JCB_SuccessImport()
     {
-        const string fileName = "JCB_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string fileName = "JCB_07_26_new_correct.xlsx";
+        const string expectedMonthYear = "July 2026";
         const string expectedCompany = "JCB";
+        const string expectedFuelType = "—";
         const string expectedSource = "JCB";
         var expectedImportDate = DateTime.Now.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
 
@@ -407,41 +449,94 @@ public class TelemetryImportTests : BaseTest
             (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
 
             var previewRows = await importPage.GetPreviewRowsAsync();
-            previewRows.Should().HaveCount(2);
-            previewRows[0].RowNumber.Should().Be("3");
-            previewRows[0].EquipmentTag.Should().Be("111-2222");
-            previewRows[0].EquipmentType.Should().Be("AUTOTEST TYPE 1");
-            previewRows[0].LocationText.Should().Be("BOEING SOUTH");
-            previewRows[0].OperatingHours.Should().Be("22.52");
-            previewRows[0].FuelType.Should().Be("P");
-            previewRows[1].RowNumber.Should().Be("4");
-            previewRows[1].EquipmentTag.Should().Be("333-4444");
-            previewRows[1].EquipmentType.Should().Be("AUTOTEST TYPE 2");
-            previewRows[1].LocationText.Should().Be("BOTAL INDUSTRIES");
-            previewRows[1].OperatingHours.Should().Be("1.32");
-            previewRows[1].FuelType.Should().Be("D");
+            previewRows.Should().HaveCount(10);
+            previewRows[0].RowNumber.Should().Be("2");
+            previewRows[0].EquipmentTag.Should().Be("210342678");
+            previewRows[0].EquipmentType.Should().Be("405-1087 SCISSOR LIFT 19FT 32IN COMPACT LCS ELEC");
+            previewRows[0].LocationText.Should().Be("CITY CREEK WATER PLANT");
+            previewRows[0].OperatingHours.Should().Be("140.92");
+            previewRows[0].FuelType.Should().Be(expectedFuelType);
+            previewRows[1].RowNumber.Should().Be("3");
+            previewRows[1].EquipmentTag.Should().Be("210398716");
+            previewRows[1].EquipmentType.Should().Be("630-1280 CART UTV 4 PASSENGER DSL");
+            previewRows[1].LocationText.Should().Be("AMAZON RIDGELAND");
+            previewRows[1].OperatingHours.Should().Be("20.64");
+            previewRows[1].FuelType.Should().Be(expectedFuelType);
+            previewRows[2].RowNumber.Should().Be("4");
+            previewRows[2].EquipmentTag.Should().Be("210438462");
+            previewRows[2].EquipmentType.Should().Be("630-1260 4-Person Gas Utility Vehicle Rental");
+            previewRows[2].LocationText.Should().Be("AWS 200");
+            previewRows[2].OperatingHours.Should().Be("96.49");
+            previewRows[2].FuelType.Should().Be(expectedFuelType);
+            previewRows[3].RowNumber.Should().Be("5");
+            previewRows[3].EquipmentTag.Should().Be("210441502");
+            previewRows[3].EquipmentType.Should().Be("630-1260 4-Person Gas Utility Vehicle Rental");
+            previewRows[3].LocationText.Should().Be("AWS 200");
+            previewRows[3].OperatingHours.Should().Be("0");
+            previewRows[3].FuelType.Should().Be(expectedFuelType);
+            previewRows[4].RowNumber.Should().Be("6");
+            previewRows[4].EquipmentTag.Should().Be("800213755");
+            previewRows[4].EquipmentType.Should().Be("405-1085 SCISSOR LIFT 19FT 32IN COMPACT ELEC");
+            previewRows[4].LocationText.Should().Be("CITY CREEK WATER PLANT");
+            previewRows[4].OperatingHours.Should().Be("138.72");
+            previewRows[4].FuelType.Should().Be(expectedFuelType);
+            previewRows[5].RowNumber.Should().Be("7");
+            previewRows[5].EquipmentTag.Should().Be("800395291");
+            previewRows[5].EquipmentType.Should().Be("460-1060 TELEHANDLER 10000LB 42-44FT LIFT ROPS");
+            previewRows[5].LocationText.Should().Be("PERRY WASTEWATER PLANT");
+            previewRows[5].OperatingHours.Should().Be("1,611.75");
+            previewRows[5].FuelType.Should().Be(expectedFuelType);
+            previewRows[6].RowNumber.Should().Be("8");
+            previewRows[6].EquipmentTag.Should().Be("800426051");
+            previewRows[6].EquipmentType.Should().Be("630-1280 CART UTV 4 PASSENGER DSL");
+            previewRows[6].LocationText.Should().Be("AWS 200");
+            previewRows[6].OperatingHours.Should().Be("415.87");
+            previewRows[6].FuelType.Should().Be(expectedFuelType);
+            previewRows[7].RowNumber.Should().Be("9");
+            previewRows[7].EquipmentTag.Should().Be("800443474");
+            previewRows[7].EquipmentType.Should().Be("501-1100 100KW GENERATOR DSL");
+            previewRows[7].LocationText.Should().Be("PROJECT POWEHOUSE WAREHOUSE");
+            previewRows[7].OperatingHours.Should().Be("7,350.85");
+            previewRows[7].FuelType.Should().Be(expectedFuelType);
+            previewRows[8].RowNumber.Should().Be("10");
+            previewRows[8].EquipmentTag.Should().Be("800451697");
+            previewRows[8].EquipmentType.Should().Be("630-1280 CART UTV 4 PASSENGER DSL");
+            previewRows[8].LocationText.Should().Be("AWS 200");
+            previewRows[8].OperatingHours.Should().Be("458.73");
+            previewRows[8].FuelType.Should().Be(expectedFuelType);
+            previewRows[9].RowNumber.Should().Be("11");
+            previewRows[9].EquipmentTag.Should().Be("800453796");
+            previewRows[9].EquipmentType.Should().Be("460-1085 TELEHANDLER 12000LB 55-56FT LIFT CAB");
+            previewRows[9].LocationText.Should().Be("CITY CREEK WATER PLANT");
+            previewRows[9].OperatingHours.Should().Be("799.38");
+            previewRows[9].FuelType.Should().Be(expectedFuelType);
 
             var telemetryPage = await importPage.ClickSaveBtnAsync();
             (await telemetryPage.GetTitleAsync()).Should().Be("Telemetry Upload");
+            await telemetryPage.SetMonthAsync("2026-07");
             (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
 
             var gridRows = await telemetryPage.GetGridRowsAsync();
-            var row1 = gridRows.FirstOrDefault(r => r.EquipmentTag == "111-2222");
-            var row2 = gridRows.FirstOrDefault(r => r.EquipmentTag == "333-4444");
-            row1.Should().NotBeNull();
-            row2.Should().NotBeNull();
-            row1!.EquipmentType.Should().Be("AUTOTEST TYPE 1");
-            row1.Location.Should().Be("5300904001 — Boeing South Yard");
-            row1.OperatingHours.Should().Be("22.52");
-            row1.FuelType.Should().Be("P");
-            row1.ImportDate.Should().Be(expectedImportDate);
-            row1.Source.Should().Be(expectedSource);
-            row2!.EquipmentType.Should().Be("AUTOTEST TYPE 2");
-            row2.Location.Should().Be("2094761001 — Abbott Sturgis InstrumntCal");
-            row2.OperatingHours.Should().Be("1.32");
-            row2.FuelType.Should().Be("D");
-            row2.ImportDate.Should().Be(expectedImportDate);
-            row2.Source.Should().Be(expectedSource);
+            AssertJcbGridRow(gridRows, "210342678", "405-1087 SCISSOR LIFT 19FT 32IN COMPACT LCS ELEC",
+                "6704204001 — City Creek Treatment Self Perf", "140.92", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "210398716", "630-1280 CART UTV 4 PASSENGER DSL",
+                "6000025001 — JAN200 - AWS Internal", "20.64", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "210438462", "630-1260 4-Person Gas Utility Vehicle Rental",
+                "6000025001 — JAN200 - AWS Internal", "96.49", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "210441502", "630-1260 4-Person Gas Utility Vehicle Rental",
+                "6000025001 — JAN200 - AWS Internal", "0", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "800213755", "405-1085 SCISSOR LIFT 19FT 32IN COMPACT ELEC",
+                "6704204001 — City Creek Treatment Self Perf", "138.72", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "800395291", "460-1060 TELEHANDLER 10000LB 42-44FT LIFT ROPS",
+                "6704216001 — Perry WWTF Self Perform", "1,611.75", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "800426051", "630-1280 CART UTV 4 PASSENGER DSL",
+                "6000025001 — JAN200 - AWS Internal", "415.87", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "800443474", "501-1100 100KW GENERATOR DSL",
+                "6000039001 — Powerhouse", "7,350.85", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "800451697", "630-1280 CART UTV 4 PASSENGER DSL",
+                "6000025001 — JAN200 - AWS Internal", "458.73", expectedFuelType, expectedImportDate, expectedSource);
+            AssertJcbGridRow(gridRows, "800453796", "460-1085 TELEHANDLER 12000LB 55-56FT LIFT CAB",
+                "6704204001 — City Creek Treatment Self Perf", "799.38", expectedFuelType, expectedImportDate, expectedSource);
         }
         finally
         {
@@ -449,12 +544,34 @@ public class TelemetryImportTests : BaseTest
         }
     }
 
+    private static void AssertJcbGridRow(
+        IReadOnlyList<TelemetryGridRow> gridRows,
+        string equipmentTag,
+        string equipmentType,
+        string location,
+        string operatingHours,
+        string fuelType,
+        string importDate,
+        string source)
+    {
+        var row = gridRows.FirstOrDefault(r => r.EquipmentTag == equipmentTag);
+        row.Should().NotBeNull(
+            $"Equipment tag '{equipmentTag}' was not found in the telemetry grid. Found: [{string.Join(", ", gridRows.Select(r => r.EquipmentTag))}]");
+        row!.EquipmentType.Should().Be(equipmentType);
+        row.Location.Should().Be(location);
+        row.OperatingHours.Should().Be(operatingHours);
+        row.FuelType.Should().Be(fuelType);
+        row.ImportDate.Should().Be(importDate);
+        row.Source.Should().Be(source);
+    }
+
     [Test]
     public async Task T23_TelemetryImport_JCB_CancelImport()
     {
-        const string fileName = "JCB_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string fileName = "JCB_07_26_new_correct.xlsx";
+        const string expectedMonthYear = "July 2026";
         const string expectedCompany = "JCB";
+        const string expectedFuelType = "—";
 
         await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
 
@@ -466,21 +583,69 @@ public class TelemetryImportTests : BaseTest
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
         (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
         (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
-
+                
         var previewRows = await importPage.GetPreviewRowsAsync();
-        previewRows.Should().HaveCount(2);
-        previewRows[0].RowNumber.Should().Be("3");
-        previewRows[0].EquipmentTag.Should().Be("111-2222");
-        previewRows[0].EquipmentType.Should().Be("AUTOTEST TYPE 1");
-        previewRows[0].LocationText.Should().Be("BOEING SOUTH");
-        previewRows[0].OperatingHours.Should().Be("22.52");
-        previewRows[0].FuelType.Should().Be("P");
-        previewRows[1].RowNumber.Should().Be("4");
-        previewRows[1].EquipmentTag.Should().Be("333-4444");
-        previewRows[1].EquipmentType.Should().Be("AUTOTEST TYPE 2");
-        previewRows[1].LocationText.Should().Be("BOTAL INDUSTRIES");
-        previewRows[1].OperatingHours.Should().Be("1.32");
-        previewRows[1].FuelType.Should().Be("D");
+        previewRows.Should().HaveCount(10);
+        previewRows[0].RowNumber.Should().Be("2");
+        previewRows[0].EquipmentTag.Should().Be("210342678");
+        previewRows[0].EquipmentType.Should().Be("405-1087 SCISSOR LIFT 19FT 32IN COMPACT LCS ELEC");
+        previewRows[0].LocationText.Should().Be("CITY CREEK WATER PLANT");
+        previewRows[0].OperatingHours.Should().Be("140.92");
+        previewRows[0].FuelType.Should().Be(expectedFuelType);
+        previewRows[1].RowNumber.Should().Be("3");
+        previewRows[1].EquipmentTag.Should().Be("210398716");
+        previewRows[1].EquipmentType.Should().Be("630-1280 CART UTV 4 PASSENGER DSL");
+        previewRows[1].LocationText.Should().Be("AMAZON RIDGELAND");
+        previewRows[1].OperatingHours.Should().Be("20.64");
+        previewRows[1].FuelType.Should().Be(expectedFuelType);
+        previewRows[2].RowNumber.Should().Be("4");
+        previewRows[2].EquipmentTag.Should().Be("210438462");
+        previewRows[2].EquipmentType.Should().Be("630-1260 4-Person Gas Utility Vehicle Rental");
+        previewRows[2].LocationText.Should().Be("AWS 200");
+        previewRows[2].OperatingHours.Should().Be("96.49");
+        previewRows[2].FuelType.Should().Be(expectedFuelType);
+        previewRows[3].RowNumber.Should().Be("5");
+        previewRows[3].EquipmentTag.Should().Be("210441502");
+        previewRows[3].EquipmentType.Should().Be("630-1260 4-Person Gas Utility Vehicle Rental");
+        previewRows[3].LocationText.Should().Be("AWS 200");
+        previewRows[3].OperatingHours.Should().Be("0");
+        previewRows[3].FuelType.Should().Be(expectedFuelType);
+        previewRows[4].RowNumber.Should().Be("6");
+        previewRows[4].EquipmentTag.Should().Be("800213755");
+        previewRows[4].EquipmentType.Should().Be("405-1085 SCISSOR LIFT 19FT 32IN COMPACT ELEC");
+        previewRows[4].LocationText.Should().Be("CITY CREEK WATER PLANT");
+        previewRows[4].OperatingHours.Should().Be("138.72");
+        previewRows[4].FuelType.Should().Be(expectedFuelType);
+        previewRows[5].RowNumber.Should().Be("7");
+        previewRows[5].EquipmentTag.Should().Be("800395291");
+        previewRows[5].EquipmentType.Should().Be("460-1060 TELEHANDLER 10000LB 42-44FT LIFT ROPS");
+        previewRows[5].LocationText.Should().Be("PERRY WASTEWATER PLANT");
+        previewRows[5].OperatingHours.Should().Be("1,611.75");
+        previewRows[5].FuelType.Should().Be(expectedFuelType);
+        previewRows[6].RowNumber.Should().Be("8");
+        previewRows[6].EquipmentTag.Should().Be("800426051");
+        previewRows[6].EquipmentType.Should().Be("630-1280 CART UTV 4 PASSENGER DSL");
+        previewRows[6].LocationText.Should().Be("AWS 200");
+        previewRows[6].OperatingHours.Should().Be("415.87");
+        previewRows[6].FuelType.Should().Be(expectedFuelType);
+        previewRows[7].RowNumber.Should().Be("9");
+        previewRows[7].EquipmentTag.Should().Be("800443474");
+        previewRows[7].EquipmentType.Should().Be("501-1100 100KW GENERATOR DSL");
+        previewRows[7].LocationText.Should().Be("PROJECT POWEHOUSE WAREHOUSE");
+        previewRows[7].OperatingHours.Should().Be("7,350.85");
+        previewRows[7].FuelType.Should().Be(expectedFuelType);
+        previewRows[8].RowNumber.Should().Be("10");
+        previewRows[8].EquipmentTag.Should().Be("800451697");
+        previewRows[8].EquipmentType.Should().Be("630-1280 CART UTV 4 PASSENGER DSL");
+        previewRows[8].LocationText.Should().Be("AWS 200");
+        previewRows[8].OperatingHours.Should().Be("458.73");
+        previewRows[8].FuelType.Should().Be(expectedFuelType);
+        previewRows[9].RowNumber.Should().Be("11");
+        previewRows[9].EquipmentTag.Should().Be("800453796");
+        previewRows[9].EquipmentType.Should().Be("460-1085 TELEHANDLER 12000LB 55-56FT LIFT CAB");
+        previewRows[9].LocationText.Should().Be("CITY CREEK WATER PLANT");
+        previewRows[9].OperatingHours.Should().Be("799.38");
+        previewRows[9].FuelType.Should().Be(expectedFuelType);
 
         await importPage.ClickCancelBtnAsync();
 
@@ -490,18 +655,26 @@ public class TelemetryImportTests : BaseTest
         (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
         var telemetryPage = await importPage.ClickBackToTelemetryAsync();
-        await telemetryPage.SetMonthAsync("2026-08");
+        await telemetryPage.SetMonthAsync("2026-07");
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
-        (await telemetryPage.GetGridRowByEquipmentTagAsync("111-2222")).Should().BeNull();
-        (await telemetryPage.GetGridRowByEquipmentTagAsync("333-4444")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("210342678")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("210398716")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("210438462")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("210441502")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("800213755")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("800395291")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("800426051")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("800443474")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("800451697")).Should().BeNull();
+        (await telemetryPage.GetGridRowByEquipmentTagAsync("800453796")).Should().BeNull();
     }
 
     [Test]
     public async Task T24_TelemetryImport_JCB_EmptyFields()
     {
-        const string fileName = "JCB_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string fileName = "JCB_07_26_new_correct.xlsx";
+        const string expectedMonthYear = "July 2026";
         const string expectedCompany = "JCB";
         const string expectedMonthYearError = "Month/Year is required.";
         const string expectedCompanyError = "Company is required.";
@@ -527,47 +700,41 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T25_TelemetryImport_JCB_MissingValues()
     {
-        const string fileName = "JCB_08_26_MissingValues.xlsx";
+        const string fileName = "JCB_07_26_new_missing_values.xlsx";
         const string expectedFuelType = "—";
         const string expectedValidationLead =
-            "Some rows were not fully recognized and are omitted from the table. Required columns: Equipment Tag, Equipment Type, and Location.";
+            "They are omitted from the table. Required columns: IC, Cat-Class and Description, and Job Name.";
         var expectedValidationList = """
-            Row 3: Equipment Tag is required.
-            Equipment Tag: —
-            Equipment Type: AUTOTEST TYPE 2
-            Location: BOTAL INDUSTRIES
-            Operating Hours: 1.32
-            Fuel Type: D
-            Row 4: Equipment Type is required.
-            Equipment Tag: 111-2224
-            Equipment Type: —
-            Location: BOEING SOUTH
-            Operating Hours: 22.52
-            Fuel Type: P
-            Row 5: Location is required.
-            Equipment Tag: 111-2225
-            Equipment Type: AUTOTEST TYPE 4
-            Location: —
-            Operating Hours: 1.32
-            Fuel Type: D
-            Row 8: Equipment Tag and Equipment Type are required.
-            Equipment Tag: —
-            Equipment Type: —
-            Location: BOEING SOUTH
-            Operating Hours: 22.52
-            Fuel Type: P
-            Row 9: Equipment Tag and Location are required.
-            Equipment Tag: —
-            Equipment Type: AUTOTEST TYPE 8
-            Location: —
-            Operating Hours: 1.32
-            Fuel Type: D
-            Row 11: Equipment Tag, Equipment Type, and Location are required.
-            Equipment Tag: —
-            Equipment Type: —
-            Location: —
-            Operating Hours: 1.32
-            Fuel Type: D
+            Row 3: IC is required.
+            IC: —
+            Cat-Class and Description: 630-1280 CART UTV 4 PASSENGER DSL
+            Job Name: AMAZON RIDGELAND
+            Current Hours Meter and Operating Hours: 20.64
+            Row 6: Job Name is required.
+            IC: 800213755
+            Cat-Class and Description: 405-1085 SCISSOR LIFT 19FT 32IN COMPACT ELEC
+            Job Name: —
+            Current Hours Meter and Operating Hours: 138.72
+            Row 11: IC is required. At least one of Cat-Class and Description should have value.
+            IC: —
+            Cat-Class and Description: —
+            Job Name: CITY CREEK WATER PLANT
+            Current Hours Meter and Operating Hours: 799.38
+            Row 12: At least one of Cat-Class and Description should have value.
+            IC: 800474744
+            Cat-Class and Description: —
+            Job Name: AWS 200
+            Current Hours Meter and Operating Hours: 683.1
+            Row 13: IC is required. Job Name is required.
+            IC: —
+            Cat-Class and Description: 410-2020 BOOM ARTICULATED 30FT NAR ROT JIB ELEC
+            Job Name: —
+            Current Hours Meter and Operating Hours: 10574.55
+            Row 14: At least one of Cat-Class and Description should have value. Job Name is required.
+            IC: 800481172
+            Cat-Class and Description: —
+            Job Name: —
+            Current Hours Meter and Operating Hours: 268.75
             """.Replace("\r\n", "\n").Trim();
 
         var importPage = new ImportPage(Fixture.Page);
@@ -576,31 +743,43 @@ public class TelemetryImportTests : BaseTest
         await importPage.ClickImportBtnAsync();
 
         var previewRows = await importPage.GetPreviewRowsAsync();
-        previewRows.Should().HaveCount(4);
+        previewRows.Should().HaveCount(6);
         previewRows[0].RowNumber.Should().Be("2");
-        previewRows[0].EquipmentTag.Should().Be("111-2222");
-        previewRows[0].EquipmentType.Should().Be("AUTOTEST TYPE 1");
-        previewRows[0].LocationText.Should().Be("BOEING SOUTH");
-        previewRows[0].OperatingHours.Should().Be("22.52");
-        previewRows[0].FuelType.Should().Be("P");
-        previewRows[1].RowNumber.Should().Be("6");
-        previewRows[1].EquipmentTag.Should().Be("111-2226");
-        previewRows[1].EquipmentType.Should().Be("AUTOTEST TYPE 5");
-        previewRows[1].LocationText.Should().Be("BOEING SOUTH");
-        previewRows[1].OperatingHours.Should().Be("22.52");
+        previewRows[0].EquipmentTag.Should().Be("210342678");
+        previewRows[0].EquipmentType.Should().Be("405-1087 SCISSOR LIFT 19FT 32IN COMPACT LCS ELEC");
+        previewRows[0].LocationText.Should().Be("CITY CREEK WATER PLANT");
+        previewRows[0].OperatingHours.Should().Be("140.92");
+        previewRows[0].FuelType.Should().Be(expectedFuelType);
+        previewRows[1].RowNumber.Should().Be("4");
+        previewRows[1].EquipmentTag.Should().Be("210438462");
+        previewRows[1].EquipmentType.Should().Be("4-Person Gas Utility Vehicle Rental");
+        previewRows[1].LocationText.Should().Be("AWS 200");
+        previewRows[1].OperatingHours.Should().Be("96.49");
         previewRows[1].FuelType.Should().Be(expectedFuelType);
-        previewRows[2].RowNumber.Should().Be("7");
-        previewRows[2].EquipmentTag.Should().Be("111-2227");
-        previewRows[2].EquipmentType.Should().Be("AUTOTEST TYPE 6");
-        previewRows[2].LocationText.Should().Be("BOTAL INDUSTRIES");
-        previewRows[2].OperatingHours.Should().Be(expectedFuelType);
-        previewRows[2].FuelType.Should().Be("D");
-        previewRows[3].RowNumber.Should().Be("10");
-        previewRows[3].EquipmentTag.Should().Be("111-2230");
-        previewRows[3].EquipmentType.Should().Be("AUTOTEST TYPE 9");
-        previewRows[3].LocationText.Should().Be("BOEING SOUTH");
-        previewRows[3].OperatingHours.Should().Be("22.52");
+        previewRows[2].RowNumber.Should().Be("5");
+        previewRows[2].EquipmentTag.Should().Be("210441502");
+        previewRows[2].EquipmentType.Should().Be("630-1260");
+        previewRows[2].LocationText.Should().Be("AWS 200");
+        previewRows[2].OperatingHours.Should().Be("0");
+        previewRows[2].FuelType.Should().Be(expectedFuelType);
+        previewRows[3].RowNumber.Should().Be("7");
+        previewRows[3].EquipmentTag.Should().Be("800395291");
+        previewRows[3].EquipmentType.Should().Be("460-1060 TELEHANDLER 10000LB 42-44FT LIFT ROPS");
+        previewRows[3].LocationText.Should().Be("PERRY WASTEWATER PLANT");
+        previewRows[3].OperatingHours.Should().Be(expectedFuelType);
         previewRows[3].FuelType.Should().Be(expectedFuelType);
+        previewRows[4].RowNumber.Should().Be("9");
+        previewRows[4].EquipmentTag.Should().Be("800443474");
+        previewRows[4].EquipmentType.Should().Be("100KW GENERATOR DSL");
+        previewRows[4].LocationText.Should().Be("PROJECT POWEHOUSE WAREHOUSE");
+        previewRows[4].OperatingHours.Should().Be("7,350.85");
+        previewRows[4].FuelType.Should().Be(expectedFuelType);
+        previewRows[5].RowNumber.Should().Be("10");
+        previewRows[5].EquipmentTag.Should().Be("800451697");
+        previewRows[5].EquipmentType.Should().Be("630-1280");
+        previewRows[5].LocationText.Should().Be("AWS 200");
+        previewRows[5].OperatingHours.Should().Be("458.73");
+        previewRows[5].FuelType.Should().Be(expectedFuelType);
 
         (await importPage.IsUnrecognizedRowsAlertVisibleAsync()).Should().BeTrue();
         (await importPage.GetValidationLeadAsync()).Should().Be(expectedValidationLead);
@@ -644,7 +823,7 @@ public class TelemetryImportTests : BaseTest
     {
         await AssertImportAlertAsync(
             "Custom_08_26_no_MultipleColumns.xlsx",
-            "Missing required column(s): Equipment Type, Location.");
+            "Missing required column(s): Cat-Class, Description, Job Name.");
     }
 
     [Test]
@@ -823,7 +1002,7 @@ public class TelemetryImportTests : BaseTest
         const string fileName = "Custom_08_26_MissingValues.xlsx";
         const string expectedFuelType = "—";
         const string expectedValidationLead =
-            "Some rows were not fully recognized and are omitted from the table. Required columns: Equipment Tag, Equipment Type, and Location.";
+            "They are omitted from the table. Required columns: Equipment Tag, Equipment Type, and Location.";
         var expectedValidationList = """
             Row 2: Equipment Tag is required.
             Equipment Tag: —
@@ -843,13 +1022,13 @@ public class TelemetryImportTests : BaseTest
             Location: —
             Operating Hours: 22.52
             Fuel Type: P
-            Row 8: Equipment Tag and Equipment Type are required.
+            Row 8: Equipment Tag is required. Equipment Type is required.
             Equipment Tag: —
             Equipment Type: —
             Location: BOEING SOUTH
             Operating Hours: 22.52
             Fuel Type: P
-            Row 9: Equipment Type and Location are required.
+            Row 9: Equipment Type is required. Location is required.
             Equipment Tag: 222-3333
             Equipment Type: —
             Location: —
@@ -976,7 +1155,7 @@ public class TelemetryImportTests : BaseTest
     {
         const string fileName = "Custom_08_26_UnknownProject.xlsx";
         const string expectedAlert =
-            "2 rows could not be matched to a location from the Location column and will be saved under the corporate fallback location unless you choose a location from the dropdown. Add a project alias to attribute them automatically.";
+            "They'll be saved under the corporate fallback location. Choose a location from the dropdown, or add a project alias to attribute them automatically.";
         const string expectedLocation = "000000 — Haskell";
 
         var importPage = new ImportPage(Fixture.Page);

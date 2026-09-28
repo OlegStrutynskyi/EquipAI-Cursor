@@ -42,7 +42,7 @@ public class EmissionCategoriesTests : BaseTest
         await emissionCategoriesPage.OpenAsync();
 
         (await emissionCategoriesPage.GetGridColumnHeadersAsync()).Should().Equal(expectedColumns);
-        (await emissionCategoriesPage.GetGridRowCountAsync()).Should().Be(5);
+        (await emissionCategoriesPage.GetGridRowCountAsync()).Should().Be(7);
         (await emissionCategoriesPage.DoesEachRowHaveEditButtonAsync()).Should().BeTrue();
 
         foreach (var (displayName, ghgScope) in expectedRows)

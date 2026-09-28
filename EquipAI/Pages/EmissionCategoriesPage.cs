@@ -54,7 +54,14 @@ public class EmissionCategoriesPage : BasePage
     public async Task<int> GetGridRowCountAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        return await Grid.Locator("tbody tr").CountAsync();
+        return await Grid.EvaluateAsync<int>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => {
+                const cells = tr.querySelectorAll('td');
+                return cells.length > 0 && (cells[0].innerText || '').trim().length > 0;
+              }).length
+            """);
     }
 
     public async Task<(string DisplayName, string GhgScope)> GetFirstRowDisplayNameAndScopeAsync()
