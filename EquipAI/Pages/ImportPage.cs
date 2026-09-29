@@ -101,6 +101,8 @@ public class ImportPage : BasePage
     public Task<bool> IsReportingMonthVisibleAsync() => ReportingMonthInput.IsVisibleAsync();
     public Task<bool> IsCompanyVisibleAsync() => CompanyInput.IsVisibleAsync();
     public Task<bool> IsPreviewGridVisibleAsync() => PreviewTable.IsVisibleAsync();
+    public Task<bool> IsSaveBtnVisibleAsync() => SaveBtn.IsVisibleAsync();
+    public Task<bool> IsSaveBtnEnabledAsync() => SaveBtn.IsEnabledAsync();
 
     public async Task UploadCsvFileAsync(string fileName)
     {
@@ -459,7 +461,17 @@ public class ImportPage : BasePage
 
         for (var i = 0; i < count; i++)
         {
-            var cells = rows.Nth(i).Locator("td");
+            var row = rows.Nth(i);
+            try
+            {
+                await row.ScrollIntoViewIfNeededAsync();
+            }
+            catch (TimeoutException)
+            {
+                // Virtualized/detached placeholder rows may not scroll.
+            }
+
+            var cells = row.Locator("td");
             var cellCount = await cells.CountAsync();
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             for (var c = 0; c < cellCount && c < headers.Count; c++)
@@ -471,12 +483,16 @@ public class ImportPage : BasePage
                     : NormalizeCell(await cell.InnerTextAsync());
             }
 
+            var equipmentTag = GetCell(values, "EQUIPMENT TAG");
+            if (string.IsNullOrWhiteSpace(equipmentTag))
+                continue;
+
             result.Add(new TelemetryImportPreviewRow
             {
                 RowNumber = GetCell(values, "ROW #", "ROW"),
-                EquipmentTag = GetCell(values, "EQUIPMENT TAG"),
+                EquipmentTag = equipmentTag,
                 EquipmentType = GetCell(values, "EQUIPMENT TYPE"),
-                LocationText = await ResolveLocationTextAsync(rows.Nth(i), values),
+                LocationText = await ResolveLocationTextAsync(row, values),
                 OperatingHours = GetCell(values, "OPERATING HOURS"),
                 FuelType = GetCell(values, "FUEL TYPE"),
             });

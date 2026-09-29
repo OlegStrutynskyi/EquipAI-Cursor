@@ -388,6 +388,14 @@ public static class SqlHelper
 
         if (sourceId is not null)
         {
+            await using (var deleteActivitiesCommand = new SqlCommand(
+                "DELETE FROM [emissions].[Activity] WHERE [SourceId] = @sourceId",
+                connection))
+            {
+                deleteActivitiesCommand.Parameters.AddWithValue("@sourceId", sourceId);
+                await deleteActivitiesCommand.ExecuteNonQueryAsync();
+            }
+
             await using var deleteActivitySourceCommand = new SqlCommand(
                 "DELETE FROM [sources].[ActivitySource] WHERE Id = @sourceId",
                 connection);
@@ -408,6 +416,21 @@ public static class SqlHelper
         await using var connection = new SqlConnection(Config.SqlConnectionString);
         await connection.OpenAsync();
 
+        await using (var deleteActivitiesCommand = new SqlCommand(
+            """
+            DELETE FROM [emissions].[Activity]
+            WHERE [SourceId] IN (
+                SELECT [Id] FROM [sources].[ActivitySource]
+                WHERE [SourceType] = 'BulkCsv'
+                  AND [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
+            )
+            """,
+            connection))
+        {
+            deleteActivitiesCommand.Parameters.AddWithValue("@hash", hash);
+            await deleteActivitiesCommand.ExecuteNonQueryAsync();
+        }
+
         await using var command = new SqlCommand(
             """
             DELETE FROM [sources].[ActivitySource]
@@ -427,6 +450,25 @@ public static class SqlHelper
 
         await using var connection = new SqlConnection(Config.SqlConnectionString);
         await connection.OpenAsync();
+
+        await using (var deleteActivitiesCommand = new SqlCommand(
+            """
+            DELETE FROM [emissions].[Activity]
+            WHERE [SourceId] IN (
+                SELECT [Id] FROM [sources].[ActivitySource]
+                WHERE [SourceType] IN ('AiInvoice', 'UtilityBill', 'AiUtilityBill')
+                  AND (
+                        [OriginalDocumentBlobUrl] LIKE '%' + @hash + '%'
+                     OR [OriginalDocumentBlobUrl] LIKE '%' + @fileName + '%' ESCAPE '\'
+                  )
+            )
+            """,
+            connection))
+        {
+            deleteActivitiesCommand.Parameters.AddWithValue("@hash", hash);
+            deleteActivitiesCommand.Parameters.AddWithValue("@fileName", EscapeLikePattern(fileName));
+            await deleteActivitiesCommand.ExecuteNonQueryAsync();
+        }
 
         await using var command = new SqlCommand(
             """
