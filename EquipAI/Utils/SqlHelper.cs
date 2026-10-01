@@ -50,6 +50,47 @@ public static class SqlHelper
         return projectNames;
     }
 
+    public static async Task<IReadOnlyList<ProjectGridRow>> GetProjectGridRowsAsync()
+    {
+        var rows = new List<ProjectGridRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT
+                p.Code,
+                p.Name,
+                CONCAT_WS(', ',
+                    NULLIF(a.AddressLine1, ''),
+                    NULLIF(a.AddressLine2, ''),
+                    NULLIF(a.City, ''),
+                    NULLIF(CONCAT_WS(' ', a.StateProvince, a.PostalCode), ''),
+                    NULLIF(a.CountryCode, '')) AS Address,
+                p.StartDate,
+                p.IsActive
+            FROM [projects].[Project] AS p
+            LEFT JOIN [projects].[Address] AS a
+                ON p.AddressId = a.Id
+            WHERE p.IsDeleted = 0
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var code = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var address = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            DateTime? startDate = reader.IsDBNull(3) ? null : Convert.ToDateTime(reader.GetValue(3));
+            var isActive = !reader.IsDBNull(4) && Convert.ToBoolean(reader.GetValue(4));
+            rows.Add(new ProjectGridRow(code, name, address, startDate, isActive));
+        }
+
+        return rows;
+    }
+
     public static async Task<bool?> TryGetProjectIsDeletedByNameAsync(string name)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -1877,3 +1918,5 @@ public sealed record CategoryEmissionsRow(string CategoryName, decimal Co2eTonne
 public sealed record ScopeEmissionCategoryRow(string DisplayName, string Code);
 
 public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
+
+public sealed record ProjectGridRow(string Code, string Name, string Address, DateTime? StartDate, bool IsActive);

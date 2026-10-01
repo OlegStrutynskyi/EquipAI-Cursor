@@ -8,6 +8,8 @@ public class ProjectsPage : BasePage
 
     private ILocator PageTitle => Page.Locator("//h1[contains(@id,'title')]")
         .Filter(new LocatorFilterOptions { HasTextString = "Projects" });
+    private ILocator SynchronizeFromProcoreBtn => Page.Locator("//button[normalize-space()='Synchronize from Procore']");
+    private ILocator SynchDate => Page.Locator("//span[@class='text-muted']");
     private ILocator Grid => Page.Locator("table.table");
     private ILocator NextPageBtn => Page.Locator(
         "//nav[contains(@class,'pagination')]//button[@aria-label='Next page' or normalize-space()='Next']");
@@ -27,6 +29,60 @@ public class ProjectsPage : BasePage
         await PageTitle.WaitForAsync();
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await WaitForGridDataAsync();
+    }
+
+    public Task<bool> IsSynchronizeFromProcoreBtnVisibleAsync() => SynchronizeFromProcoreBtn.IsVisibleAsync();
+    public Task<bool> IsSynchronizeFromProcoreBtnEnabledAsync() => SynchronizeFromProcoreBtn.IsEnabledAsync();
+    public Task<bool> IsSynchDateVisibleAsync() => SynchDate.IsVisibleAsync();
+    public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
+
+    public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var headers = await Grid.Locator("thead th").AllInnerTextsAsync();
+        return headers
+            .Select(header => header.Replace('\u00A0', ' ').Trim())
+            .Where(header => !string.IsNullOrWhiteSpace(header))
+            .ToList();
+    }
+
+    public async Task ClickSynchronizeFromProcoreBtnAsync() =>
+        await SynchronizeFromProcoreBtn.ClickAsync();
+
+    public async Task<string> GetSynchDateTextAsync()
+    {
+        await SynchDate.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var text = (await SynchDate.InnerTextAsync())?.Replace('\u00A0', ' ').Replace("…", "...") ?? string.Empty;
+        return System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+    }
+
+    public async Task WaitForSynchDateTextAsync(string expectedText)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (string.Equals(await GetSynchDateTextAsync(), expectedText, StringComparison.Ordinal))
+                return;
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"Synch date did not become '{expectedText}'. Actual: '{await GetSynchDateTextAsync()}'.");
+    }
+
+    public async Task<string> WaitForSynchDateChangedFromAsync(string previousText)
+    {
+        var deadline = DateTime.UtcNow.AddMinutes(3);
+        while (DateTime.UtcNow < deadline)
+        {
+            var text = await GetSynchDateTextAsync();
+            if (!string.Equals(text, previousText, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(text))
+                return text;
+
+            await Task.Delay(500);
+        }
+
+        throw new TimeoutException($"Synch date stayed '{previousText}'.");
     }
 
     public async Task<IReadOnlyList<(string Code, string Name)>> GetAllCodesAndNamesAsync()
@@ -52,14 +108,69 @@ public class ProjectsPage : BasePage
         return results;
     }
 
+    public async Task<IReadOnlyList<ProjectGridRecord>> GetAllGridRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        await GoToFirstGridPageAsync();
+
+        var results = new List<ProjectGridRecord>();
+        var seenCodes = new HashSet<string>(StringComparer.Ordinal);
+        while (true)
+        {
+            foreach (var row in await GetGridRecordsOnCurrentPageAsync())
+            {
+                if (seenCodes.Add(row.Code))
+                    results.Add(row);
+            }
+
+            if (!await TryGoToNextGridPageAsync())
+                break;
+        }
+
+        return results;
+    }
+
+    private async Task<IReadOnlyList<ProjectGridRecord>> GetGridRecordsOnCurrentPageAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var rows = await Grid.EvaluateAsync<string[][]>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => !tr.querySelector(':scope > td .table__skeleton-bar'))
+              .map(tr => [...tr.querySelectorAll(':scope > td')].map(td => {
+                const rendered = (td.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const full = (td.textContent || '').replace(/\u00a0/g, ' ').trim();
+                return full.length > rendered.length ? full : rendered;
+              }))
+              .filter(cells => cells.length > 2 && cells[1])
+            """);
+
+        return rows
+            .Select(cells => new ProjectGridRecord(
+                Code: Cell(cells, 1),
+                Name: Cell(cells, 2),
+                Address: CollapseWhitespace(Cell(cells, 3)),
+                StartDate: Cell(cells, 4),
+                Status: Cell(cells, 5)))
+            .Where(row => !string.IsNullOrEmpty(row.Code))
+            .ToList();
+    }
+
+    private static string Cell(string[] cells, int index) =>
+        index < cells.Length ? cells[index] : string.Empty;
+
+    private static string CollapseWhitespace(string value) =>
+        System.Text.RegularExpressions.Regex.Replace(value, @"\s+", " ").Trim();
+
     private async Task<IReadOnlyList<(string Code, string Name)>> GetCodesAndNamesOnCurrentPageAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         var rows = await Grid.EvaluateAsync<string[][]>(
             """
             table => [...table.querySelectorAll('tbody tr')]
-              .filter(tr => !tr.querySelector('.table__skeleton-bar'))
-              .map(tr => [...tr.querySelectorAll('td')]
+              .filter(tr => !tr.querySelector(':scope > td .table__skeleton-bar'))
+              .map(tr => [...tr.querySelectorAll(':scope > td')]
                 .map(td => (td.innerText || '').replace(/\u00a0/g, ' ').trim()))
               .filter(cells => cells.length > 2 && cells[1])
             """);
@@ -160,33 +271,33 @@ public class ProjectsPage : BasePage
             return false;
         }
 
-        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await WaitForGridDataAsync();
-
-        var showingAfter = await TryGetShowingRangeAsync();
-        if (showingBefore is not null
-            && showingAfter is not null
-            && showingAfter.Value.Start == showingBefore.Value.Start)
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
         {
-            return false;
-        }
+            var showingAfter = await TryGetShowingRangeAsync();
+            var showingAdvanced = showingBefore is not null
+                && showingAfter is not null
+                && showingAfter.Value.Start != showingBefore.Value.Start;
 
-        if (!string.IsNullOrEmpty(firstCodeBefore))
-        {
-            var deadline = DateTime.UtcNow.AddSeconds(10);
-            while (DateTime.UtcNow < deadline)
+            if (!string.IsNullOrEmpty(firstCodeBefore))
             {
                 var firstCodeAfter = (await GetCodesAndNamesOnCurrentPageAsync()).FirstOrDefault().Code ?? string.Empty;
                 if (!string.Equals(firstCodeAfter, firstCodeBefore, StringComparison.Ordinal))
+                {
+                    await WaitForGridDataAsync();
                     return true;
-                await Task.Delay(200);
+                }
             }
+            else if (showingAdvanced)
+            {
+                await WaitForGridDataAsync();
+                return true;
+            }
+
+            await Task.Delay(150);
         }
 
-        return showingAfter is not null
-            && showingBefore is not null
-            && showingAfter.Value.Start != showingBefore.Value.Start;
+        return false;
     }
 
     private async Task<bool> CanGoToAdjacentPageAsync(ILocator button)
@@ -208,7 +319,7 @@ public class ProjectsPage : BasePage
 
     private async Task<(int Start, int End, int Total)?> TryGetShowingRangeAsync()
     {
-        var showing = Page.Locator("//*[contains(normalize-space(.),'Showing')]").First;
+        var showing = Page.Locator(".pagination__info").First;
         if (await showing.CountAsync() == 0)
             return null;
 
@@ -239,3 +350,5 @@ public class ProjectsPage : BasePage
             """);
     }
 }
+
+public sealed record ProjectGridRecord(string Code, string Name, string Address, string StartDate, string Status);
