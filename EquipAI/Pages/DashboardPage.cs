@@ -53,16 +53,16 @@ public class DashboardPage : BasePage
     private ILocator EmissionsByCategoryMessage => Page.Locator("//h2[@id='dashboard-scopes-heading']/following-sibling::p");
     private ILocator Scope1Card => Page.Locator("//article[@aria-labelledby='scope-detail-1']");
     private ILocator Scope1Title => Page.Locator("//h3[@id='scope-detail-1']");
-    private ILocator Scope1CategoryNames => Page.Locator("//article[@aria-labelledby='scope-detail-1']//p[@class='scope-detail__source']");
-    private ILocator Scope1CategoryValues => Page.Locator("//article[@aria-labelledby='scope-detail-1']//p[@class='scope-detail__value']");
+    private ILocator Scope1CategoryNames => Page.Locator("//article[@aria-labelledby='scope-detail-1']//span[contains(@class,'scope-detail__source')]");
+    private ILocator Scope1CategoryValues => Page.Locator("//article[@aria-labelledby='scope-detail-1']//span[contains(@class,'scope-detail__value')]");
     private ILocator Scope2Card => Page.Locator("//article[@aria-labelledby='scope-detail-2']");
     private ILocator Scope2Title => Page.Locator("//h3[@id='scope-detail-2']");
-    private ILocator Scope2CategoryNames => Page.Locator("//article[@aria-labelledby='scope-detail-2']//p[@class='scope-detail__source']");
-    private ILocator Scope2CategoryValues => Page.Locator("//article[@aria-labelledby='scope-detail-2']//p[@class='scope-detail__value']");
+    private ILocator Scope2CategoryNames => Page.Locator("//article[@aria-labelledby='scope-detail-2']//span[contains(@class,'scope-detail__source')]");
+    private ILocator Scope2CategoryValues => Page.Locator("//article[@aria-labelledby='scope-detail-2']//span[contains(@class,'scope-detail__value')]");
     private ILocator Scope3Card => Page.Locator("//article[@aria-labelledby='scope-detail-3']");
     private ILocator Scope3Title => Page.Locator("//h3[@id='scope-detail-3']");
-    private ILocator Scope3CategoryNames => Page.Locator("//article[@aria-labelledby='scope-detail-3']//p[@class='scope-detail__source']");
-    private ILocator Scope3CategoryValues => Page.Locator("//article[@aria-labelledby='scope-detail-3']//p[@class='scope-detail__value']");
+    private ILocator Scope3CategoryNames => Page.Locator("//article[@aria-labelledby='scope-detail-3']//span[contains(@class,'scope-detail__source')]");
+    private ILocator Scope3CategoryValues => Page.Locator("//article[@aria-labelledby='scope-detail-3']//span[contains(@class,'scope-detail__value')]");
     private ILocator SupportCard => Page.Locator("//app-support-card[@class='dashboard__support']");
 
     public async Task OpenAsync()
@@ -141,7 +141,80 @@ public class DashboardPage : BasePage
     {
         await Scope1Card.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         var values = await Scope1CategoryValues.AllInnerTextsAsync();
-        return values.Select(value => value.Replace('\u00A0', ' ').Trim()).ToList();
+        return values
+            .Select(value => Regex.Replace(value.Replace('\u00A0', ' '), @"\s+", " ").Trim())
+            .ToList();
+    }
+
+    public Task<IReadOnlyList<string>> GetScope1DisclosureCategoryNamesAsync() =>
+        GetDisclosureCategoryNamesAsync(Scope1Card);
+
+    public Task<IReadOnlyList<string>> GetScope2DisclosureCategoryNamesAsync() =>
+        GetDisclosureCategoryNamesAsync(Scope2Card);
+
+    public Task<IReadOnlyList<string>> GetScope3DisclosureCategoryNamesAsync() =>
+        GetDisclosureCategoryNamesAsync(Scope3Card);
+
+    public Task<IReadOnlyList<string>> GetScope1CategoryEmissionTypeNamesAsync(string categoryDisplayName) =>
+        GetCategoryEmissionTypeTextsAsync(Scope1Card, categoryDisplayName, "disclosure__label");
+
+    public Task<IReadOnlyList<string>> GetScope1CategoryEmissionTypeValuesAsync(string categoryDisplayName) =>
+        GetCategoryEmissionTypeTextsAsync(Scope1Card, categoryDisplayName, "disclosure__value");
+
+    public Task<IReadOnlyList<string>> GetScope2CategoryEmissionTypeNamesAsync(string categoryDisplayName) =>
+        GetCategoryEmissionTypeTextsAsync(Scope2Card, categoryDisplayName, "disclosure__label");
+
+    public Task<IReadOnlyList<string>> GetScope2CategoryEmissionTypeValuesAsync(string categoryDisplayName) =>
+        GetCategoryEmissionTypeTextsAsync(Scope2Card, categoryDisplayName, "disclosure__value");
+
+    public Task<IReadOnlyList<string>> GetScope3CategoryEmissionTypeNamesAsync(string categoryDisplayName) =>
+        GetCategoryEmissionTypeTextsAsync(Scope3Card, categoryDisplayName, "disclosure__label");
+
+    public Task<IReadOnlyList<string>> GetScope3CategoryEmissionTypeValuesAsync(string categoryDisplayName) =>
+        GetCategoryEmissionTypeTextsAsync(Scope3Card, categoryDisplayName, "disclosure__value");
+
+    private static async Task<IReadOnlyList<string>> GetDisclosureCategoryNamesAsync(ILocator scopeCard)
+    {
+        await scopeCard.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var names = await scopeCard.Locator("span.scope-detail__source").AllInnerTextsAsync();
+        return names.Select(name => name.Replace('\u00A0', ' ').Trim()).Where(name => name.Length > 0).ToList();
+    }
+
+    private static async Task<IReadOnlyList<string>> GetCategoryEmissionTypeTextsAsync(
+        ILocator scopeCard,
+        string categoryDisplayName,
+        string valueClass)
+    {
+        var nameLiteral = ToXPathLiteral(categoryDisplayName);
+        var categorySpan = scopeCard.Locator($"xpath=.//span[normalize-space()={nameLiteral}]");
+        await categorySpan.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await categorySpan.First.ScrollIntoViewIfNeededAsync();
+
+        var toggle = categorySpan.First.Locator("xpath=ancestor::button[contains(@class,'disclosure__toggle')][1]");
+        var expanded = await toggle.GetAttributeAsync("aria-expanded");
+        if (!string.Equals(expanded, "true", StringComparison.OrdinalIgnoreCase))
+            await toggle.ClickAsync();
+
+        var labels = scopeCard.Locator(
+            $"xpath=.//span[normalize-space()={nameLiteral}]/../following-sibling::div//li//span[@class='{valueClass}']");
+        await labels.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var texts = await labels.AllInnerTextsAsync();
+        return texts
+            .Select(text => Regex.Replace(text.Replace('\u00A0', ' '), @"\s+", " ").Trim())
+            .Where(text => text.Length > 0)
+            .ToList();
+    }
+
+    private static string ToXPathLiteral(string value)
+    {
+        if (!value.Contains('\''))
+            return $"'{value}'";
+
+        if (!value.Contains('"'))
+            return $"\"{value}\"";
+
+        var parts = value.Split('\'');
+        return "concat('" + string.Join("', \"'\", '", parts) + "')";
     }
 
     public async Task<string> GetScope2TitleAsync()
@@ -161,7 +234,9 @@ public class DashboardPage : BasePage
     {
         await Scope2Card.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         var values = await Scope2CategoryValues.AllInnerTextsAsync();
-        return values.Select(value => value.Replace('\u00A0', ' ').Trim()).ToList();
+        return values
+            .Select(value => Regex.Replace(value.Replace('\u00A0', ' '), @"\s+", " ").Trim())
+            .ToList();
     }
 
     public async Task<string> GetScope3TitleAsync()
@@ -181,7 +256,9 @@ public class DashboardPage : BasePage
     {
         await Scope3Card.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         var values = await Scope3CategoryValues.AllInnerTextsAsync();
-        return values.Select(value => value.Replace('\u00A0', ' ').Trim()).ToList();
+        return values
+            .Select(value => Regex.Replace(value.Replace('\u00A0', ' '), @"\s+", " ").Trim())
+            .ToList();
     }
     public Task<bool> IsLogoVisibleAsync() => Logo.IsVisibleAsync();
     public Task<bool> IsOpenMenuBtnVisibleAsync() => OpenMenuBtn.IsVisibleAsync();

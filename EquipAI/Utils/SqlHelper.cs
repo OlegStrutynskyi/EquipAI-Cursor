@@ -1719,6 +1719,153 @@ public static class SqlHelper
 
         return rows;
     }
+
+    public static async Task<IReadOnlyList<ScopeEmissionCategoryRow>> GetEmissionCategoriesByScopeAsync(int ghgScope)
+    {
+        var rows = new List<ScopeEmissionCategoryRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT DisplayName, Code
+            FROM [emissions].[EmissionCategory]
+            WHERE GhgScope = @GhgScope
+            """,
+            connection);
+        command.Parameters.AddWithValue("@GhgScope", ghgScope);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var displayName = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var code = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            rows.Add(new ScopeEmissionCategoryRow(displayName, code));
+        }
+
+        return rows;
+    }
+
+    public static async Task<IReadOnlyList<string>> GetEmissionTypeDisplayNamesByCategoryCodeAsync(string categoryCode)
+    {
+        var displayNames = new List<string>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT DisplayName
+            FROM [emissions].[EmissionType]
+            WHERE IsDeleted = 0
+              AND DefaultCategoryId = (
+                  SELECT Id
+                  FROM [emissions].[EmissionCategory]
+                  WHERE Code = @Code)
+            ORDER BY DisplayName
+            """,
+            connection);
+        command.Parameters.AddWithValue("@Code", categoryCode);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            if (!reader.IsDBNull(0))
+                displayNames.Add(reader.GetString(0).Trim());
+        }
+
+        return displayNames;
+    }
+
+    public static async Task<IReadOnlyList<EmissionTypeEmissionsRow>> GetEmissionTypeEmissionsByCategoryCodeAsync(
+        int year,
+        string categoryCode)
+    {
+        var rows = new List<EmissionTypeEmissionsRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            DECLARE @PeriodStart date = DATEFROMPARTS(@Year, 1, 1);
+            DECLARE @PeriodEnd   date = IIF(@Year = YEAR(GETUTCDATE()),
+                                            CAST(GETUTCDATE() AS date),
+                                            DATEFROMPARTS(@Year, 12, 31));
+
+            WITH ActivityTotals AS (
+                SELECT
+                    a.TypeId,
+                    COALESCE(SUM(a.Quantity * ef.Co2eTonnesPerActivityUnit), 0) AS Co2eTonnes
+                FROM projects.Project AS p
+                INNER JOIN emissions.Activity AS a
+                    ON a.ProjectId = p.Id AND a.IsDeleted = 0
+                    AND a.ActivityDate >= @PeriodStart
+                    AND a.ActivityDate <= @PeriodEnd
+                    AND a.CategoryId = (
+                        SELECT Id
+                        FROM emissions.EmissionCategory
+                        WHERE Code = @Code)
+                LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
+                LEFT JOIN factors.FactorLibraryVersion AS flv
+                    ON flv.IsDeleted = 0
+                    AND flv.Year = COALESCE(
+                        (
+                            SELECT TOP (1) flvExact.Year
+                            FROM factors.FactorLibraryVersion AS flvExact
+                            WHERE flvExact.IsDeleted = 0
+                              AND flvExact.Year = YEAR(a.ActivityDate)
+                              AND EXISTS (
+                                  SELECT 1
+                                  FROM factors.EmissionFactor AS efExact
+                                  WHERE efExact.FactorLibraryVersionId = flvExact.Id
+                                    AND efExact.IsDeleted = 0)
+                        ),
+                        (
+                            SELECT MAX(flvLatest.Year)
+                            FROM factors.FactorLibraryVersion AS flvLatest
+                            WHERE flvLatest.IsDeleted = 0
+                              AND EXISTS (
+                                  SELECT 1
+                                  FROM factors.EmissionFactor AS efLatest
+                                  WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
+                                    AND efLatest.IsDeleted = 0)
+                        ))
+                LEFT JOIN factors.EmissionFactor AS ef
+                    ON ef.FactorLibraryVersionId = flv.Id
+                    AND ef.TypeId = t.Id
+                    AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
+                    AND ef.IsDeleted = 0
+                WHERE p.IsDeleted = 0
+                GROUP BY a.TypeId
+            )
+            SELECT
+                et.DisplayName,
+                COALESCE(totals.Co2eTonnes, 0) AS Co2eTonnes
+            FROM emissions.EmissionType AS et
+            LEFT JOIN ActivityTotals AS totals ON totals.TypeId = et.Id
+            WHERE et.IsDeleted = 0
+              AND et.DefaultCategoryId = (
+                  SELECT Id
+                  FROM emissions.EmissionCategory
+                  WHERE Code = @Code)
+            ORDER BY et.DisplayName;
+            """,
+            connection);
+        command.Parameters.AddWithValue("@Year", year);
+        command.Parameters.AddWithValue("@Code", categoryCode);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var displayName = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var tonnes = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
+            rows.Add(new EmissionTypeEmissionsRow(displayName, tonnes));
+        }
+
+        return rows;
+    }
 }
 
 public sealed record ActiveProjectEmissionsRow(string Name, decimal TotalCo2eTonnes);
@@ -1726,3 +1873,7 @@ public sealed record ActiveProjectEmissionsRow(string Name, decimal TotalCo2eTon
 public sealed record ChartMonthEmissionsRow(int Month, decimal Co2eTonnes);
 
 public sealed record CategoryEmissionsRow(string CategoryName, decimal Co2eTonnes);
+
+public sealed record ScopeEmissionCategoryRow(string DisplayName, string Code);
+
+public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
