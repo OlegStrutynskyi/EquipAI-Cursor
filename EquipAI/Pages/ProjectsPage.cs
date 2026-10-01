@@ -49,6 +49,28 @@ public class ProjectsPage : BasePage
     public async Task ClickSynchronizeFromProcoreBtnAsync() =>
         await SynchronizeFromProcoreBtn.ClickAsync();
 
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = Grid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName });
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (!string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await WaitForGridSettledAsync();
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"Column '{columnName}' sort did not change from '{ariaBefore ?? "none"}'.");
+    }
+
     public async Task<string> GetSynchDateTextAsync()
     {
         await SynchDate.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -106,6 +128,13 @@ public class ProjectsPage : BasePage
         }
 
         return results;
+    }
+
+    public async Task<IReadOnlyList<ProjectGridRecord>> GetCurrentPageGridRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        return await GetGridRecordsOnCurrentPageAsync();
     }
 
     public async Task<IReadOnlyList<ProjectGridRecord>> GetAllGridRecordsAsync()
@@ -170,8 +199,12 @@ public class ProjectsPage : BasePage
             """
             table => [...table.querySelectorAll('tbody tr')]
               .filter(tr => !tr.querySelector(':scope > td .table__skeleton-bar'))
-              .map(tr => [...tr.querySelectorAll(':scope > td')]
-                .map(td => (td.innerText || '').replace(/\u00a0/g, ' ').trim()))
+              .map(tr => [...tr.querySelectorAll(':scope > td')].map(td => {
+                const rendered = (td.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const title = (td.getAttribute('title') || td.querySelector('[title]')?.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim();
+                const full = (td.textContent || '').replace(/\u00a0/g, ' ').trim();
+                return [title, full, rendered].sort((a, b) => b.length - a.length)[0];
+              }))
               .filter(cells => cells.length > 2 && cells[1])
             """);
 
@@ -179,6 +212,24 @@ public class ProjectsPage : BasePage
             .Select(cells => (Code: cells[1], Name: cells.Length > 2 ? cells[2] : string.Empty))
             .Where(row => !string.IsNullOrEmpty(row.Code))
             .ToList();
+    }
+
+    private async Task WaitForGridSettledAsync()
+    {
+        await WaitForGridDataAsync();
+        string? previous = null;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = string.Join(
+                "|",
+                (await GetCodesAndNamesOnCurrentPageAsync()).Select(row => row.Code));
+            if (previous is not null && snapshot.Length > 0 && snapshot == previous)
+                return;
+
+            previous = snapshot;
+            await Task.Delay(200);
+        }
     }
 
     private async Task WaitForGridDataAsync()

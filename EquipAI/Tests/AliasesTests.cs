@@ -36,7 +36,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T03_Aliases_GridColumns_Units()
+    public async Task T03_Aliases_Units_GridColumns()
     {
         var expectedColumns = new[]
         {
@@ -53,7 +53,52 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T04_Aliases_GridColumns_EmissionTypes()
+    public async Task T04_Aliases_Units_GridRecords()
+    {
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+
+        var aliases = await SqlHelper.GetUnitAliasGridRowsAsync();
+        if (aliases.Count == 0)
+            Assert.Pass("No Unit aliases");
+
+        var actualRecords = await aliasesPage.GetAllUnitAliasGridRecordsAsync();
+        var expectedRecords = aliases
+            .Select(alias => new AliasUnitGridRow
+            {
+                Context = string.Empty,
+                AliasText = alias.AliasText,
+                ResolvesTo = alias.ResolvesTo,
+            })
+            .ToList();
+
+        actualRecords.Should().BeEquivalentTo(expectedRecords);
+    }
+
+    [Test]
+    public async Task T05_Aliases_Units_GridSorting()
+    {
+        var columns = new[] { "ALIAS TEXT", "RESOLVES TO" };
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickUnitsOfMeasureTabAsync();
+
+        var aliases = await SqlHelper.GetUnitAliasGridRowsAsync();
+        if (aliases.Count == 0)
+            Assert.Pass("No Unit aliases");
+
+        await AssertFirstPageSortCycleAsync(
+            aliasesPage,
+            columns,
+            resetColumn: "ALIAS TEXT",
+            (column, ascending) => ExpectedSortedUnitAliases(aliases, column, ascending),
+            page => page.GetCurrentUnitAliasPageRecordsAsync());
+    }
+
+    [Test]
+    public async Task T06_Aliases_EmissionTypes_GridColumns()
     {
         var expectedColumns = new[]
         {
@@ -72,7 +117,64 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T05_Aliases_GridColumns_Projects()
+    public async Task T07_Aliases_EmissionTypes_GridRecords()
+    {
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+
+        var aliases = await SqlHelper.GetEmissionTypeAliasGridRowsAsync();
+        if (aliases.Count == 0)
+            Assert.Pass("No Emission Type aliases");
+
+        var actualRecords = await aliasesPage.GetAllEmissionTypeAliasGridRecordsAsync();
+        var expectedRecords = aliases
+            .Select(alias => new AliasEmissionTypeGridRow
+            {
+                Context = FormatAliasContext(alias.Context),
+                AliasText = alias.AliasText,
+                FactorSource = FormatFactorSource(alias.FactorSource),
+                ResolvesTo = alias.ResolvesTo,
+            })
+            .ToList();
+
+        actualRecords.Should().BeEquivalentTo(expectedRecords);
+    }
+
+    [Test]
+    public async Task T08_Aliases_EmissionTypes_GridSorting()
+    {
+        var columns = new[] { "CONTEXT", "ALIAS TEXT", "FACTOR SOURCE", "RESOLVES TO" };
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickEmissionTypesTabAsync();
+
+        var aliases = await SqlHelper.GetEmissionTypeAliasGridRowsAsync();
+        if (aliases.Count == 0)
+            Assert.Pass("No Emission Type aliases");
+
+        var displayRows = aliases
+            .Select(alias => new AliasEmissionTypeGridRow
+            {
+                Context = FormatAliasContext(alias.Context),
+                AliasText = alias.AliasText,
+                FactorSource = FormatFactorSource(alias.FactorSource),
+                ResolvesTo = alias.ResolvesTo,
+            })
+            .ToList();
+
+        await AssertFirstPageSortCycleAsync(
+            aliasesPage,
+            columns,
+            resetColumn: "CONTEXT, ALIAS TEXT",
+            (column, ascending) => ExpectedSortedEmissionTypeAliases(displayRows, column, ascending),
+            page => page.GetCurrentEmissionTypeAliasPageRecordsAsync(),
+            () => ExpectedDefaultEmissionTypeAliases(displayRows));
+    }
+
+    [Test]
+    public async Task T09_Aliases_Projects_GridColumns()
     {
         var expectedColumns = new[]
         {
@@ -89,7 +191,52 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T06_Aliases_Add_DefaultView()
+    public async Task T10_Aliases_Projects_GridRecords()
+    {
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickProjectsTabAsync();
+
+        var aliases = await SqlHelper.GetProjectAliasGridRowsAsync();
+        if (aliases.Count == 0)
+            Assert.Pass("No Project aliases");
+
+        var actualRecords = await aliasesPage.GetAllProjectAliasGridRecordsAsync();
+        var expectedRecords = aliases
+            .Select(alias => new AliasUnitGridRow
+            {
+                Context = string.Empty,
+                AliasText = alias.AliasText,
+                ResolvesTo = alias.ResolvesTo,
+            })
+            .ToList();
+
+        actualRecords.Should().BeEquivalentTo(expectedRecords);
+    }
+
+    [Test]
+    public async Task T11_Aliases_Projects_GridSorting()
+    {
+        var columns = new[] { "ALIAS TEXT", "RESOLVES TO" };
+
+        var aliasesPage = new AliasesPage(Fixture.Page);
+        await aliasesPage.OpenAsync();
+        await aliasesPage.ClickProjectsTabAsync();
+
+        var aliases = await SqlHelper.GetProjectAliasGridRowsAsync();
+        if (aliases.Count == 0)
+            Assert.Pass("No Project aliases");
+
+        await AssertFirstPageSortCycleAsync(
+            aliasesPage,
+            columns,
+            resetColumn: "ALIAS TEXT",
+            (column, ascending) => ExpectedSortedUnitAliases(aliases, column, ascending),
+            page => page.GetCurrentProjectAliasPageRecordsAsync());
+    }
+
+    [Test]
+    public async Task T12_Aliases_Add_DefaultView()
     {
         const string expectedPageTitle = "Add Alias";
 
@@ -107,7 +254,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T07_Aliases_Add_ContextDropdown()
+    public async Task T13_Aliases_Add_ContextDropdown()
     {
         const string dataIngestionOption = "Data Ingestion";
         const string catalogFactorMappingOption = "Catalog Factor Mapping";
@@ -132,7 +279,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T08_Aliases_Add_FieldsList()
+    public async Task T14_Aliases_Add_FieldsList()
     {
         const string targetKindOption = "Emission Type";
         const string catalogFactorMappingOption = "Catalog Factor Mapping";
@@ -175,7 +322,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T09_Aliases_Add_AliasTextTooLong()
+    public async Task T15_Aliases_Add_AliasTextTooLong()
     {
         const string expectedAliasTextError = "Alias text must be at most 256 characters.";
         var randomAliasText = GenerateRandomString(257);
@@ -190,7 +337,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T10_Aliases_Add_TargetKind()
+    public async Task T16_Aliases_Add_TargetKind()
     {
         const string unitOfMeasureOption = "Unit of Measure";
         const string emissionTypeOption = "Emission Type";
@@ -222,7 +369,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T11_Aliases_Add_UnitOfMeasure()
+    public async Task T17_Aliases_Add_UnitOfMeasure()
     {
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -241,7 +388,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T12_Aliases_Add_Project()
+    public async Task T18_Aliases_Add_Project()
     {
         var projectsPage = new ProjectsPage(Fixture.Page);
         await projectsPage.OpenAsync();
@@ -260,7 +407,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T13_Aliases_Add_EmptyFields()
+    public async Task T19_Aliases_Add_EmptyFields()
     {
         const string dataIngestionOption = "Data ingestion";
         const string catalogFactorMappingOption = "Catalog factor mapping";
@@ -303,7 +450,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T14_Aliases_Add_ClickCancel()
+    public async Task T20_Aliases_Add_ClickCancel()
     {
         const string expectedPageTitle = "Aliases";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -321,7 +468,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T15_Aliases_Add_Success_Unit()
+    public async Task T21_Aliases_Add_Success_Unit()
     {
         const string expectedPageTitle = "Aliases";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -353,7 +500,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T16_Aliases_Add_Success_EmissionType()
+    public async Task T22_Aliases_Add_Success_EmissionType()
     {
         const string expectedPageTitle = "Aliases";
         const string expectedContext = "Data Ingestion";
@@ -390,7 +537,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T17_Aliases_Add_Success_CatalogEmissionType()
+    public async Task T23_Aliases_Add_Success_CatalogEmissionType()
     {
         const string expectedPageTitle = "Aliases";
         const string expectedContext = "Catalog Factor Mapping";
@@ -428,7 +575,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T18_Aliases_Add_Success_Project()
+    public async Task T24_Aliases_Add_Success_Project()
     {
         const string expectedPageTitle = "Aliases";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
@@ -460,7 +607,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T19_Aliases_ClickEdit()
+    public async Task T25_Aliases_ClickEdit()
     {
         var expectedPageTitle = "Edit Alias " + Config.SetupAliasUnit;
 
@@ -470,7 +617,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T20_Aliases_Edit_Unit_DefaultView()
+    public async Task T26_Aliases_Edit_Unit_DefaultView()
     {
         var expectedPageTitle = "Edit Alias " + Config.SetupAliasUnit;
         const string expectedTargetKind = "Unit of Measure";
@@ -492,7 +639,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T21_Aliases_Edit_Unit_EmptyAliasText()
+    public async Task T27_Aliases_Edit_Unit_EmptyAliasText()
     {
         const string expectedAliasTextError = "Alias text is required.";
 
@@ -504,7 +651,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T22_Aliases_Edit_Unit_ExistingAliasText()
+    public async Task T28_Aliases_Edit_Unit_ExistingAliasText()
     {
         const string expectedAlertMessage = "Alias text should be unique.";
         var conflictingAliasText = $"AliasConflict{DateTime.Now:yyyyMMddHHmmss}";
@@ -536,7 +683,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T23_Aliases_Edit_Unit_AliasTextTooLong()
+    public async Task T29_Aliases_Edit_Unit_AliasTextTooLong()
     {
         const string expectedAliasTextError = "Alias text must be at most 256 characters.";
         var randomAliasText = GenerateRandomString(257);
@@ -550,7 +697,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T24_Aliases_Edit_Unit_ClickCancel()
+    public async Task T30_Aliases_Edit_Unit_ClickCancel()
     {
         const string expectedPageTitle = "Aliases";
         const string updatedAliasText = $"{Config.SetupAliasUnit} UPDATED";
@@ -572,7 +719,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T25_Aliases_Edit_Unit_Success()
+    public async Task T31_Aliases_Edit_Unit_Success()
     {
         const string expectedPageTitle = "Aliases";
         var updatedAliasText = $"{Config.SetupAliasUnit} UPDATED";
@@ -605,7 +752,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T26_Aliases_Edit_EmissionType_DefaultView()
+    public async Task T32_Aliases_Edit_EmissionType_DefaultView()
     {
         var expectedPageTitle = "Edit Alias " + Config.SetupAliasEmissionType;
         const string expectedContext = "Data Ingestion";
@@ -626,7 +773,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T27_Aliases_Edit_EmissionType_Success()
+    public async Task T33_Aliases_Edit_EmissionType_Success()
     {
         const string expectedPageTitle = "Aliases";
         var updatedAliasText = $"{Config.SetupAliasEmissionType} UPDATED";
@@ -664,7 +811,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T28_Aliases_Edit_Factor_DefaultView()
+    public async Task T34_Aliases_Edit_Factor_DefaultView()
     {
         var expectedPageTitle = "Edit Alias " + Config.SetupAliasFactor1;
         const string expectedContext = "Catalog Factor Mapping";
@@ -686,7 +833,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T29_Aliases_Edit_Factor_Success()
+    public async Task T35_Aliases_Edit_Factor_Success()
     {
         const string expectedPageTitle = "Aliases";
         const string expectedFactorSource = "DEFRA";
@@ -726,7 +873,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T30_Aliases_Edit_Project_DefaultView()
+    public async Task T36_Aliases_Edit_Project_DefaultView()
     {
         var expectedPageTitle = "Edit Alias " + Config.SetupAliasProject1;
         const string expectedTargetKind = "Project";
@@ -748,7 +895,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T31_Aliases_Edit_Project_Success()
+    public async Task T37_Aliases_Edit_Project_Success()
     {
         const string expectedPageTitle = "Aliases";
         var updatedAliasText = $"{Config.SetupAliasProject1} UPDATED";
@@ -785,7 +932,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T32_Aliases_ClickDeactivate()
+    public async Task T38_Aliases_ClickDeactivate()
     {
         const string expectedTitle = "Deactivate Alias";
         var expectedMessage =
@@ -808,7 +955,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T33_Aliases_Deactivate_Cancel()
+    public async Task T39_Aliases_Deactivate_Cancel()
     {
         await SqlHelper.EnsureSetupUnitAliasAsync();
 
@@ -823,7 +970,7 @@ public class AliasesTests : BaseTest
     }
 
     [Test]
-    public async Task T34_Aliases_Deactivate_Success()
+    public async Task T40_Aliases_Deactivate_Success()
     {
         try
         {
@@ -874,9 +1021,138 @@ public class AliasesTests : BaseTest
 
     private async Task<EditAliasPage> OpenEditAliasProjectPageAsync()
     {
+        await SqlHelper.EnsureSetupProjectAliasAsync();
+
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
         await aliasesPage.ClickProjectsTabAsync();
         return await aliasesPage.ClickEditBtnAsync(Config.SetupAliasProject1);
     }
+
+    private static async Task AssertFirstPageSortCycleAsync<T>(
+        AliasesPage aliasesPage,
+        IReadOnlyList<string> columns,
+        string resetColumn,
+        Func<string, bool, List<T>> expected,
+        Func<AliasesPage, Task<IReadOnlyList<T>>> readPage,
+        Func<List<T>>? resetExpected = null)
+    {
+        foreach (var column in columns)
+        {
+            await aliasesPage.ClickGridColumnAsync(column);
+            await AssertFirstPageSortedAsync(aliasesPage, expected(column, true), readPage, $"{column} ASC");
+
+            await aliasesPage.ClickGridColumnAsync(column);
+            await AssertFirstPageSortedAsync(aliasesPage, expected(column, false), readPage, $"{column} DESC");
+
+            await aliasesPage.ClickGridColumnAsync(column);
+            await AssertFirstPageSortedAsync(
+                aliasesPage,
+                resetExpected?.Invoke() ?? expected(resetColumn, true),
+                readPage,
+                $"{column} reset to {resetColumn} ASC");
+        }
+    }
+
+    private static async Task AssertFirstPageSortedAsync<T>(
+        AliasesPage aliasesPage,
+        List<T> expected,
+        Func<AliasesPage, Task<IReadOnlyList<T>>> readPage,
+        string because)
+    {
+        var actual = await readPage(aliasesPage);
+        actual.Should().BeEquivalentTo(
+            expected.Take(actual.Count),
+            options => options.WithStrictOrdering(),
+            because);
+    }
+
+    private static List<AliasUnitGridRow> ExpectedSortedUnitAliases(
+        IReadOnlyList<UnitAliasGridRow> aliases,
+        string column,
+        bool ascending)
+    {
+        Func<UnitAliasGridRow, string> key = column switch
+        {
+            "ALIAS TEXT" => alias => alias.AliasText,
+            "RESOLVES TO" => alias => alias.ResolvesTo,
+            _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown aliases grid column."),
+        };
+
+        var ordered = OrderByText(aliases, key, ascending, alias => alias.AliasText, alias => alias.ResolvesTo);
+        return ordered
+            .Select(alias => new AliasUnitGridRow
+            {
+                Context = string.Empty,
+                AliasText = alias.AliasText,
+                ResolvesTo = alias.ResolvesTo,
+            })
+            .ToList();
+    }
+
+    private static List<AliasEmissionTypeGridRow> ExpectedSortedEmissionTypeAliases(
+        IReadOnlyList<AliasEmissionTypeGridRow> aliases,
+        string column,
+        bool ascending)
+    {
+        Func<AliasEmissionTypeGridRow, string> key = column switch
+        {
+            "CONTEXT" => alias => alias.Context,
+            "ALIAS TEXT" => alias => alias.AliasText,
+            "FACTOR SOURCE" => alias => alias.FactorSource == "—" ? "" : alias.FactorSource,
+            "RESOLVES TO" => alias => alias.ResolvesTo,
+            _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown aliases grid column."),
+        };
+
+        return OrderByText(
+                aliases,
+                key,
+                ascending,
+                alias => alias.Context == "Data Ingestion" ? "0" : "1",
+                alias => alias.AliasText,
+                alias => alias.FactorSource == "—" ? "" : alias.FactorSource,
+                alias => alias.ResolvesTo)
+            .ToList();
+    }
+
+    private static List<AliasEmissionTypeGridRow> ExpectedDefaultEmissionTypeAliases(
+        IReadOnlyList<AliasEmissionTypeGridRow> aliases) =>
+        aliases
+            .OrderBy(alias => alias.Context == "Catalog Factor Mapping")
+            .ThenBy(alias => alias.AliasText, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(alias => alias.FactorSource, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(alias => alias.ResolvesTo, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static IEnumerable<T> OrderByText<T>(
+        IReadOnlyList<T> rows,
+        Func<T, string> key,
+        bool ascending,
+        params Func<T, string>[] tieBreakers)
+    {
+        IOrderedEnumerable<T> ordered = ascending
+            ? rows.OrderBy(key, StringComparer.OrdinalIgnoreCase)
+            : rows.OrderByDescending(key, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var tieBreaker in tieBreakers)
+            ordered = ordered.ThenBy(tieBreaker, StringComparer.OrdinalIgnoreCase);
+
+        return ordered;
+    }
+
+    private static string FormatAliasContext(int context) => context switch
+    {
+        0 => "Data Ingestion",
+        1 => "Catalog Factor Mapping",
+        _ => throw new ArgumentOutOfRangeException(nameof(context), context, "Unknown alias context."),
+    };
+
+    private static string FormatFactorSource(int? factorSource) => factorSource switch
+    {
+        null => "—",
+        0 => "EPA",
+        1 => "DEFRA",
+        2 => "Custom",
+        _ => throw new ArgumentOutOfRangeException(nameof(factorSource), factorSource, "Unknown factor source."),
+    };
 }

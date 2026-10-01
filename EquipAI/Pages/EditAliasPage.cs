@@ -112,7 +112,25 @@ public class EditAliasPage : BasePage
 
     public async Task<string> GetEmissionTypeAsync() => await GetSelectedOptionTextAsync(EmissionTypeDropdown);
 
-    public async Task<string> GetTelemetryProjectAsync() => await GetSelectedOptionTextAsync(TelemetryProjectDropdown);
+    public async Task<string> GetTelemetryProjectAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        var last = string.Empty;
+        while (DateTime.UtcNow < deadline)
+        {
+            last = await GetSelectedOptionTextAsync(TelemetryProjectDropdown);
+            if (!IsProjectPlaceholder(last))
+                return last;
+
+            await Task.Delay(200);
+        }
+
+        return last;
+    }
+
+    private static bool IsProjectPlaceholder(string value) =>
+        string.IsNullOrWhiteSpace(value)
+        || value.StartsWith("Select", StringComparison.OrdinalIgnoreCase);
 
     public Task<bool> IsPreparedFactorsPreviewTextVisibleAsync() => PreparedFactorsPreviewText.IsVisibleAsync();
     public Task<bool> IsContextDropdownVisibleAsync() => ContextDropdown.IsVisibleAsync();
@@ -455,7 +473,10 @@ public class EditAliasPage : BasePage
             return string.Empty;
         }
 
-        var selectedLabel = dropdown.Locator(".select__value:not(.select__value--placeholder), .select__value");
+        var selectedLabel = dropdown.Locator(".select__value:not(.select__value--placeholder)");
+        if (await selectedLabel.CountAsync() == 0)
+            selectedLabel = dropdown.Locator(".select__value");
+
         if (await selectedLabel.CountAsync() > 0)
             return (await selectedLabel.First.TextContentAsync())?.Trim() ?? string.Empty;
 

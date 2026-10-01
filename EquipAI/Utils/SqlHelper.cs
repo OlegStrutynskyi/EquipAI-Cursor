@@ -1066,6 +1066,93 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
+    public static async Task<IReadOnlyList<UnitAliasGridRow>> GetUnitAliasGridRowsAsync()
+    {
+        var rows = new List<UnitAliasGridRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT a.AliasText, CONCAT_WS(' — ', u.Code, u.DisplayName) AS Resolves
+            FROM [emissions].[ReferenceAlias] AS a
+            LEFT JOIN [emissions].[UnitOfMeasure] AS u
+                ON a.UnitOfMeasureId = u.Id
+            WHERE a.IsDeleted = 0 AND a.TargetEntityType = 0
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var aliasText = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var resolvesTo = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            rows.Add(new UnitAliasGridRow(aliasText, resolvesTo));
+        }
+
+        return rows;
+    }
+
+    public static async Task<IReadOnlyList<EmissionTypeAliasGridRow>> GetEmissionTypeAliasGridRowsAsync()
+    {
+        var rows = new List<EmissionTypeAliasGridRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT a.Context, a.AliasText, a.FactorSource, CONCAT_WS(' — ', u.Code, u.DisplayName) AS Resolves
+            FROM [emissions].[ReferenceAlias] AS a
+            LEFT JOIN [emissions].[EmissionType] AS u
+                ON a.EmissionTypeId = u.Id
+            WHERE a.IsDeleted = 0 AND a.TargetEntityType = 1
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var context = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0));
+            var aliasText = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            int? factorSource = reader.IsDBNull(2) ? null : Convert.ToInt32(reader.GetValue(2));
+            var resolvesTo = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            rows.Add(new EmissionTypeAliasGridRow(context, aliasText, factorSource, resolvesTo));
+        }
+
+        return rows;
+    }
+
+    public static async Task<IReadOnlyList<UnitAliasGridRow>> GetProjectAliasGridRowsAsync()
+    {
+        var rows = new List<UnitAliasGridRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT a.AliasText, CONCAT_WS(' — ', u.Code, u.Name) AS Resolves
+            FROM [emissions].[ReferenceAlias] AS a
+            LEFT JOIN [projects].[Project] AS u
+                ON a.ProjectId = u.Id
+            WHERE a.IsDeleted = 0 AND a.TargetEntityType = 2
+            ORDER BY a.AliasText
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var aliasText = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var resolvesTo = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            rows.Add(new UnitAliasGridRow(aliasText, resolvesTo));
+        }
+
+        return rows;
+    }
+
     public static async Task DeleteReferenceAliasByAliasTextAsync(string aliasText)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -1155,6 +1242,35 @@ public static class SqlHelper
         command.Parameters.AddWithValue("@emissionTypeCode", emissionTypeCode);
         command.Parameters.AddWithValue("@factorSource", factorSource);
         command.Parameters.AddWithValue("@id", id);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task EnsureSetupProjectAliasAsync()
+    {
+        var isDeleted = await TryGetProjectIsDeletedByNameAsync(Config.SetupProjectName1);
+        if (isDeleted is null)
+            await CreateSetupTestProjectAsync();
+        else if (isDeleted == true)
+            await RestoreProjectByNameAsync(Config.SetupProjectName1);
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [emissions].[ReferenceAlias]
+            SET IsDeleted = 0,
+                AliasText = @aliasText,
+                ProjectId = (
+                    SELECT TOP (1) [Id]
+                    FROM [projects].[Project]
+                    WHERE [Name] = @projectName AND [IsDeleted] = 0)
+            WHERE AliasText = @aliasText
+               OR AliasText = @aliasText + N' UPDATED'
+            """,
+            connection);
+        command.Parameters.AddWithValue("@aliasText", Config.SetupAliasProject1);
+        command.Parameters.AddWithValue("@projectName", Config.SetupProjectName1);
         await command.ExecuteNonQueryAsync();
     }
 
@@ -1920,3 +2036,7 @@ public sealed record ScopeEmissionCategoryRow(string DisplayName, string Code);
 public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
 
 public sealed record ProjectGridRow(string Code, string Name, string Address, DateTime? StartDate, bool IsActive);
+
+public sealed record UnitAliasGridRow(string AliasText, string ResolvesTo);
+
+public sealed record EmissionTypeAliasGridRow(int Context, string AliasText, int? FactorSource, string ResolvesTo);

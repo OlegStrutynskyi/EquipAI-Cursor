@@ -93,6 +93,146 @@ public class AliasesPage : BasePage
         await WaitForPaginationReadyAsync(expectFirstPage: true);
     }
 
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = Grid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName });
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (!string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await WaitForGridSettledAsync();
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"Column '{columnName}' sort did not change from '{ariaBefore ?? "none"}'.");
+    }
+
+    public async Task<IReadOnlyList<AliasUnitGridRow>> GetCurrentUnitAliasPageRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        return await GetUnitAliasRecordsOnCurrentPageAsync();
+    }
+
+    public Task<IReadOnlyList<AliasUnitGridRow>> GetCurrentProjectAliasPageRecordsAsync() =>
+        GetCurrentUnitAliasPageRecordsAsync();
+
+    public async Task<IReadOnlyList<AliasEmissionTypeGridRow>> GetCurrentEmissionTypeAliasPageRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        return await GetEmissionTypeAliasRecordsOnCurrentPageAsync();
+    }
+
+    public async Task<IReadOnlyList<AliasUnitGridRow>> GetAllUnitAliasGridRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        await GoToFirstGridPageAsync();
+
+        var results = new List<AliasUnitGridRow>();
+        while (true)
+        {
+            var pageRows = await GetUnitAliasRecordsOnCurrentPageAsync();
+            results.AddRange(pageRows);
+            var firstAlias = pageRows.FirstOrDefault()?.AliasText ?? string.Empty;
+            if (!await TryGoToNextAliasPageAsync(
+                    firstAlias,
+                    async () => (await GetUnitAliasRecordsOnCurrentPageAsync()).FirstOrDefault()?.AliasText ?? string.Empty))
+                break;
+        }
+
+        return results;
+    }
+
+    public Task<IReadOnlyList<AliasUnitGridRow>> GetAllProjectAliasGridRecordsAsync() =>
+        GetAllUnitAliasGridRecordsAsync();
+
+    public async Task<IReadOnlyList<AliasEmissionTypeGridRow>> GetAllEmissionTypeAliasGridRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        await GoToFirstGridPageAsync();
+
+        var results = new List<AliasEmissionTypeGridRow>();
+        while (true)
+        {
+            var pageRows = await GetEmissionTypeAliasRecordsOnCurrentPageAsync();
+            results.AddRange(pageRows);
+            var firstRow = pageRows.FirstOrDefault();
+            var fingerprint = firstRow is null
+                ? string.Empty
+                : $"{firstRow.Context}|{firstRow.AliasText}|{firstRow.FactorSource}|{firstRow.ResolvesTo}";
+            if (!await TryGoToNextAliasPageAsync(fingerprint, async () =>
+                {
+                    var row = (await GetEmissionTypeAliasRecordsOnCurrentPageAsync()).FirstOrDefault();
+                    return row is null
+                        ? string.Empty
+                        : $"{row.Context}|{row.AliasText}|{row.FactorSource}|{row.ResolvesTo}";
+                }))
+                break;
+        }
+
+        return results;
+    }
+
+    private async Task<bool> TryGoToNextAliasPageAsync(string firstRowBefore, Func<Task<string>> readFirstRow)
+    {
+        await WaitForPaginationReadyAsync();
+
+        var showingBefore = await TryGetShowingRangeAsync();
+        if (showingBefore is not null && showingBefore.Value.End >= showingBefore.Value.Total)
+            return false;
+
+        if (showingBefore is null && !await IsPagerButtonEnabledAsync(NextBtn))
+            return false;
+
+        try
+        {
+            await NextBtn.ClickAsync(new LocatorClickOptions { Timeout = 5_000, Force = true });
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var showingAfter = await TryGetShowingRangeAsync();
+            var showingAdvanced = showingBefore is not null
+                && showingAfter is not null
+                && showingAfter.Value.Start > showingBefore.Value.Start;
+            var firstRowAfter = await readFirstRow();
+            var rowsChanged = !string.IsNullOrEmpty(firstRowBefore)
+                && !string.Equals(firstRowAfter, firstRowBefore, StringComparison.Ordinal);
+
+            if (rowsChanged && (showingBefore is null || showingAdvanced))
+            {
+                await WaitForGridDataAsync();
+                return true;
+            }
+
+            if (string.IsNullOrEmpty(firstRowBefore) && showingAdvanced)
+            {
+                await WaitForGridDataAsync();
+                return true;
+            }
+
+            await Task.Delay(150);
+        }
+
+        return false;
+    }
+
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -470,6 +610,22 @@ public class AliasesPage : BasePage
             """);
     }
 
+    private async Task WaitForGridSettledAsync()
+    {
+        await WaitForGridDataAsync();
+        string? previous = null;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = string.Join("|", await GetAliasTextCellValuesAsync());
+            if (previous is not null && snapshot.Length > 0 && snapshot == previous)
+                return;
+
+            previous = snapshot;
+            await Task.Delay(200);
+        }
+    }
+
     private async Task WaitForGridDataAsync()
     {
         try
@@ -768,6 +924,59 @@ public class AliasesPage : BasePage
               || el.classList.contains('disabled')
             )
             """);
+    }
+
+    private async Task<IReadOnlyList<AliasEmissionTypeGridRow>> GetEmissionTypeAliasRecordsOnCurrentPageAsync()
+    {
+        var rows = await Grid.EvaluateAsync<string[][]>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => !tr.querySelector(':scope > td .table__skeleton-bar'))
+              .map(tr => [...tr.querySelectorAll(':scope > td')].slice(0, 4).map(td => {
+                const rendered = (td.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const title = (td.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim();
+                const full = (td.textContent || '').replace(/\u00a0/g, ' ').trim();
+                if (title.length > rendered.length) return title;
+                return full.length > rendered.length ? full : rendered;
+              }))
+              .filter(cells => cells.length >= 4 && cells[1])
+            """);
+
+        return rows
+            .Select(cells => new AliasEmissionTypeGridRow
+            {
+                Context = NormalizeContext(cells[0]),
+                AliasText = cells[1],
+                FactorSource = cells.Length > 2 ? cells[2] : string.Empty,
+                ResolvesTo = cells.Length > 3 ? cells[3] : string.Empty,
+            })
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<AliasUnitGridRow>> GetUnitAliasRecordsOnCurrentPageAsync()
+    {
+        var rows = await Grid.EvaluateAsync<string[][]>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => !tr.querySelector(':scope > td .table__skeleton-bar'))
+              .map(tr => [...tr.querySelectorAll(':scope > td')].slice(0, 2).map(td => {
+                const rendered = (td.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const title = (td.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim();
+                const full = (td.textContent || '').replace(/\u00a0/g, ' ').trim();
+                if (title.length > rendered.length) return title;
+                return full.length > rendered.length ? full : rendered;
+              }))
+              .filter(cells => cells.length >= 2 && cells[0])
+            """);
+
+        return rows
+            .Select(cells => new AliasUnitGridRow
+            {
+                Context = string.Empty,
+                AliasText = cells[0],
+                ResolvesTo = cells.Length > 1 ? cells[1] : string.Empty,
+            })
+            .ToList();
     }
 
     private async Task<AliasUnitGridRow?> FindUnitAliasRowOnCurrentPageAsync(string aliasText)
