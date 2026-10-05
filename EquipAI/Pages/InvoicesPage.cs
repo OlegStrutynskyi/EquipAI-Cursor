@@ -78,6 +78,135 @@ public class InvoicesPage : BasePage
             .ToList();
     }
 
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = InvoicesGrid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName }).First;
+        await header.ScrollIntoViewIfNeededAsync();
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        var fingerprintBefore = await GetPageFingerprintAsync();
+        var showingBefore = await TryGetShowingRangeAsync();
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await Task.Delay(100);
+                continue;
+            }
+
+            var refreshDeadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < refreshDeadline)
+            {
+                var showingAfter = await TryGetShowingRangeAsync();
+                var onFirstPage = showingAfter is null || showingAfter.Value.Start == 1;
+                var fingerprintAfter = await GetPageFingerprintAsync();
+                if (onFirstPage
+                    && fingerprintAfter.Length > 0
+                    && !string.Equals(fingerprintAfter, fingerprintBefore, StringComparison.Ordinal))
+                {
+                    await WaitForInvoiceGridSettledAsync();
+                    var settled = await GetPageFingerprintAsync();
+                    if (!string.Equals(settled, fingerprintBefore, StringComparison.Ordinal))
+                        return;
+                }
+
+                await Task.Delay(100);
+            }
+
+            if (showingBefore is null || showingBefore.Value.Start == 1)
+            {
+                await WaitForInvoiceGridSettledAsync();
+                var settled = await GetPageFingerprintAsync();
+                if (!string.Equals(settled, fingerprintBefore, StringComparison.Ordinal))
+                    return;
+            }
+
+            break;
+        }
+
+        await WaitForInvoiceGridSettledAsync();
+    }
+
+    public async Task<IReadOnlyList<InvoiceGridRow>> GetCurrentPageInvoiceGridRowsAsync()
+    {
+        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return await ReadInvoiceGridRowsOnCurrentPageAsync();
+    }
+
+    public async Task<IReadOnlyList<InvoiceGridRow>> GetAllInvoiceGridRowsAsync()
+    {
+        await InvoicesGrid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        var results = new List<InvoiceGridRow>();
+        while (true)
+        {
+            results.AddRange(await ReadInvoiceGridRowsOnCurrentPageAsync());
+            if (!await TryGoToNextStableInvoicePageAsync())
+                break;
+        }
+
+        return results;
+    }
+
+    private async Task<IReadOnlyList<InvoiceGridRow>> ReadInvoiceGridRowsOnCurrentPageAsync()
+    {
+        var rows = await InvoicesGrid.EvaluateAsync<string[][]>(
+            """
+            table => {
+              const textOf = td => {
+                const title = (td.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim();
+                const nested = td.querySelector('[title]');
+                const nestedTitle = nested ? (nested.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim() : '';
+                const text = (td.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                const inner = (td.innerText || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                let best = inner;
+                for (const value of [title, nestedTitle, text]) {
+                  if (value.length > best.length) best = value;
+                }
+                return best;
+              };
+              return [...table.querySelectorAll('tbody tr')]
+                .filter(tr => !tr.querySelector('.table__skeleton-bar'))
+                .map(tr => [...tr.querySelectorAll(':scope > td')].slice(0, 8).map(textOf))
+                .filter(cells => cells.some(cell => cell.length > 0));
+            }
+            """);
+
+        return rows
+            .Where(cells => cells.Length >= 8)
+            .Select(cells => new InvoiceGridRow
+            {
+                Project = cells[0],
+                InvoiceNumber = cells[1],
+                Company = cells[2],
+                Date = cells[3],
+                Status = cells[4],
+                ImportDate = cells[5],
+                ApproveRejectDate = cells[6],
+                Source = cells[7],
+            })
+            .ToList();
+    }
+
+    private async Task WaitForInvoiceGridSettledAsync()
+    {
+        string? previous = null;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = await GetPageFingerprintAsync();
+            if (previous is not null && snapshot.Length > 0 && snapshot == previous)
+                return;
+
+            previous = snapshot;
+            await Task.Delay(200);
+        }
+    }
+
     public async Task<CreateInvoicePage> ClickCreateBtnAsync()
     {
         await CreateBtn.ClickAsync();
@@ -473,6 +602,62 @@ public class InvoicesPage : BasePage
             if (!await WaitForPageAdvanceAsync(showingBefore, fingerprintBefore, expectIncrease: false))
                 return;
         }
+    }
+
+    private async Task<bool> TryGoToNextStableInvoicePageAsync()
+    {
+        var showingBefore = await TryGetShowingRangeAsync();
+        if (showingBefore is not null && showingBefore.Value.End >= showingBefore.Value.Total)
+            return false;
+
+        var nextBtn = Page.Locator("//nav[contains(@class,'pagination')]//button[@aria-label='Next page' or normalize-space()='Next']");
+        if (await nextBtn.CountAsync() == 0 || !await IsPaginationButtonEnabledAsync(nextBtn.First))
+            return false;
+
+        var pageKeyBefore = await GetInvoicePageKeyAsync();
+        try
+        {
+            await nextBtn.First.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(12);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await InvoicesGrid.Locator(".table__skeleton-bar").CountAsync() > 0)
+            {
+                await Task.Delay(100);
+                continue;
+            }
+
+            var showingAfter = await TryGetShowingRangeAsync();
+            var pageKeyAfter = await GetInvoicePageKeyAsync();
+            var contentMoved = pageKeyAfter.Length > 0
+                && !string.Equals(pageKeyAfter, pageKeyBefore, StringComparison.Ordinal);
+            var showingMoved = showingBefore is not null
+                && showingAfter is not null
+                && showingAfter.Value.Start > showingBefore.Value.Start;
+            if (showingBefore is not null ? showingMoved && contentMoved : contentMoved)
+            {
+                var confirm = await GetInvoicePageKeyAsync();
+                if (string.Equals(confirm, pageKeyAfter, StringComparison.Ordinal))
+                    return true;
+            }
+
+            await Task.Delay(150);
+        }
+
+        return false;
+    }
+
+    private async Task<string> GetInvoicePageKeyAsync()
+    {
+        var rows = await ReadInvoiceGridRowsOnCurrentPageAsync();
+        return string.Join("||", rows.Select(row =>
+            $"{row.InvoiceNumber}|{row.Date}|{row.ImportDate}|{row.Status}|{row.Company}"));
     }
 
     private async Task<bool> TryGoToNextGridPageAsync()

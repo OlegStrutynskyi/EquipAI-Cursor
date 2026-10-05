@@ -1112,6 +1112,52 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task<IReadOnlyList<InvoiceGridDbRow>> GetInvoiceGridRowsAsync()
+    {
+        var rows = new List<InvoiceGridDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.Id, p.Name, i.InvoiceNumber, i.CompanyName, i.InvoiceDate, i.Status, i.CreatedAt,
+                   CASE i.Status
+                       WHEN 'Approved' THEN i.ApprovedAt
+                       WHEN 'Rejected' THEN i.UpdatedAt
+                   END AS ApproveDate,
+                   s.SourceType
+            FROM [invoices].[Invoice] AS i
+            FULL JOIN [ingestion].[InvoiceRecognition] AS r
+                ON i.Id = r.InvoiceId
+            LEFT JOIN [projects].[Project] AS p
+                ON i.ProjectId = p.Id
+            LEFT JOIN [sources].[ActivitySource] AS s
+                ON i.SourceId = s.Id
+            WHERE i.IsDeleted = 0
+              AND (r.DocumentKindId != 2 OR r.DocumentKindId IS NULL)
+            ORDER BY i.InvoiceDate DESC, i.CreatedAt DESC, i.Id DESC
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var id = Convert.ToInt64(reader.GetValue(0));
+            var project = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var invoiceNumber = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            var company = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            DateTime? invoiceDate = reader.IsDBNull(4) ? null : ReadLocalDateTime(reader.GetValue(4));
+            var status = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+            DateTime? importDate = reader.IsDBNull(6) ? null : ReadLocalDateTime(reader.GetValue(6));
+            DateTime? approveDate = reader.IsDBNull(7) ? null : ReadLocalDateTime(reader.GetValue(7));
+            var source = reader.IsDBNull(8) ? string.Empty : reader.GetValue(8).ToString()?.Trim() ?? string.Empty;
+            rows.Add(new InvoiceGridDbRow(id, project, invoiceNumber, company, invoiceDate, status, importDate, approveDate, source));
+        }
+
+        return rows;
+    }
+
     private static string FormatFactorImportSource(object value) => value switch
     {
         string text => text.Trim(),
@@ -2150,6 +2196,17 @@ public sealed record ScopeEmissionCategoryRow(string DisplayName, string Code);
 public sealed record EmissionCategoryGridRow(string DisplayName, int GhgScope);
 
 public sealed record EmissionTypeGridRow(string Code, string DisplayName, string DefaultUnit);
+
+public sealed record InvoiceGridDbRow(
+    long Id,
+    string Project,
+    string InvoiceNumber,
+    string Company,
+    DateTime? InvoiceDate,
+    string Status,
+    DateTime? ImportDate,
+    DateTime? ApproveRejectDate,
+    string Source);
 
 public sealed record FactorImportBatchGridDbRow(
     long Id,

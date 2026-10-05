@@ -78,7 +78,78 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T06_Invoices_Manual_Data()
+    public async Task T06_Invoices_GridRecords()
+    {
+        var invoicesPage = new InvoicesPage(Fixture.Page);
+        await invoicesPage.OpenAsync();
+
+        var expected = (await SqlHelper.GetInvoiceGridRowsAsync())
+            .Select(ToGridRow)
+            .ToList();
+        var actual = (await invoicesPage.GetAllInvoiceGridRowsAsync())
+            .Select(ToActualRow)
+            .ToList();
+
+        if (actual.Count != expected.Count)
+        {
+            static string Key((string Project, string InvoiceNumber, string Company, string Date, string Status, string ImportDate, string ApproveRejectDate, string Source) row) =>
+                $"{row.InvoiceNumber}|{row.Date}|{row.Status}|{row.ImportDate}|{row.Source}";
+
+            var actualKeys = actual.Select(Key).ToList();
+            var expectedKeys = expected.Select(Key).ToList();
+            var extra = actualKeys.Except(expectedKeys).Take(15).ToList();
+            var missing = expectedKeys.Except(actualKeys).Take(15).ToList();
+            throw new AssertionException(
+                $"Grid has {actual.Count} rows, database has {expected.Count}. Missing: {string.Join(" || ", missing)}. Extra: {string.Join(" || ", extra)}.");
+        }
+
+        actual.Should().Equal(expected);
+    }
+
+    [Test]
+    public async Task T07_Invoices_GridSorting()
+    {
+        var columns = new[]
+        {
+            "PROJECT",
+            "INVOICE NUMBER",
+            "COMPANY",
+            "INVOICE DATE",
+            "STATUS",
+            "IMPORT DATE",
+            "APPROVE/REJECT DATE",
+            "SOURCE",
+        };
+
+        var invoicesPage = new InvoicesPage(Fixture.Page);
+        await invoicesPage.OpenAsync();
+
+        var invoices = await SqlHelper.GetInvoiceGridRowsAsync();
+
+        foreach (var column in columns)
+        {
+            await invoicesPage.ClickGridColumnAsync(column);
+            await AssertCurrentPageSortedAsync(
+                invoicesPage,
+                ExpectedSortedInvoices(invoices, column, ascending: true),
+                $"{column} ASC");
+
+            await invoicesPage.ClickGridColumnAsync(column);
+            await AssertCurrentPageSortedAsync(
+                invoicesPage,
+                ExpectedSortedInvoices(invoices, column, ascending: false),
+                $"{column} DESC");
+
+            await invoicesPage.ClickGridColumnAsync(column);
+            await AssertCurrentPageSortedAsync(
+                invoicesPage,
+                ExpectedSortedInvoices(invoices, "INVOICE DATE", ascending: false),
+                $"{column} reset to INVOICE DATE DESC");
+        }
+    }
+
+    [Test]
+    public async Task T08_Invoices_Manual_Data()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedProject = Config.SetupProjectName1;
@@ -103,7 +174,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T07_Invoices_ClickViewBtn()
+    public async Task T09_Invoices_ClickViewBtn()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
 
@@ -115,7 +186,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T08_Invoices_ClickEditBtn()
+    public async Task T10_Invoices_ClickEditBtn()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedTitle = "Edit Invoice";
@@ -130,7 +201,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T09_Invoices_Rejected_View()
+    public async Task T11_Invoices_Rejected_View()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedStatus = "REJECTED";
@@ -158,7 +229,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T10_Invoices_Approved_View()
+    public async Task T12_Invoices_Approved_View()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedStatus = "APPROVED";
@@ -186,7 +257,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T11_Invoices_InvoicesCount()
+    public async Task T13_Invoices_InvoicesCount()
     {
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -196,6 +267,89 @@ public class InvoicesTests : BaseTest
 
         totalFromGrid.Should().Be(totalFromPaginationSummary);
     }
+
+    private static async Task AssertCurrentPageSortedAsync(
+        InvoicesPage invoicesPage,
+        IReadOnlyList<(string Project, string InvoiceNumber, string Company, string Date, string Status, string ImportDate, string ApproveRejectDate, string Source)> expected,
+        string because)
+    {
+        var actual = (await invoicesPage.GetCurrentPageInvoiceGridRowsAsync())
+            .Select(ToActualRow)
+            .ToList();
+        actual.Should().Equal(expected.Take(actual.Count), because);
+    }
+
+    private static List<(string Project, string InvoiceNumber, string Company, string Date, string Status, string ImportDate, string ApproveRejectDate, string Source)> ExpectedSortedInvoices(
+        IReadOnlyList<InvoiceGridDbRow> invoices,
+        string column,
+        bool ascending)
+    {
+        IOrderedEnumerable<InvoiceGridDbRow> ordered = column switch
+        {
+            "PROJECT" => OrderByText(invoices, row => row.Project, ascending),
+            "INVOICE NUMBER" => OrderByText(invoices, row => row.InvoiceNumber, ascending),
+            "COMPANY" => OrderByText(invoices, row => row.Company, ascending),
+            "INVOICE DATE" => OrderByDate(invoices, row => row.InvoiceDate, ascending),
+            "STATUS" => OrderByText(invoices, row => row.Status, ascending),
+            "IMPORT DATE" => OrderByDate(invoices, row => row.ImportDate, ascending),
+            "APPROVE/REJECT DATE" => OrderByDate(invoices, row => row.ApproveRejectDate, ascending),
+            "SOURCE" => OrderByText(invoices, row => FormatSource(row.Source), ascending),
+            _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown invoices grid column."),
+        };
+
+        return ordered.Select(ToGridRow).ToList();
+    }
+
+    private static IOrderedEnumerable<InvoiceGridDbRow> OrderByText(
+        IReadOnlyList<InvoiceGridDbRow> invoices,
+        Func<InvoiceGridDbRow, string> key,
+        bool ascending) =>
+        ascending
+            ? invoices.OrderBy(key, StringComparer.OrdinalIgnoreCase).ThenByDescending(row => row.InvoiceDate ?? DateTime.MinValue).ThenByDescending(row => row.ImportDate ?? DateTime.MinValue).ThenByDescending(row => row.Id)
+            : invoices.OrderByDescending(key, StringComparer.OrdinalIgnoreCase).ThenByDescending(row => row.InvoiceDate ?? DateTime.MinValue).ThenByDescending(row => row.ImportDate ?? DateTime.MinValue).ThenByDescending(row => row.Id);
+
+    private static IOrderedEnumerable<InvoiceGridDbRow> OrderByDate(
+        IReadOnlyList<InvoiceGridDbRow> invoices,
+        Func<InvoiceGridDbRow, DateTime?> key,
+        bool ascending) =>
+        ascending
+            ? invoices.OrderBy(row => key(row) ?? DateTime.MinValue).ThenByDescending(row => row.InvoiceDate ?? DateTime.MinValue).ThenByDescending(row => row.ImportDate ?? DateTime.MinValue).ThenByDescending(row => row.Id)
+            : invoices.OrderByDescending(row => key(row) ?? DateTime.MinValue).ThenByDescending(row => row.InvoiceDate ?? DateTime.MinValue).ThenByDescending(row => row.ImportDate ?? DateTime.MinValue).ThenByDescending(row => row.Id);
+
+    private static (string Project, string InvoiceNumber, string Company, string Date, string Status, string ImportDate, string ApproveRejectDate, string Source) ToGridRow(
+        InvoiceGridDbRow row) =>
+        (
+            FormatEmpty(row.Project),
+            row.InvoiceNumber,
+            FormatEmpty(row.Company),
+            FormatDate(row.InvoiceDate),
+            row.Status.ToUpperInvariant(),
+            FormatDate(row.ImportDate),
+            FormatDate(row.ApproveRejectDate),
+            FormatSource(row.Source)
+        );
+
+    private static string FormatDate(DateTime? value) =>
+        value?.ToString("MMM d, yyyy", CultureInfo.InvariantCulture) ?? "—";
+
+    private static string FormatEmpty(string value) =>
+        string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static (string Project, string InvoiceNumber, string Company, string Date, string Status, string ImportDate, string ApproveRejectDate, string Source) ToActualRow(
+        InvoiceGridRow row) =>
+        (
+            row.Project,
+            row.InvoiceNumber,
+            row.Company,
+            row.Date,
+            row.Status.ToUpperInvariant(),
+            row.ImportDate,
+            row.ApproveRejectDate,
+            row.Source
+        );
+
+    private static string FormatSource(string source) =>
+        string.IsNullOrWhiteSpace(source) ? "Manual" : source;
 
     private static string[] BuildApproveRejectDateCandidates(DateTime source)
     {
