@@ -52,6 +52,77 @@ public class UtilityBillUploadPage : BasePage
         return importPage;
     }
 
+    public async Task<ViewInvoicePage> ClickViewBtnAsync(string projectName)
+    {
+        await ClickRowActionAsync(projectName, "View");
+        var viewInvoicePage = new ViewInvoicePage(Page);
+        await viewInvoicePage.GetTitleAsync();
+        return viewInvoicePage;
+    }
+
+    public async Task<ImportPage> ClickEditBtnAsync(string projectName)
+    {
+        await ClickRowActionAsync(projectName, "Edit");
+        var reviewTitle = Page.Locator("h1").Filter(new LocatorFilterOptions { HasTextString = "Review PDF Import" });
+        await reviewTitle.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+        return new ImportPage(Page);
+    }
+
+    private async Task ClickRowActionAsync(string projectName, string actionName)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var matchIndex = await Grid.EvaluateAsync<int?>(
+                """
+                (table, args) => {
+                  const textOf = td => {
+                    const title = (td.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim();
+                    const nested = td.querySelector('[title]');
+                    const nestedTitle = nested ? (nested.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim() : '';
+                    const text = (td.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                    const inner = (td.innerText || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                    let best = inner;
+                    for (const value of [title, nestedTitle, text]) {
+                      if (value.length > best.length) best = value;
+                    }
+                    return best;
+                  };
+                  const rows = [...table.querySelectorAll('tbody tr')];
+                  for (let i = 0; i < rows.length; i++) {
+                    if (rows[i].querySelector('.table__skeleton-bar')) continue;
+                    const cell = rows[i].querySelector(':scope > td');
+                    if (!cell || textOf(cell) !== args.projectName) continue;
+                    const hasAction = [...rows[i].querySelectorAll('button, a')]
+                      .some(el => (el.innerText || '').replace(/\s+/g, ' ').trim() === args.actionName);
+                    if (hasAction) return i;
+                  }
+                  return null;
+                }
+                """,
+                new { projectName, actionName });
+
+            if (matchIndex is not null)
+            {
+                var row = Grid.Locator("tbody tr").Nth(matchIndex.Value);
+                var actionBtn = row.Locator("button, a").Filter(new LocatorFilterOptions { HasTextString = actionName }).First;
+                await actionBtn.ClickAsync();
+                return;
+            }
+
+            if (!await TryGoToNextStablePageAsync())
+                break;
+        }
+
+        throw new InvalidOperationException($"Utility bill for project '{projectName}' with '{actionName}' was not found in the grid.");
+    }
+
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -61,6 +132,206 @@ public class UtilityBillUploadPage : BasePage
             .Where(header => !string.IsNullOrWhiteSpace(header))
             .ToList();
     }
+
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = Grid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName }).First;
+        await header.ScrollIntoViewIfNeededAsync();
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        var fingerprintBefore = await GetPageFingerprintAsync();
+        var showingBefore = await TryGetShowingRangeAsync();
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await Task.Delay(100);
+                continue;
+            }
+
+            var refreshDeadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < refreshDeadline)
+            {
+                var showingAfter = await TryGetShowingRangeAsync();
+                var onFirstPage = showingAfter is null || showingAfter.Value.Start == 1;
+                var fingerprintAfter = await GetPageFingerprintAsync();
+                if (onFirstPage
+                    && fingerprintAfter.Length > 0
+                    && !string.Equals(fingerprintAfter, fingerprintBefore, StringComparison.Ordinal))
+                {
+                    await WaitForGridSettledAsync();
+                    var settled = await GetPageFingerprintAsync();
+                    if (!string.Equals(settled, fingerprintBefore, StringComparison.Ordinal))
+                        return;
+                }
+
+                await Task.Delay(100);
+            }
+
+            if (showingBefore is null || showingBefore.Value.Start == 1)
+            {
+                await WaitForGridSettledAsync();
+                var settled = await GetPageFingerprintAsync();
+                if (!string.Equals(settled, fingerprintBefore, StringComparison.Ordinal))
+                    return;
+            }
+
+            break;
+        }
+
+        await WaitForGridSettledAsync();
+    }
+
+    public async Task<IReadOnlyList<UtilityBillGridRow>> GetCurrentPageGridRowsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return await ReadGridRowsOnCurrentPageAsync();
+    }
+
+    public async Task<IReadOnlyList<UtilityBillGridRow>> GetAllGridRowsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        var results = new List<UtilityBillGridRow>();
+        while (true)
+        {
+            results.AddRange(await ReadGridRowsOnCurrentPageAsync());
+            if (!await TryGoToNextStablePageAsync())
+                break;
+        }
+
+        return results;
+    }
+
+    private async Task<IReadOnlyList<UtilityBillGridRow>> ReadGridRowsOnCurrentPageAsync()
+    {
+        var rows = await Grid.EvaluateAsync<string[][]>(
+            """
+            table => {
+              const textOf = td => {
+                const title = (td.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim();
+                const nested = td.querySelector('[title]');
+                const nestedTitle = nested ? (nested.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim() : '';
+                const text = (td.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                const inner = (td.innerText || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                let best = inner;
+                for (const value of [title, nestedTitle, text]) {
+                  if (value.length > best.length) best = value;
+                }
+                return best;
+              };
+              return [...table.querySelectorAll('tbody tr')]
+                .filter(tr => !tr.querySelector('.table__skeleton-bar'))
+                .map(tr => [...tr.querySelectorAll(':scope > td')].slice(0, 7).map(textOf))
+                .filter(cells => cells.some(cell => cell.length > 0));
+            }
+            """);
+
+        return rows
+            .Where(cells => cells.Length >= 7)
+            .Select(cells => new UtilityBillGridRow
+            {
+                Project = cells[0],
+                Company = cells[1],
+                Date = cells[2],
+                Status = cells[3],
+                ImportDate = cells[4],
+                ApproveRejectDate = cells[5],
+                Source = cells[6],
+            })
+            .ToList();
+    }
+
+    private async Task<string> GetPageFingerprintAsync()
+    {
+        var rows = await ReadGridRowsOnCurrentPageAsync();
+        return string.Join("||", rows.Take(3).Select(row => $"{row.Company}|{row.Date}|{row.ImportDate}"));
+    }
+
+    private async Task WaitForGridSettledAsync()
+    {
+        string? previous = null;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = await GetPageFingerprintAsync();
+            if (previous is not null && snapshot.Length > 0 && snapshot == previous)
+                return;
+
+            previous = snapshot;
+            await Task.Delay(200);
+        }
+    }
+
+    private async Task<bool> TryGoToNextStablePageAsync()
+    {
+        var showingBefore = await TryGetShowingRangeAsync();
+        if (showingBefore is not null && showingBefore.Value.End >= showingBefore.Value.Total)
+            return false;
+
+        var nextBtn = Page.Locator("//nav[contains(@class,'pagination')]//button[@aria-label='Next page' or normalize-space()='Next']");
+        if (await nextBtn.CountAsync() == 0 || !await IsPagerEnabledAsync(nextBtn.First))
+            return false;
+
+        var pageKeyBefore = await GetPageKeyAsync();
+        try
+        {
+            await nextBtn.First.ClickAsync(new LocatorClickOptions { Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(12);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await Grid.Locator(".table__skeleton-bar").CountAsync() > 0)
+            {
+                await Task.Delay(100);
+                continue;
+            }
+
+            var showingAfter = await TryGetShowingRangeAsync();
+            var pageKeyAfter = await GetPageKeyAsync();
+            var contentMoved = pageKeyAfter.Length > 0
+                && !string.Equals(pageKeyAfter, pageKeyBefore, StringComparison.Ordinal);
+            var showingMoved = showingBefore is not null
+                && showingAfter is not null
+                && showingAfter.Value.Start > showingBefore.Value.Start;
+            if (showingBefore is not null ? showingMoved && contentMoved : contentMoved)
+            {
+                var confirm = await GetPageKeyAsync();
+                if (string.Equals(confirm, pageKeyAfter, StringComparison.Ordinal))
+                    return true;
+            }
+
+            await Task.Delay(150);
+        }
+
+        return false;
+    }
+
+    private async Task<string> GetPageKeyAsync()
+    {
+        var rows = await ReadGridRowsOnCurrentPageAsync();
+        return string.Join("||", rows.Select(row => $"{row.Company}|{row.Date}|{row.ImportDate}|{row.Status}|{row.Project}"));
+    }
+
+    private static async Task<bool> IsPagerEnabledAsync(ILocator button) =>
+        await button.EvaluateAsync<bool>(
+            """
+            el => !(
+              el.disabled
+              || el.hasAttribute('disabled')
+              || el.getAttribute('aria-disabled') === 'true'
+              || el.classList.contains('disabled')
+            )
+            """);
 
     public async Task<UtilityBillGridRow?> GetUtilityBillGridRowAsync(string company, string importDate)
     {
