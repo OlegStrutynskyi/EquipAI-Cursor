@@ -45,6 +45,28 @@ public class EmissionCategoriesPage : BasePage
 
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
 
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = Grid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName });
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (!string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await WaitForGridSettledAsync();
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"Column '{columnName}' sort did not change from '{ariaBefore ?? "none"}'.");
+    }
+
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -207,6 +229,21 @@ public class EmissionCategoriesPage : BasePage
     private ILocator FindRowLocator(string displayName, string ghgScope) =>
         Grid.Locator(
             $"xpath=.//tbody/tr[td[1][normalize-space()='{displayName}'] and td[2][normalize-space()='{ghgScope}']]");
+
+    private async Task WaitForGridSettledAsync()
+    {
+        string? previous = null;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = string.Join("|", (await GetGridRowsOnCurrentPageAsync()).Select(row => row.DisplayName));
+            if (previous is not null && snapshot.Length > 0 && snapshot == previous)
+                return;
+
+            previous = snapshot;
+            await Task.Delay(200);
+        }
+    }
 
     private async Task<IReadOnlyList<(string DisplayName, string GhgScope)>> GetGridRowsOnCurrentPageAsync()
     {

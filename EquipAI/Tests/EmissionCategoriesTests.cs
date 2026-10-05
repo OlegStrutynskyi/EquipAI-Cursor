@@ -21,7 +21,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T02_EmissionCategories_Grid()
+    public async Task T02_EmissionCategories_GridColumns()
     {
         var expectedColumns = new[]
         {
@@ -29,39 +29,65 @@ public class EmissionCategoriesTests : BaseTest
             "GHG SCOPE",
             "ACTIONS",
         };
-        var expectedRows = new[]
-        {
-            ("Business Travel", "Scope 3"),
-            ("Direct Fleet Emissions", "Scope 1"),
-            ("Direct Fuel Emissions", "Scope 1"),
-            ("Direct Natural Gas Emissions", "Scope 1"),
-            ("Downstream Transportation and Distribution", "Scope 3"),
-            ("Purchased Capital Goods", "Scope 3"),
-            ("Purchased Electricity", "Scope 2"),
-            ("Purchased Goods and Services", "Scope 3"),
-            ("Refrigerant Leakage", "Scope 1"),
-            ("Upstream Transportation and Distribution", "Scope 3"),
-            ("Waste from Operations", "Scope 3"),
-        };
 
         var emissionCategoriesPage = new EmissionCategoriesPage(Fixture.Page);
         await emissionCategoriesPage.OpenAsync();
 
         (await emissionCategoriesPage.GetGridColumnHeadersAsync()).Should().Equal(expectedColumns);
+    }
+
+    [Test]
+    public async Task T03_EmissionCategories_GridRecords()
+    {
+        var emissionCategoriesPage = new EmissionCategoriesPage(Fixture.Page);
+        await emissionCategoriesPage.OpenAsync();
+
+        var expectedRows = (await SqlHelper.GetEmissionCategoryGridRowsAsync())
+            .Select(category => (category.DisplayName, GhgScope: $"Scope {category.GhgScope}"))
+            .ToList();
 
         var actualRows = await emissionCategoriesPage.GetGridRowsAsync();
-        actualRows.Should().HaveCount(11);
+        actualRows.Should().HaveCount(expectedRows.Count);
         actualRows.Should().Equal(expectedRows);
         (await emissionCategoriesPage.DoesEachRowHaveEditButtonAsync()).Should().BeTrue();
 
         foreach (var (displayName, ghgScope) in expectedRows)
-        {
             (await emissionCategoriesPage.IsEditButtonVisibleForRowAsync(displayName, ghgScope)).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task T04_EmissionCategories_GridSorting()
+    {
+        var columns = new[] { "DISPLAY NAME", "GHG SCOPE" };
+
+        var emissionCategoriesPage = new EmissionCategoriesPage(Fixture.Page);
+        await emissionCategoriesPage.OpenAsync();
+
+        var categories = (await SqlHelper.GetEmissionCategoryGridRowsAsync())
+            .Select(category => (category.DisplayName, GhgScope: $"Scope {category.GhgScope}"))
+            .ToList();
+
+        foreach (var column in columns)
+        {
+            await emissionCategoriesPage.ClickGridColumnAsync(column);
+            (await emissionCategoriesPage.GetGridRowsAsync()).Should().Equal(
+                ExpectedSortedCategories(categories, column, ascending: true),
+                $"{column} ASC");
+
+            await emissionCategoriesPage.ClickGridColumnAsync(column);
+            (await emissionCategoriesPage.GetGridRowsAsync()).Should().Equal(
+                ExpectedSortedCategories(categories, column, ascending: false),
+                $"{column} DESC");
+
+            await emissionCategoriesPage.ClickGridColumnAsync(column);
+            (await emissionCategoriesPage.GetGridRowsAsync()).Should().Equal(
+                ExpectedSortedCategories(categories, "DISPLAY NAME", ascending: true),
+                $"{column} reset to DISPLAY NAME ASC");
         }
     }
 
     [Test]
-    public async Task T03_EmissionCategories_ClickEditBtn()
+    public async Task T05_EmissionCategories_ClickEditBtn()
     {
         const string expectedPageTitle = "Edit Emission Category";
 
@@ -73,7 +99,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T04_EmissionCategories_Edit_DefaultView()
+    public async Task T06_EmissionCategories_Edit_DefaultView()
     {
         const string expectedPageTitle = "Edit Emission Category";
 
@@ -95,7 +121,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T05_EmissionCategories_Edit_EmptyDisplayName()
+    public async Task T07_EmissionCategories_Edit_EmptyDisplayName()
     {
         const string expectedDisplayNameError = "Display name is required.";
 
@@ -109,7 +135,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T06_EmissionCategories_Edit_DisplayNameTooLong()
+    public async Task T08_EmissionCategories_Edit_DisplayNameTooLong()
     {
         const string expectedDisplayNameError = "Display name must be at most 256 characters.";
         var tooLongDisplayName = GenerateRandomString(257);
@@ -125,7 +151,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T07_EmissionCategories_Edit_Success()
+    public async Task T09_EmissionCategories_Edit_Success()
     {
         var updatedDisplayName = $"Name{DateTime.Now:yyyyMMddHHmmss}";
         object? emissionCategoryId = null;
@@ -162,5 +188,28 @@ public class EmissionCategoriesTests : BaseTest
                     originalScopeDigit);
             }
         }
+    }
+
+    private static List<(string DisplayName, string GhgScope)> ExpectedSortedCategories(
+        IReadOnlyList<(string DisplayName, string GhgScope)> categories,
+        string column,
+        bool ascending)
+    {
+        Func<(string DisplayName, string GhgScope), string> key = column switch
+        {
+            "DISPLAY NAME" => row => row.DisplayName,
+            "GHG SCOPE" => row => row.GhgScope,
+            _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown emission categories grid column."),
+        };
+
+        var ordered = ascending
+            ? categories
+                .OrderBy(key, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(row => row.DisplayName, StringComparer.OrdinalIgnoreCase)
+            : categories
+                .OrderByDescending(key, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(row => row.DisplayName, StringComparer.OrdinalIgnoreCase);
+
+        return ordered.ToList();
     }
 }
