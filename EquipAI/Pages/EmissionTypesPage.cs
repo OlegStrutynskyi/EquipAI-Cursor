@@ -46,6 +46,83 @@ public class EmissionTypesPage : BasePage
     public Task<bool> IsAddEmissionTypeBtnEnabledAsync() => AddEmissionTypeBtn.IsEnabledAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
 
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = Grid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName });
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        var fingerprintBefore = await GetCurrentPageFingerprintAsync();
+        var showingBefore = await TryGetShowingRangeAsync();
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await Task.Delay(100);
+                continue;
+            }
+
+            var refreshDeadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < refreshDeadline)
+            {
+                var showingAfter = await TryGetShowingRangeAsync();
+                var onFirstPage = showingAfter is null || showingAfter.Value.Start == 1;
+                var fingerprintAfter = await GetCurrentPageFingerprintAsync();
+                if (onFirstPage
+                    && fingerprintAfter.Length > 0
+                    && !string.Equals(fingerprintAfter, fingerprintBefore, StringComparison.Ordinal))
+                {
+                    await WaitForGridSettledAsync();
+                    return;
+                }
+
+                await Task.Delay(100);
+            }
+
+            if (showingBefore is null || showingBefore.Value.Start == 1)
+            {
+                await WaitForGridSettledAsync();
+                return;
+            }
+
+            break;
+        }
+
+        throw new TimeoutException($"Column '{columnName}' sort did not change from '{ariaBefore ?? "none"}'.");
+    }
+
+    public async Task<IReadOnlyList<(string Code, string DisplayName, string DefaultUnit)>> GetCurrentPageGridRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return await GetGridRecordsOnCurrentPageAsync();
+    }
+
+    public async Task<IReadOnlyList<(string Code, string DisplayName, string DefaultUnit)>> GetAllGridRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        var results = new List<(string Code, string DisplayName, string DefaultUnit)>();
+        var seenCodes = new HashSet<string>(StringComparer.Ordinal);
+        while (true)
+        {
+            var pageRows = await GetGridRecordsOnCurrentPageAsync();
+            foreach (var row in pageRows)
+            {
+                if (seenCodes.Add(row.Code))
+                    results.Add(row);
+            }
+
+            var firstCode = pageRows.FirstOrDefault().Code ?? string.Empty;
+            if (!await TryGoToNextGridPageAsync(firstCode))
+                break;
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -166,6 +243,77 @@ public class EmissionTypesPage : BasePage
             return true;
 
         return false;
+    }
+
+    private async Task<string> GetCurrentPageFingerprintAsync() =>
+        string.Join("|", (await GetGridRecordsOnCurrentPageAsync()).Select(row => row.Code));
+
+    private async Task<(int Start, int End, int Total)?> TryGetShowingRangeAsync()
+    {
+        var showing = Page.Locator("nav.pagination .pagination__info, .pagination__info").First;
+        if (await showing.CountAsync() == 0)
+            return null;
+
+        string text;
+        try
+        {
+            text = await showing.InnerTextAsync();
+        }
+        catch (PlaywrightException)
+        {
+            return null;
+        }
+
+        text = text.Replace('\u00A0', ' ').Replace('–', '-').Replace('—', '-').Replace('−', '-');
+        var match = System.Text.RegularExpressions.Regex.Match(
+            text,
+            @"Showing\s+(\d+)\s*-\s*(\d+)\s+of\s+(\d+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!match.Success)
+            return null;
+
+        return (
+            int.Parse(match.Groups[1].Value),
+            int.Parse(match.Groups[2].Value),
+            int.Parse(match.Groups[3].Value));
+    }
+
+    private async Task WaitForGridSettledAsync()
+    {
+        string? previous = null;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = string.Join("|", (await GetGridRecordsOnCurrentPageAsync()).Select(row => row.Code));
+            if (previous is not null && snapshot.Length > 0 && snapshot == previous)
+                return;
+
+            previous = snapshot;
+            await Task.Delay(200);
+        }
+    }
+
+    private async Task<IReadOnlyList<(string Code, string DisplayName, string DefaultUnit)>> GetGridRecordsOnCurrentPageAsync()
+    {
+        var rows = await Grid.EvaluateAsync<string[][]>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => !tr.querySelector(':scope > td .table__skeleton-bar'))
+              .map(tr => [...tr.querySelectorAll(':scope > td')].slice(0, 3).map(td => {
+                const rendered = (td.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const title = (td.getAttribute('title') || td.querySelector('[title]')?.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim();
+                const full = (td.textContent || '').replace(/\u00a0/g, ' ').trim();
+                return [title, full, rendered].sort((a, b) => b.length - a.length)[0];
+              }))
+              .filter(cells => cells.length >= 3 && cells[0])
+            """);
+
+        return rows
+            .Select(cells => (
+                Code: cells[0],
+                DisplayName: cells.Length > 1 ? cells[1] : string.Empty,
+                DefaultUnit: cells.Length > 2 ? cells[2] : string.Empty))
+            .ToList();
     }
 
     private async Task GoToFirstGridPageAsync()

@@ -1045,6 +1045,36 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task<IReadOnlyList<EmissionTypeGridRow>> GetEmissionTypeGridRowsAsync()
+    {
+        var rows = new List<EmissionTypeGridRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT e.Code, e.DisplayName, CONCAT_WS(' — ', u.Code, u.DisplayName) AS [Default Unit]
+            FROM [emissions].[EmissionType] AS e
+            LEFT JOIN [emissions].[UnitOfMeasure] AS u
+                ON e.DefaultUnitOfMeasureId = u.Id
+            WHERE e.IsDeleted = 0
+            ORDER BY e.Code
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var code = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var displayName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var defaultUnit = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            rows.Add(new EmissionTypeGridRow(code, displayName, defaultUnit));
+        }
+
+        return rows;
+    }
+
     public static async Task<object> GetEmissionCategoryIdByDisplayNameAsync(string displayName)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -2061,6 +2091,8 @@ public sealed record CategoryEmissionsRow(string CategoryName, decimal Co2eTonne
 public sealed record ScopeEmissionCategoryRow(string DisplayName, string Code);
 
 public sealed record EmissionCategoryGridRow(string DisplayName, int GhgScope);
+
+public sealed record EmissionTypeGridRow(string Code, string DisplayName, string DefaultUnit);
 
 public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
 
