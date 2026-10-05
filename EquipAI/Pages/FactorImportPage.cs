@@ -204,6 +204,68 @@ public class FactorImportPage : BasePage
     public Task<string> GetResultLibraryAsync() => GetResultDetailAsync("Library");
     public Task<string> GetResultBatchIdAsync() => GetResultDetailAsync("Batch ID");
 
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = Grid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName });
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        var fingerprintBefore = await GetCurrentPageBatchIdFingerprintAsync();
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await Task.Delay(100);
+                continue;
+            }
+
+            var refreshDeadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < refreshDeadline)
+            {
+                var fingerprintAfter = await GetCurrentPageBatchIdFingerprintAsync();
+                if (fingerprintAfter.Length > 0
+                    && !string.Equals(fingerprintAfter, fingerprintBefore, StringComparison.Ordinal))
+                {
+                    await WaitForBatchGridSettledAsync();
+                    return;
+                }
+
+                await Task.Delay(100);
+            }
+
+            await WaitForBatchGridSettledAsync();
+            return;
+        }
+
+        throw new TimeoutException($"Column '{columnName}' sort did not change from '{ariaBefore ?? "none"}'.");
+    }
+
+    public async Task<IReadOnlyList<FactorImportBatchGridRow>> GetAllBatchGridRowsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForBatchRowCountStableAsync();
+        await GoToFirstBatchPageAsync();
+
+        var results = new List<FactorImportBatchGridRow>();
+        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (true)
+        {
+            var pageRows = await GetBatchGridRowsAsync();
+            foreach (var row in pageRows)
+            {
+                if (seenIds.Add(row.BatchId))
+                    results.Add(row);
+            }
+
+            if (!await TryGoToNextBatchPageAsync(pageRows.FirstOrDefault()?.BatchId ?? string.Empty))
+                break;
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<FactorImportBatchGridRow>> GetBatchGridRowsAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -321,6 +383,102 @@ public class FactorImportPage : BasePage
 
         throw new FileNotFoundException($"Test data file was not found: {fileName}");
     }
+
+    private async Task<string> GetCurrentPageBatchIdFingerprintAsync() =>
+        string.Join("|", (await GetBatchGridRowsAsync()).Select(row => row.BatchId));
+
+    private async Task WaitForBatchRowCountStableAsync()
+    {
+        var previous = -1;
+        var stableReads = 0;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var count = await Grid.Locator("tbody tr").CountAsync();
+            if (count > 0 && count == previous)
+            {
+                stableReads++;
+                if (stableReads >= 2)
+                    return;
+            }
+            else
+            {
+                stableReads = 0;
+                previous = count;
+            }
+
+            await Task.Delay(200);
+        }
+    }
+
+    private async Task WaitForBatchGridSettledAsync()
+    {
+        string? previous = null;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = await GetCurrentPageBatchIdFingerprintAsync();
+            if (previous is not null && snapshot.Length > 0 && snapshot == previous)
+                return;
+
+            previous = snapshot;
+            await Task.Delay(200);
+        }
+    }
+
+    private async Task GoToFirstBatchPageAsync()
+    {
+        var previousBtn = Page.Locator("//nav[contains(@class,'pagination')]//button[@aria-label='Previous page' or normalize-space()='Previous']");
+        for (var guard = 0; guard < 50; guard++)
+        {
+            if (await previousBtn.CountAsync() == 0 || !await previousBtn.First.IsVisibleAsync() || !await IsBatchPagerEnabledAsync(previousBtn.First))
+                return;
+
+            var firstId = (await GetBatchGridRowsAsync()).FirstOrDefault()?.BatchId ?? string.Empty;
+            await previousBtn.First.ClickAsync();
+            if (!await WaitForBatchPageChangeAsync(firstId))
+                return;
+        }
+    }
+
+    private async Task<bool> TryGoToNextBatchPageAsync(string firstIdBefore)
+    {
+        var nextBtn = Page.Locator("//nav[contains(@class,'pagination')]//button[@aria-label='Next page' or normalize-space()='Next']");
+        if (await nextBtn.CountAsync() == 0 || !await nextBtn.First.IsVisibleAsync() || !await IsBatchPagerEnabledAsync(nextBtn.First))
+            return false;
+
+        await nextBtn.First.ClickAsync();
+        return await WaitForBatchPageChangeAsync(firstIdBefore);
+    }
+
+    private async Task<bool> WaitForBatchPageChangeAsync(string firstIdBefore)
+    {
+        if (string.IsNullOrEmpty(firstIdBefore))
+            return true;
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var firstIdAfter = (await GetBatchGridRowsAsync()).FirstOrDefault()?.BatchId ?? string.Empty;
+            if (!string.Equals(firstIdAfter, firstIdBefore, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            await Task.Delay(150);
+        }
+
+        return false;
+    }
+
+    private static async Task<bool> IsBatchPagerEnabledAsync(ILocator button) =>
+        await button.EvaluateAsync<bool>(
+            """
+            el => !(
+              el.disabled
+              || el.hasAttribute('disabled')
+              || el.getAttribute('aria-disabled') === 'true'
+              || el.classList.contains('disabled')
+            )
+            """);
 
     private static string GetCell(IReadOnlyDictionary<string, string> values, params string[] keys)
     {

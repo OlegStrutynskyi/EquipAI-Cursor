@@ -1075,6 +1075,63 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task<IReadOnlyList<FactorImportBatchGridDbRow>> GetFactorImportBatchGridRowsAsync()
+    {
+        var rows = new List<FactorImportBatchGridDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT b.Id, b.Source, b.Year, v.Label, COUNT(i.Id) AS N, b.CreatedAt
+            FROM [factors].[FactorImportBatch] AS b
+            LEFT JOIN [factors].[FactorLibraryVersion] AS v
+                ON b.FactorLibraryVersionId = v.Id
+            LEFT JOIN [factors].[FactorImportLine] AS i
+                ON b.Id = i.BatchId
+                AND i.IsDeleted = 0
+            WHERE b.IsDeleted = 0
+            GROUP BY b.Id, b.Source, b.Year, v.Label, b.CreatedAt
+            ORDER BY b.Id DESC
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var id = Convert.ToInt64(reader.GetValue(0));
+            var source = FormatFactorImportSource(reader.GetValue(1));
+            int? year = reader.IsDBNull(2) ? null : Convert.ToInt32(reader.GetValue(2));
+            var library = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            var lines = Convert.ToInt32(reader.GetValue(4));
+            var createdAt = ReadLocalDateTime(reader.GetValue(5));
+            rows.Add(new FactorImportBatchGridDbRow(id, source, year, library, lines, createdAt));
+        }
+
+        return rows;
+    }
+
+    private static string FormatFactorImportSource(object value) => value switch
+    {
+        string text => text.Trim(),
+        _ => Convert.ToInt32(value) switch
+        {
+            0 => "EPA",
+            1 => "DEFRA",
+            2 => "CUSTOM",
+            var other => other.ToString(),
+        },
+    };
+
+    private static DateTime ReadLocalDateTime(object value) => value switch
+    {
+        DateTimeOffset offset => offset.LocalDateTime,
+        DateTime dateTime when dateTime.Kind == DateTimeKind.Utc => dateTime.ToLocalTime(),
+        DateTime dateTime => dateTime,
+        _ => Convert.ToDateTime(value),
+    };
+
     public static async Task<object> GetEmissionCategoryIdByDisplayNameAsync(string displayName)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -2093,6 +2150,14 @@ public sealed record ScopeEmissionCategoryRow(string DisplayName, string Code);
 public sealed record EmissionCategoryGridRow(string DisplayName, int GhgScope);
 
 public sealed record EmissionTypeGridRow(string Code, string DisplayName, string DefaultUnit);
+
+public sealed record FactorImportBatchGridDbRow(
+    long Id,
+    string Source,
+    int? Year,
+    string Library,
+    int Lines,
+    DateTime CreatedAt);
 
 public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
 

@@ -79,7 +79,56 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T05_FactorImport_YearField()
+    public async Task T05_FactorImport_GridRecords()
+    {
+        var factorImportPage = new FactorImportPage(Fixture.Page);
+        await factorImportPage.OpenAsync();
+
+        var expected = (await SqlHelper.GetFactorImportBatchGridRowsAsync())
+            .Select(ToGridRow)
+            .ToList();
+        var actual = (await factorImportPage.GetAllBatchGridRowsAsync())
+            .Select(row => (row.BatchId, row.Source, row.Year, row.Library, row.Lines, row.Created))
+            .ToList();
+
+        actual.Should().HaveCount(expected.Count);
+        actual.Should().Equal(expected);
+    }
+
+    [Test]
+    public async Task T06_FactorImport_GridSorting()
+    {
+        var columns = new[] { "BATCH ID", "SOURCE", "YEAR", "LIBRARY", "LINES", "CREATED" };
+
+        var factorImportPage = new FactorImportPage(Fixture.Page);
+        await factorImportPage.OpenAsync();
+
+        var batches = await SqlHelper.GetFactorImportBatchGridRowsAsync();
+
+        foreach (var column in columns)
+        {
+            await factorImportPage.ClickGridColumnAsync(column);
+            await AssertCurrentPageSortedAsync(
+                factorImportPage,
+                ExpectedSortedBatches(batches, column, ascending: true),
+                $"{column} ASC");
+
+            await factorImportPage.ClickGridColumnAsync(column);
+            await AssertCurrentPageSortedAsync(
+                factorImportPage,
+                ExpectedSortedBatches(batches, column, ascending: false),
+                $"{column} DESC");
+
+            await factorImportPage.ClickGridColumnAsync(column);
+            await AssertCurrentPageSortedAsync(
+                factorImportPage,
+                ExpectedSortedBatches(batches, "BATCH ID", ascending: false),
+                $"{column} reset to BATCH ID DESC");
+        }
+    }
+
+    [Test]
+    public async Task T07_FactorImport_YearField()
     {
         var factorImportPage = new FactorImportPage(Fixture.Page);
         await factorImportPage.OpenAsync();
@@ -98,7 +147,7 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T06_FactorImport_Import_IncorrectFormat()
+    public async Task T08_FactorImport_Import_IncorrectFormat()
     {
         const string expectedAlert = "Only .xlsx files are accepted.";
 
@@ -111,7 +160,7 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T07_FactorImport_Custom_No1stRow()
+    public async Task T09_FactorImport_Custom_No1stRow()
     {
         const string expectedAlert = "Custom workbook row 1 must be 'Custom Emission Factors'.";
 
@@ -126,49 +175,49 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T08_FactorImport_Custom_NoActivity()
+    public async Task T10_FactorImport_Custom_NoActivity()
     {
         await AssertCustomHeaderErrorAsync("Factor_Custom_2001_No_Activity.xlsx");
     }
 
     [Test]
-    public async Task T09_FactorImport_Custom_NoFuel()
+    public async Task T11_FactorImport_Custom_NoFuel()
     {
         await AssertCustomHeaderErrorAsync("Factor_Custom_2001_No_Fuel.xlsx");
     }
 
     [Test]
-    public async Task T10_FactorImport_Custom_NoUnit()
+    public async Task T12_FactorImport_Custom_NoUnit()
     {
         await AssertCustomHeaderErrorAsync("Factor_Custom_2001_No_Unit.xlsx");
     }
 
     [Test]
-    public async Task T11_FactorImport_Custom_NoKGCO2()
+    public async Task T13_FactorImport_Custom_NoKGCO2()
     {
         await AssertCustomHeaderErrorAsync("Factor_Custom_2001_No_KGCO2.xlsx");
     }
 
     [Test]
-    public async Task T12_FactorImport_Custom_NoCO2PerUnit()
+    public async Task T14_FactorImport_Custom_NoCO2PerUnit()
     {
         await AssertCustomHeaderErrorAsync("Factor_Custom_2001_No_CO2PerUnit.xlsx");
     }
 
     [Test]
-    public async Task T13_FactorImport_Custom_NoCH4PerUnit()
+    public async Task T15_FactorImport_Custom_NoCH4PerUnit()
     {
         await AssertCustomHeaderErrorAsync("Factor_Custom_2001_No_CH4PerUnit.xlsx");
     }
 
     [Test]
-    public async Task T14_FactorImport_Custom_NoN2OPerUnit()
+    public async Task T16_FactorImport_Custom_NoN2OPerUnit()
     {
         await AssertCustomHeaderErrorAsync("Factor_Custom_2001_No_N2OPerUnit.xlsx");
     }
 
     [Test]
-    public async Task T15_FactorImport_Custom_OnlyHeaders()
+    public async Task T17_FactorImport_Custom_OnlyHeaders()
     {
         const string expectedAlert = "The workbook did not contain any eligible factor rows.";
 
@@ -183,7 +232,7 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T16_FactorImport_Custom_Success()
+    public async Task T18_FactorImport_Custom_Success()
     {
         const string fileName = "Factor_Custom_2001_Correct.xlsx";
         const string expectedOutcome = "Created";
@@ -262,7 +311,7 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T17_FactorImport_EPA_IncorrectSheetName()
+    public async Task T19_FactorImport_EPA_IncorrectSheetName()
     {
         const string expectedAlert = "EPA workbook must contain a sheet named 'Emission Factors Hub'.";
 
@@ -276,7 +325,7 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T18_FactorImport_EPA_Success()
+    public async Task T20_FactorImport_EPA_Success()
     {
         const string fileName = "Factor_EPA_2001_Correct.xlsx";
         const string expectedOutcome = "Created";
@@ -356,7 +405,7 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T19_FactorImport_DEFRA_IncorrectSheetName()
+    public async Task T21_FactorImport_DEFRA_IncorrectSheetName()
     {
         const string expectedAlert = "DEFRA flat file must contain a sheet named 'Factors by Category'.";
 
@@ -370,7 +419,7 @@ public class FactorImportTests : BaseTest
     }
 
     [Test]
-    public async Task T20_FactorImport_DEFRA_Success()
+    public async Task T22_FactorImport_DEFRA_Success()
     {
         const string fileName = "Factor_DEFRA_2001_Correct.xlsx";
         const string expectedOutcome = "Created";
@@ -448,6 +497,74 @@ public class FactorImportTests : BaseTest
                 await SqlHelper.DeleteCustomFactorImportByYearAsync(2001);
         }
     }
+
+    private static async Task AssertCurrentPageSortedAsync(
+        FactorImportPage factorImportPage,
+        IReadOnlyList<(string BatchId, string Source, string Year, string Library, string Lines, string Created)> expected,
+        string because)
+    {
+        var actual = (await factorImportPage.GetBatchGridRowsAsync())
+            .Select(row => (row.BatchId, row.Source, row.Year, row.Library, row.Lines, row.Created))
+            .ToList();
+        actual.Should().Equal(expected.Take(actual.Count), because);
+    }
+
+    private static List<(string BatchId, string Source, string Year, string Library, string Lines, string Created)> ExpectedSortedBatches(
+        IReadOnlyList<FactorImportBatchGridDbRow> batches,
+        string column,
+        bool ascending)
+    {
+        IOrderedEnumerable<FactorImportBatchGridDbRow> ordered = column switch
+        {
+            "BATCH ID" => ascending
+                ? batches.OrderBy(batch => batch.Id)
+                : batches.OrderByDescending(batch => batch.Id),
+            "SOURCE" => OrderByText(batches, batch => batch.Source, ascending),
+            "YEAR" => OrderByNumber(batches, batch => batch.Year ?? int.MinValue, ascending),
+            "LIBRARY" => OrderByText(batches, batch => batch.Library, ascending),
+            "LINES" => OrderByNumber(batches, batch => batch.Lines, ascending),
+            "CREATED" => OrderByDate(batches, ascending),
+            _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown factor import grid column."),
+        };
+
+        return ordered.Select(ToGridRow).ToList();
+    }
+
+    private static IOrderedEnumerable<FactorImportBatchGridDbRow> OrderByText(
+        IReadOnlyList<FactorImportBatchGridDbRow> batches,
+        Func<FactorImportBatchGridDbRow, string> key,
+        bool ascending) =>
+        ascending
+            ? batches.OrderBy(key, StringComparer.OrdinalIgnoreCase).ThenByDescending(batch => batch.Id)
+            : batches.OrderByDescending(key, StringComparer.OrdinalIgnoreCase).ThenByDescending(batch => batch.Id);
+
+    private static IOrderedEnumerable<FactorImportBatchGridDbRow> OrderByNumber(
+        IReadOnlyList<FactorImportBatchGridDbRow> batches,
+        Func<FactorImportBatchGridDbRow, int> key,
+        bool ascending) =>
+        ascending
+            ? batches.OrderBy(key).ThenByDescending(batch => batch.Id)
+            : batches.OrderByDescending(key).ThenByDescending(batch => batch.Id);
+
+    private static IOrderedEnumerable<FactorImportBatchGridDbRow> OrderByDate(
+        IReadOnlyList<FactorImportBatchGridDbRow> batches,
+        bool ascending) =>
+        ascending
+            ? batches.OrderBy(batch => batch.CreatedAt).ThenByDescending(batch => batch.Id)
+            : batches.OrderByDescending(batch => batch.CreatedAt).ThenByDescending(batch => batch.Id);
+
+    private static (string BatchId, string Source, string Year, string Library, string Lines, string Created) ToGridRow(
+        FactorImportBatchGridDbRow row) =>
+        (
+            row.Id.ToString(CultureInfo.InvariantCulture),
+            row.Source,
+            row.Year?.ToString(CultureInfo.InvariantCulture) ?? "—",
+            string.IsNullOrEmpty(row.Library) ? "—" : row.Library,
+            row.Lines.ToString(CultureInfo.InvariantCulture),
+            row.CreatedAt.ToString("MMM d, yyyy, h:mm:ss tt", CultureInfo.InvariantCulture)
+                .Replace(" AM", "\u202FAM")
+                .Replace(" PM", "\u202FPM")
+        );
 
     private async Task AssertCustomHeaderErrorAsync(string fileName)
     {
