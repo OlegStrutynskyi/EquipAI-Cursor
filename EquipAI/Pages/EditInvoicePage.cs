@@ -57,6 +57,20 @@ public class EditInvoicePage : InvoiceFormPage
     public async Task SelectProjectAsync(string project) =>
         await SelectOptionByTextAsync(ProjectDropdown, project);
 
+    public Task<string> SelectDifferentProjectAsync() => SelectDifferentOptionAsync(ProjectDropdown);
+
+    public Task<string> SelectDifferentCurrencyAsync() => SelectDifferentOptionAsync(CurrencyDropdown);
+
+    public Task<string> SelectDifferentEmissionCategoryAsync() => SelectDifferentOptionAsync(EmissionCategoryDropdown);
+
+    public Task<string> SelectDifferentEmissionType1Async() => SelectDifferentOptionAsync(EmissionType1Dropdown);
+
+    public Task<string> SelectDifferentUnit1Async() => SelectDifferentOptionAsync(Unit1Dropdown);
+
+    public Task<string> SelectDifferentEmissionType2Async() => SelectDifferentOptionAsync(EmissionType2Dropdown);
+
+    public Task<string> SelectDifferentUnit2Async() => SelectDifferentOptionAsync(Unit2Dropdown);
+
     public async Task SelectCurrencyAsync(string currency) =>
         await SelectOptionByTextAsync(CurrencyDropdown, currency);
 

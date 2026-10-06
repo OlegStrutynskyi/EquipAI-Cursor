@@ -37,6 +37,23 @@ public class ImportPage : BasePage
     private ILocator ValidationLead => Page.Locator("//p[@class='telemetry-import__validation-lead']");
     private ILocator ValidationList => Page.Locator("//ul[@class='telemetry-import__validation-list']");
     private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
+    private ILocator ReviewLead => Page.Locator("//p[@class='invoice-pdf-review-page__lead']");
+    private ILocator ReviewApproveBtn => Page.Locator("//button[normalize-space()='Approve']");
+    private ILocator ReviewRejectBtn => Page.Locator("//button[normalize-space()='Reject']");
+    private ILocator ReviewSaveAsDraftBtn => Page.Locator("//button[normalize-space()='Save as Draft']");
+    private ILocator ReviewDraftSavedMessage => Page.Locator(
+        "app-alert.alert--success, app-alert[tone='success'], .alert.alert--success")
+        .Filter(new LocatorFilterOptions { HasTextString = "Draft saved" })
+        .First;
+    private ILocator ReviewAlertMessage => Page.Locator(
+        "app-alert, .alert__body, .alert__content, .alert__title").First;
+    private ILocator ReviewPreviewSection => Page.Locator("//div[@class='ng2-pdf-viewer-container']//div[1]//div[2]");
+    private ILocator RejectDialog => Page.Locator("//div[@role='dialog']");
+    private ILocator RejectDialogTitle => Page.Locator("//h2[@id='invoice-reject-dialog-title']");
+    private ILocator RejectDialogLabel => Page.Locator("//label[@for='invoice-rejection-reason']");
+    private ILocator RejectionReasonInput => Page.Locator("//textarea[@id='invoice-rejection-reason']");
+    private ILocator RejectDialogCancelBtn => RejectDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" });
+    private ILocator RejectDialogConfirmBtn => RejectDialog.GetByRole(AriaRole.Button, new() { Name = "Confirm" });
 
     public async Task OpenAsync()
     {
@@ -516,6 +533,215 @@ public class ImportPage : BasePage
         return invoicesPage;
     }
 
+    public async Task<string> GetReviewMessageAsync()
+    {
+        await Page.Locator("#company-name").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await ReviewLead.WaitForAsync();
+        return (await ReviewLead.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public Task<bool> IsReviewApproveBtnVisibleAsync() => ReviewApproveBtn.IsVisibleAsync();
+    public Task<bool> IsReviewRejectBtnVisibleAsync() => ReviewRejectBtn.IsVisibleAsync();
+
+    public async Task<ViewInvoicePage> ClickReviewApproveBtnAsync()
+    {
+        await ReviewApproveBtn.ClickAsync();
+        var viewPage = new ViewInvoicePage(Page);
+        await viewPage.GetTitleAsync();
+        return viewPage;
+    }
+
+    public async Task ClickReviewRejectBtnAsync()
+    {
+        await ReviewRejectBtn.ClickAsync();
+        await RejectDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    public async Task<string> GetRejectDialogTitleAsync()
+    {
+        await RejectDialogTitle.WaitForAsync();
+        return (await RejectDialogTitle.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> GetRejectDialogLabelAsync()
+    {
+        await RejectDialogLabel.WaitForAsync();
+        return (await RejectDialogLabel.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    public Task<bool> IsRejectDialogVisibleAsync() => RejectDialog.IsVisibleAsync();
+    public Task<bool> IsRejectionReasonInputVisibleAsync() => RejectionReasonInput.IsVisibleAsync();
+    public Task<bool> IsRejectDialogCancelBtnVisibleAsync() => RejectDialogCancelBtn.IsVisibleAsync();
+    public Task<bool> IsRejectDialogConfirmBtnVisibleAsync() => RejectDialogConfirmBtn.IsVisibleAsync();
+
+    public async Task<bool> IsRejectDialogConfirmBtnDisabledAsync()
+    {
+        if (await RejectDialogConfirmBtn.GetAttributeAsync("disabled") is not null)
+            return true;
+
+        return !await RejectDialogConfirmBtn.IsEnabledAsync();
+    }
+
+    public async Task<bool> IsRejectDialogConfirmBtnEnabledAsync()
+    {
+        if (await RejectDialogConfirmBtn.GetAttributeAsync("disabled") is not null)
+            return false;
+
+        return await RejectDialogConfirmBtn.IsEnabledAsync();
+    }
+
+    public async Task FillRejectionReasonAsync(string reason)
+    {
+        await RejectionReasonInput.FillAsync(reason);
+    }
+
+    public async Task ClickRejectDialogCancelBtnAsync()
+    {
+        await RejectDialogCancelBtn.ClickAsync();
+        await RejectDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+    }
+
+    public async Task<ViewInvoicePage> ClickRejectDialogConfirmBtnAsync()
+    {
+        await RejectDialogConfirmBtn.ClickAsync();
+        var viewPage = new ViewInvoicePage(Page);
+        await viewPage.GetTitleAsync();
+        return viewPage;
+    }
+
+    public async Task<UtilityBillUploadPage> ClickReviewCancelBtnAsync()
+    {
+        await CancelBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url =>
+            {
+                var path = new Uri(url).AbsolutePath.TrimEnd('/');
+                return path.Equals("/utility-bills", StringComparison.OrdinalIgnoreCase);
+            },
+            new PageWaitForURLOptions { Timeout = 60_000 });
+
+        var utilityBillUploadPage = new UtilityBillUploadPage(Page);
+        await utilityBillUploadPage.WaitForLoadedAsync();
+        return utilityBillUploadPage;
+    }
+
+    public async Task ClickReviewSaveAsDraftBtnAsync()
+    {
+        await ReviewSaveAsDraftBtn.ClickAsync();
+    }
+
+    public async Task WaitForReviewDraftSavedMessageAsync()
+    {
+        try
+        {
+            await ReviewDraftSavedMessage.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+        }
+        catch (TimeoutException)
+        {
+            var alertText = string.Empty;
+            try
+            {
+                if (await ReviewAlertMessage.CountAsync() > 0 && await ReviewAlertMessage.IsVisibleAsync())
+                    alertText = (await ReviewAlertMessage.InnerTextAsync()).Trim();
+
+                var fieldErrors = await Page.Locator(".form-hint--error").AllInnerTextsAsync();
+                var errorText = string.Join(" | ", fieldErrors.Select(error => error.Trim()).Where(error => error.Length > 0));
+                if (!string.IsNullOrWhiteSpace(errorText))
+                    alertText = string.IsNullOrWhiteSpace(alertText) ? errorText : $"{alertText} | {errorText}";
+            }
+            catch (PlaywrightException)
+            {
+            }
+
+            throw new TimeoutException(
+                string.IsNullOrWhiteSpace(alertText)
+                    ? "Timed out waiting for 'Draft saved' confirmation."
+                    : $"Timed out waiting for 'Draft saved' confirmation. Visible alert: '{alertText}'");
+        }
+    }
+
+    public Task<bool> IsReviewDraftSavedMessageVisibleAsync() => ReviewDraftSavedMessage.IsVisibleAsync();
+
+    public Task ClearReviewCompanyNameAsync() => ClearReviewInputAsync("#company-name");
+    public Task ClearReviewAddressAsync() => ClearReviewInputAsync("#address");
+    public Task ClearReviewTotalCostAsync() => ClearReviewInputAsync("#total-cost");
+    public Task ClearReviewLineDescriptionAsync(int linePosition) => ClearReviewInputAsync($"#line-description-{linePosition - 1}");
+    public Task FillReviewLineDescriptionAsync(int linePosition, string description) =>
+        FillReviewInputAsync($"#line-description-{linePosition - 1}", description);
+
+    public Task FillReviewLineQuantityAsync(int linePosition, string quantity) =>
+        FillReviewInputAsync($"#quantity-{linePosition - 1}", quantity);
+
+    public Task FillReviewBillDateAsync(string billDate) => FillReviewInputAsync("#invoice-date", billDate);
+
+    public Task FillReviewTotalCostAsync(string totalCost) => FillReviewInputAsync("#total-cost", totalCost);
+
+    public Task<string> SelectDifferentReviewProjectAsync() => SelectDifferentReviewOptionAsync("#invoice-project");
+
+    public Task<string> SelectDifferentReviewCurrencyAsync() => SelectDifferentReviewOptionAsync("#currency-code");
+
+    public Task<string> SelectDifferentReviewLineEmissionTypeAsync(int linePosition) =>
+        SelectDifferentReviewOptionAsync($"#emission-type-{linePosition - 1}");
+
+    public Task<string> SelectDifferentReviewLineUnitAsync(int linePosition) =>
+        SelectDifferentReviewOptionAsync($"#unit-of-measure-{linePosition - 1}");
+
+    public Task<string> SelectDifferentReviewLineCategoryAsync(int linePosition) =>
+        SelectDifferentReviewOptionAsync($"#line-emission-category-{linePosition - 1}");
+
+    public async Task<int> ClickReviewAddRowBtnAsync()
+    {
+        var currentLineCount = await Page.Locator("//legend[starts-with(normalize-space(),'Line ')]").CountAsync();
+        var newLine = currentLineCount + 1;
+        await Page.Locator("//button[normalize-space()='Add row']").ClickAsync();
+        await Page.Locator($"//legend[normalize-space()='Line {newLine}']").WaitForAsync();
+        return newLine;
+    }
+
+    public Task ClearReviewLineQuantityAsync(int linePosition) => ClearReviewInputAsync($"#quantity-{linePosition - 1}");
+
+    public Task<string> GetReviewCompanyNameErrorAsync() => ReadReviewFieldErrorAsync("company-name");
+    public Task<string> GetReviewAddressErrorAsync() => ReadReviewFieldErrorAsync("address");
+    public Task<string> GetReviewTotalCostErrorAsync() => ReadReviewFieldErrorAsync("total-cost");
+    public Task<string> GetReviewLineDescriptionErrorAsync(int linePosition) => ReadReviewFieldErrorAsync($"line-description-{linePosition - 1}");
+    public Task<string> GetReviewLineQuantityErrorAsync(int linePosition) => ReadReviewFieldErrorAsync($"quantity-{linePosition - 1}");
+    public Task<bool> IsCancelBtnVisibleAsync() => CancelBtn.IsVisibleAsync();
+    public Task<bool> IsReviewSaveAsDraftBtnVisibleAsync() => ReviewSaveAsDraftBtn.IsVisibleAsync();
+
+    public async Task<bool> IsReviewPreviewSectionVisibleAsync()
+    {
+        try
+        {
+            await ReviewPreviewSection.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public Task<string> GetReviewCompanyNameAsync() => ReadInputValueAsync("#company-name");
+    public Task<string> GetReviewAddressAsync() => ReadInputValueAsync("#address");
+    public Task<string> GetReviewProjectAsync() => ReadSelectTextAsync("#invoice-project");
+    public Task<string> GetReviewBillDateAsync() => ReadInputValueAsync("#invoice-date");
+    public Task<string> GetReviewTotalCostAsync() => ReadInputValueAsync("#total-cost");
+    public Task<string> GetReviewCurrencyAsync() => ReadSelectTextAsync("#currency-code");
+    public Task<string> GetReviewLineDescriptionAsync(int linePosition) => ReadInputValueAsync($"#line-description-{linePosition - 1}");
+    public Task<string> GetReviewLineQuantityAsync(int linePosition) => ReadInputValueAsync($"#quantity-{linePosition - 1}");
+    public Task<string> GetReviewLineCostAsync(int linePosition) => ReadInputValueAsync($"#cost-{linePosition - 1}");
+    public Task<string> GetReviewLineUnitAsync(int linePosition) => ReadSelectTextAsync($"#unit-of-measure-{linePosition - 1}");
+    public Task<string> GetReviewLineEmissionTypeAsync(int linePosition) => ReadSelectTextAsync($"#emission-type-{linePosition - 1}");
+    public Task<string> GetReviewLineEmissionCategoryAsync(int linePosition) => ReadSelectTextAsync($"#line-emission-category-{linePosition - 1}");
+
     public async Task FillReviewCompanyNameAsync(string companyName)
     {
         var input = Page.Locator("//label[contains(normalize-space(),'Company')]/following::input[not(@type='hidden')][1]");
@@ -523,12 +749,7 @@ public class ImportPage : BasePage
         await input.FillAsync(companyName);
     }
 
-    public async Task FillReviewAddressAsync(string address)
-    {
-        var input = Page.Locator("//label[contains(normalize-space(),'Address')]/following::input[not(@type='hidden')][1]");
-        await input.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await input.FillAsync(address);
-    }
+    public Task FillReviewAddressAsync(string address) => FillReviewInputAsync("#address", address);
 
     public async Task SelectReviewProjectAsync(string projectName)
     {
@@ -610,6 +831,122 @@ public class ImportPage : BasePage
         var telemetryPage = new TelemetryPage(Page);
         await telemetryPage.WaitForLoadedAsync();
         return telemetryPage;
+    }
+
+    private async Task ClearReviewInputAsync(string selector) => await FillReviewInputAsync(selector, string.Empty);
+
+    private async Task FillReviewInputAsync(string selector, string value)
+    {
+        var input = Page.Locator(selector);
+        await input.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await input.FillAsync(value);
+    }
+
+    private async Task<string> ReadReviewFieldErrorAsync(string inputId)
+    {
+        var error = Page.Locator($"//input[@id='{inputId}']/following-sibling::span");
+        await error.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return (await error.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
+    private async Task<string> ReadInputValueAsync(string selector)
+    {
+        var input = Page.Locator(selector);
+        await input.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return (await input.InputValueAsync()).Trim();
+    }
+
+    private async Task<string> SelectDifferentReviewOptionAsync(string selector)
+    {
+        var control = Page.Locator(selector);
+        var current = (await ReadSelectTextAsync(selector)).Trim();
+        var tagName = await control.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+        if (tagName == "select")
+        {
+            var options = await control.Locator("option").AllAsync();
+            foreach (var option in options)
+            {
+                var value = await option.GetAttributeAsync("value");
+                var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(value) || value.Contains(": null", StringComparison.Ordinal))
+                    continue;
+                if (IsReviewPlaceholderOption(text) || text.Equals(current, StringComparison.Ordinal))
+                    continue;
+
+                await control.SelectOptionAsync(value);
+                return text;
+            }
+
+            throw new InvalidOperationException("Dropdown has no alternative option.");
+        }
+
+        await OpenReviewSelectAsync(control);
+        var searchableOptions = SearchableSelectList.Locator("[role='option']");
+        var count = await searchableOptions.CountAsync();
+        for (var i = 0; i < count; i++)
+        {
+            var option = searchableOptions.Nth(i);
+            var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+            if (IsReviewPlaceholderOption(text) || text.Equals(current, StringComparison.Ordinal))
+                continue;
+
+            await option.ClickAsync();
+            return text;
+        }
+
+        throw new InvalidOperationException("Dropdown has no alternative option.");
+    }
+
+    private async Task OpenReviewSelectAsync(ILocator control)
+    {
+        var expanded = await control.GetAttributeAsync("aria-expanded");
+        if (string.Equals(expanded, "true", StringComparison.OrdinalIgnoreCase)
+            && await SearchableSelectList.IsVisibleAsync())
+            return;
+
+        if (await SearchableSelectList.IsVisibleAsync())
+        {
+            await Page.Keyboard.PressAsync("Escape");
+            try
+            {
+                await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = 2_000,
+                });
+            }
+            catch (TimeoutException)
+            {
+            }
+        }
+
+        await control.ClickAsync();
+        await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    private static bool IsReviewPlaceholderOption(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return true;
+
+        if (text.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (text.Equals("No project", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return text is "—" or "-" or "–";
+    }
+
+    private async Task<string> ReadSelectTextAsync(string selector)
+    {
+        var control = Page.Locator(selector);
+        await control.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var selected = control.Locator(".select__value");
+        if (await selected.CountAsync() > 0)
+            return NormalizeCell(await selected.First.InnerTextAsync());
+
+        return NormalizeCell(await control.InnerTextAsync());
     }
 
     private static async Task<string> ResolveLocationTextAsync(

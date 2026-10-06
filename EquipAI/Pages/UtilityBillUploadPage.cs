@@ -99,6 +99,18 @@ public class UtilityBillUploadPage : BasePage
         }
     }
 
+    public async Task<bool> IsEditBtnVisibleForBillAsync(string billDate, string project, string company, string status)
+    {
+        var row = await FindBillRowLocatorAsync(billDate, project, company, status);
+        return await IsRowActionVisibleAsync(row, "Edit");
+    }
+
+    public async Task<bool> IsViewBtnVisibleForBillAsync(string billDate, string project, string company, string status)
+    {
+        var row = await FindBillRowLocatorAsync(billDate, project, company, status);
+        return await IsRowActionVisibleAsync(row, "View");
+    }
+
     public async Task<ViewInvoicePage> ClickViewBtnForRowAsync(string billDate, string project, string company, string status)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -119,6 +131,33 @@ public class UtilityBillUploadPage : BasePage
                 var viewInvoicePage = new ViewInvoicePage(Page);
                 await viewInvoicePage.GetTitleAsync();
                 return viewInvoicePage;
+            }
+
+            if (!await TryGoToNextStablePageAsync())
+                break;
+        }
+
+        throw new InvalidOperationException(
+            $"Utility bill with Bill Date '{billDate}', Project '{project}', Company '{company}', Status '{status}' was not found in the grid.");
+    }
+
+    public async Task<ImportPage> ClickEditBtnForRowAsync(string billDate, string project, string company, string status)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var row = Grid.Locator("tbody tr")
+                .Filter(new LocatorFilterOptions { HasText = billDate })
+                .Filter(new LocatorFilterOptions { HasText = project })
+                .Filter(new LocatorFilterOptions { HasText = company })
+                .Filter(new LocatorFilterOptions { HasText = status });
+            if (await row.CountAsync() > 0)
+            {
+                var editBtn = row.First.Locator("button, a").Filter(new LocatorFilterOptions { HasTextString = "Edit" }).First;
+                await editBtn.ClickAsync();
+                return await OpenReviewPdfImportPageAsync();
             }
 
             if (!await TryGoToNextStablePageAsync())
@@ -152,6 +191,38 @@ public class UtilityBillUploadPage : BasePage
 
         throw new InvalidOperationException(
             $"Utility bill with Bill Date '{billDate}' and Import Date '{importDate}' was not found in the grid.");
+    }
+
+    private async Task<ILocator> FindBillRowLocatorAsync(string billDate, string project, string company, string status)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var row = Grid.Locator("tbody tr")
+                .Filter(new LocatorFilterOptions { HasText = billDate })
+                .Filter(new LocatorFilterOptions { HasText = project })
+                .Filter(new LocatorFilterOptions { HasText = company })
+                .Filter(new LocatorFilterOptions { HasText = status });
+            if (await row.CountAsync() > 0)
+                return row.First;
+
+            if (!await TryGoToNextStablePageAsync())
+                break;
+        }
+
+        throw new InvalidOperationException(
+            $"Utility bill with Bill Date '{billDate}', Project '{project}', Company '{company}', Status '{status}' was not found in the grid.");
+    }
+
+    private static async Task<bool> IsRowActionVisibleAsync(ILocator row, string actionName)
+    {
+        var action = row.Locator("button, a").Filter(new LocatorFilterOptions { HasTextString = actionName });
+        if (await action.CountAsync() == 0)
+            return false;
+
+        return await action.First.IsVisibleAsync();
     }
 
     private async Task<ImportPage> OpenReviewPdfImportPageAsync()

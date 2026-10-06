@@ -237,6 +237,46 @@ public abstract class InvoiceFormPage : BasePage
         return (await errorLocator.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
+    protected async Task<string> SelectDifferentOptionAsync(ILocator dropdown)
+    {
+        var current = (await GetSelectedOptionTextAsync(dropdown)).Trim();
+        await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await IsNativeSelectAsync(dropdown))
+        {
+            var options = await dropdown.Locator("option").AllAsync();
+            foreach (var option in options)
+            {
+                var value = await option.GetAttributeAsync("value");
+                var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(value) || value.Contains(": null", StringComparison.Ordinal))
+                    continue;
+                if (IsPlaceholderOption(text) || text.Equals(current, StringComparison.Ordinal))
+                    continue;
+
+                await dropdown.SelectOptionAsync(value);
+                return text;
+            }
+
+            throw new InvalidOperationException("Dropdown has no alternative option.");
+        }
+
+        await OpenSearchableSelectAsync(dropdown);
+        var searchableOptions = SearchableSelectList.Locator("[role='option']");
+        var count = await searchableOptions.CountAsync();
+        for (var i = 0; i < count; i++)
+        {
+            var option = searchableOptions.Nth(i);
+            var text = (await option.TextContentAsync())?.Trim() ?? string.Empty;
+            if (IsPlaceholderOption(text) || text.Equals(current, StringComparison.Ordinal))
+                continue;
+
+            await option.ClickAsync();
+            return text;
+        }
+
+        throw new InvalidOperationException("Dropdown has no alternative option.");
+    }
+
     protected async Task SelectFirstNonEmptyOptionAsync(ILocator dropdown)
     {
         await SelectFirstNonEmptyOptionAndGetTextAsync(dropdown);

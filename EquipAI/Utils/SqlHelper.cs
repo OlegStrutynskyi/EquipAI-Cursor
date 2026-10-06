@@ -275,7 +275,7 @@ public static class SqlHelper
         return approvedAt;
     }
 
-    public static Task SetUtilityBillRejectedAsync(string projectName, string companyName, DateTime billDate, string rejectionReason) =>
+    public static Task<DateTime> SetUtilityBillRejectedAsync(string projectName, string companyName, DateTime billDate, string rejectionReason) =>
         UpdateUtilityBillStatusAsync(
             projectName,
             companyName,
@@ -288,7 +288,7 @@ public static class SqlHelper
                 i.[UpdatedAt] = @updatedAt
             """);
 
-    public static Task SetUtilityBillApprovedAsync(string projectName, string companyName, DateTime billDate) =>
+    public static Task<DateTime> SetUtilityBillApprovedAsync(string projectName, string companyName, DateTime billDate) =>
         UpdateUtilityBillStatusAsync(
             projectName,
             companyName,
@@ -301,7 +301,7 @@ public static class SqlHelper
                 i.[ApprovedByUserId] = @approvedByUserId
             """);
 
-    public static Task SetUtilityBillDraftAsync(string projectName, string companyName, DateTime billDate) =>
+    public static Task<DateTime> SetUtilityBillDraftAsync(string projectName, string companyName, DateTime billDate) =>
         UpdateUtilityBillStatusAsync(
             projectName,
             companyName,
@@ -315,7 +315,7 @@ public static class SqlHelper
                 i.[ApprovedByUserId] = NULL
             """);
 
-    private static async Task UpdateUtilityBillStatusAsync(
+    private static async Task<DateTime> UpdateUtilityBillStatusAsync(
         string projectName,
         string companyName,
         DateTime billDate,
@@ -355,6 +355,8 @@ public static class SqlHelper
         if (updated == 0)
             throw new InvalidOperationException(
                 $"Utility bill for '{companyName}' on {billDate:yyyy-MM-dd} was not found.");
+
+        return timestamp;
     }
 
     public static async Task<object> GetInvoiceIdByInvoiceNumberAsync(string invoiceNumber)
@@ -1314,6 +1316,268 @@ public static class SqlHelper
         DateTime? invoiceDate = reader.IsDBNull(3) ? null : ReadLocalDateTime(reader.GetValue(3));
         var total = reader.IsDBNull(4) ? string.Empty : reader.GetValue(4).ToString()?.Trim() ?? string.Empty;
         return new UtilityBillViewHeaderRow(company, address, project, invoiceDate, total);
+    }
+
+    public static async Task<UtilityBillEditHeaderRow> GetUtilityBillEditHeaderAsync(string companyName, DateTime billDate)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.CompanyName, i.Address, p.Name AS Project, i.InvoiceDate AS BillDate,
+                   i.TotalCost, i.CurrencyCode
+            FROM [invoices].[Invoice] AS i
+            LEFT JOIN [projects].[Project] AS p
+                ON i.ProjectId = p.Id
+            WHERE i.CompanyName = @companyName
+              AND CAST(i.InvoiceDate AS date) = @billDate
+            """,
+            connection);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@billDate", billDate.Date);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            throw new InvalidOperationException($"Utility bill for '{companyName}' on {billDate:yyyy-MM-dd} was not found.");
+
+        var company = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+        var address = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+        var project = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+        DateTime? invoiceDate = reader.IsDBNull(3) ? null : ReadLocalDateTime(reader.GetValue(3));
+        decimal? totalCost = reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4));
+        var currencyCode = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+        return new UtilityBillEditHeaderRow(company, address, project, invoiceDate, totalCost, currencyCode);
+    }
+
+    public static async Task<IReadOnlyList<UtilityBillEditLineItemRow>> GetUtilityBillEditLineItemsAsync(string companyName, DateTime billDate)
+    {
+        var rows = new List<UtilityBillEditLineItemRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.LinePosition, i.LineDescription, i.Quantity, i.Cost,
+                   CONCAT(u.DisplayName, ' (', u.Code, ')') AS Unit,
+                   t.DisplayName AS EmissionType,
+                   CONCAT(c.DisplayName, ' (Scope ', c.GhgScope, ')') AS EmissionCategory
+            FROM [invoices].[InvoiceLineItem] AS i
+            LEFT JOIN [emissions].[EmissionType] AS t
+                ON i.EmissionTypeId = t.Id
+            LEFT JOIN [emissions].[UnitOfMeasure] AS u
+                ON i.UnitOfMeasureId = u.Id
+            LEFT JOIN [emissions].[EmissionCategory] AS c
+                ON i.CategoryId = c.Id
+            WHERE i.InvoiceId = (
+                SELECT Id
+                FROM [invoices].[Invoice]
+                WHERE CompanyName = @companyName
+                  AND CAST(InvoiceDate AS date) = @billDate
+            )
+            ORDER BY i.LinePosition
+            """,
+            connection);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@billDate", billDate.Date);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var linePosition = Convert.ToInt32(reader.GetValue(0));
+            var description = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            decimal? quantity = reader.IsDBNull(2) ? null : Convert.ToDecimal(reader.GetValue(2));
+            decimal? cost = reader.IsDBNull(3) ? null : Convert.ToDecimal(reader.GetValue(3));
+            var unit = reader.IsDBNull(4) ? string.Empty : reader.GetString(4).Trim();
+            var emissionType = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+            var emissionCategory = reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim();
+            rows.Add(new UtilityBillEditLineItemRow(linePosition, description, quantity, cost, unit, emissionType, emissionCategory));
+        }
+
+        return rows;
+    }
+
+    public static async Task<UtilityBillEditSnapshot> GetUtilityBillEditSnapshotAsync(string companyName, DateTime billDate)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        long invoiceId;
+        string company;
+        string address;
+        long? projectId;
+        DateTime? invoiceDate;
+        decimal? totalCost;
+        string currencyCode;
+        long? emissionCategoryId;
+
+        await using (var command = new SqlCommand(
+            """
+            SELECT i.Id, i.CompanyName, i.Address, i.ProjectId, i.InvoiceDate, i.TotalCost, i.CurrencyCode, i.EmissionCategoryId
+            FROM [invoices].[Invoice] AS i
+            INNER JOIN [ingestion].[InvoiceRecognition] AS r
+                ON i.Id = r.InvoiceId
+            WHERE i.CompanyName = @companyName
+              AND CAST(i.InvoiceDate AS date) = @billDate
+              AND i.IsDeleted = 0
+              AND r.DocumentKindId = 2
+            """,
+            connection))
+        {
+            command.Parameters.AddWithValue("@companyName", companyName);
+            command.Parameters.AddWithValue("@billDate", billDate.Date);
+            await using var reader = await command.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+                throw new InvalidOperationException($"Utility bill for '{companyName}' on {billDate:yyyy-MM-dd} was not found.");
+
+            invoiceId = Convert.ToInt64(reader.GetValue(0));
+            company = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            address = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            projectId = reader.IsDBNull(3) ? null : Convert.ToInt64(reader.GetValue(3));
+            invoiceDate = reader.IsDBNull(4) ? null : ReadLocalDateTime(reader.GetValue(4));
+            totalCost = reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5));
+            currencyCode = reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim();
+            emissionCategoryId = reader.IsDBNull(7) ? null : Convert.ToInt64(reader.GetValue(7));
+        }
+
+        var lines = new List<UtilityBillEditLineSnapshot>();
+        await using (var command = new SqlCommand(
+            """
+            SELECT Id, LinePosition, LineDescription, Quantity, UnitPrice, Cost, EmissionTypeId, UnitOfMeasureId, CategoryId
+            FROM [invoices].[InvoiceLineItem]
+            WHERE InvoiceId = @invoiceId
+            ORDER BY LinePosition
+            """,
+            connection))
+        {
+            command.Parameters.AddWithValue("@invoiceId", invoiceId);
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                lines.Add(new UtilityBillEditLineSnapshot(
+                    Convert.ToInt64(reader.GetValue(0)),
+                    Convert.ToInt32(reader.GetValue(1)),
+                    reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim(),
+                    reader.IsDBNull(3) ? null : Convert.ToDecimal(reader.GetValue(3)),
+                    reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4)),
+                    reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5)),
+                    reader.IsDBNull(6) ? null : Convert.ToInt64(reader.GetValue(6)),
+                    reader.IsDBNull(7) ? null : Convert.ToInt64(reader.GetValue(7)),
+                    reader.IsDBNull(8) ? null : Convert.ToInt64(reader.GetValue(8))));
+            }
+        }
+
+        return new UtilityBillEditSnapshot(
+            invoiceId,
+            company,
+            address,
+            projectId,
+            invoiceDate,
+            totalCost,
+            currencyCode,
+            emissionCategoryId,
+            lines);
+    }
+
+    public static async Task RestoreUtilityBillEditSnapshotAsync(UtilityBillEditSnapshot snapshot)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var command = new SqlCommand(
+            """
+            UPDATE [invoices].[Invoice]
+            SET CompanyName = @companyName,
+                Address = @address,
+                ProjectId = @projectId,
+                InvoiceDate = @billDate,
+                TotalCost = @totalCost,
+                CurrencyCode = @currencyCode,
+                EmissionCategoryId = @emissionCategoryId,
+                Status = 'Draft'
+            WHERE Id = @invoiceId
+            """,
+            connection))
+        {
+            command.Parameters.AddWithValue("@companyName", snapshot.CompanyName);
+            command.Parameters.AddWithValue("@address", snapshot.Address);
+            command.Parameters.AddWithValue("@projectId", (object?)snapshot.ProjectId ?? DBNull.Value);
+            command.Parameters.AddWithValue("@billDate", (object?)snapshot.BillDate?.Date ?? DBNull.Value);
+            command.Parameters.AddWithValue("@totalCost", (object?)snapshot.TotalCost ?? DBNull.Value);
+            command.Parameters.AddWithValue("@currencyCode", snapshot.CurrencyCode);
+            command.Parameters.AddWithValue("@emissionCategoryId", (object?)snapshot.EmissionCategoryId ?? DBNull.Value);
+            command.Parameters.AddWithValue("@invoiceId", snapshot.InvoiceId);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        if (snapshot.Lines.Count > 0)
+        {
+            var keepParameters = snapshot.Lines.Select((_, index) => $"@keep{index}").ToArray();
+            var keepClause = string.Join(", ", keepParameters);
+
+            await using (var command = new SqlCommand(
+                $"""
+                DELETE FROM [ingestion].[InvoiceLineRecognition]
+                WHERE InvoiceLineItemId IN (
+                    SELECT Id
+                    FROM [invoices].[InvoiceLineItem]
+                    WHERE InvoiceId = @invoiceId
+                      AND Id NOT IN ({keepClause})
+                )
+                """,
+                connection))
+            {
+                command.Parameters.AddWithValue("@invoiceId", snapshot.InvoiceId);
+                for (var i = 0; i < snapshot.Lines.Count; i++)
+                    command.Parameters.AddWithValue(keepParameters[i], snapshot.Lines[i].Id);
+                await command.ExecuteNonQueryAsync();
+            }
+
+            await using (var command = new SqlCommand(
+                $"""
+                DELETE FROM [invoices].[InvoiceLineItem]
+                WHERE InvoiceId = @invoiceId
+                  AND Id NOT IN ({keepClause})
+                """,
+                connection))
+            {
+                command.Parameters.AddWithValue("@invoiceId", snapshot.InvoiceId);
+                for (var i = 0; i < snapshot.Lines.Count; i++)
+                    command.Parameters.AddWithValue(keepParameters[i], snapshot.Lines[i].Id);
+                await command.ExecuteNonQueryAsync();
+            }
+        }
+
+        foreach (var line in snapshot.Lines)
+        {
+            await using var command = new SqlCommand(
+                """
+                UPDATE [invoices].[InvoiceLineItem]
+                SET LinePosition = @linePosition,
+                    LineDescription = @lineDescription,
+                    Quantity = @quantity,
+                    UnitPrice = @unitPrice,
+                    Cost = @cost,
+                    EmissionTypeId = @emissionTypeId,
+                    UnitOfMeasureId = @unitOfMeasureId,
+                    CategoryId = @categoryId
+                WHERE Id = @id
+                """,
+                connection);
+            command.Parameters.AddWithValue("@linePosition", line.LinePosition);
+            command.Parameters.AddWithValue("@lineDescription", line.LineDescription);
+            command.Parameters.AddWithValue("@quantity", (object?)line.Quantity ?? DBNull.Value);
+            command.Parameters.AddWithValue("@unitPrice", (object?)line.UnitPrice ?? DBNull.Value);
+            command.Parameters.AddWithValue("@cost", (object?)line.Cost ?? DBNull.Value);
+            command.Parameters.AddWithValue("@emissionTypeId", (object?)line.EmissionTypeId ?? DBNull.Value);
+            command.Parameters.AddWithValue("@unitOfMeasureId", (object?)line.UnitOfMeasureId ?? DBNull.Value);
+            command.Parameters.AddWithValue("@categoryId", (object?)line.CategoryId ?? DBNull.Value);
+            command.Parameters.AddWithValue("@id", line.Id);
+            var updated = await command.ExecuteNonQueryAsync();
+            if (updated == 0)
+                throw new InvalidOperationException($"Utility bill line {line.Id} was not restored.");
+        }
     }
 
     public static async Task<IReadOnlyList<UtilityBillViewLineItemRow>> GetUtilityBillViewLineItemsAsync(string companyName, DateTime billDate)
@@ -2542,6 +2806,45 @@ public sealed record InvoiceViewLineItemRow(
     decimal? Cost,
     string EmissionType,
     string Unit);
+
+public sealed record UtilityBillEditSnapshot(
+    long InvoiceId,
+    string CompanyName,
+    string Address,
+    long? ProjectId,
+    DateTime? BillDate,
+    decimal? TotalCost,
+    string CurrencyCode,
+    long? EmissionCategoryId,
+    IReadOnlyList<UtilityBillEditLineSnapshot> Lines);
+
+public sealed record UtilityBillEditLineSnapshot(
+    long Id,
+    int LinePosition,
+    string LineDescription,
+    decimal? Quantity,
+    decimal? UnitPrice,
+    decimal? Cost,
+    long? EmissionTypeId,
+    long? UnitOfMeasureId,
+    long? CategoryId);
+
+public sealed record UtilityBillEditHeaderRow(
+    string CompanyName,
+    string Address,
+    string Project,
+    DateTime? BillDate,
+    decimal? TotalCost,
+    string CurrencyCode);
+
+public sealed record UtilityBillEditLineItemRow(
+    int LinePosition,
+    string LineDescription,
+    decimal? Quantity,
+    decimal? Cost,
+    string Unit,
+    string EmissionType,
+    string EmissionCategory);
 
 public sealed record UtilityBillViewHeaderRow(
     string CompanyName,

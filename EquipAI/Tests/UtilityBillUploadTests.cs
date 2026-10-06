@@ -149,6 +149,68 @@ public class UtilityBillUploadTests : BaseTest
         (await editPage.GetTitleAsync()).Should().Be(expectedTitle);
     }
 
+    [Test]
+    public async Task T08_UtilityBillUpload_Rejected_View()
+    {
+        const string billDate = "Jan 1, 2022";
+        const string project = Config.SetupProjectName1;
+        const string company = Config.SetupCompanyName1;
+        var billDateValue = new DateTime(2022, 1, 1);
+        const string expectedStatus = "REJECTED";
+
+        try
+        {
+            var updatedAt = await SqlHelper.SetUtilityBillRejectedAsync(project, company, billDateValue, "123");
+            var expectedApproveRejectDates = BuildApproveRejectDateCandidates(updatedAt);
+
+            var utilityBillUploadPage = new UtilityBillUploadPage(Fixture.Page);
+            await utilityBillUploadPage.OpenAsync();
+
+            (await utilityBillUploadPage.IsEditBtnVisibleForBillAsync(billDate, project, company, expectedStatus)).Should().BeFalse();
+            (await utilityBillUploadPage.IsViewBtnVisibleForBillAsync(billDate, project, company, expectedStatus)).Should().BeTrue();
+
+            var gridRow = await utilityBillUploadPage.FindGridRowAsync(billDate, project, company, status: expectedStatus);
+            gridRow.Should().NotBeNull();
+            gridRow!.Status.Should().Be(expectedStatus);
+            expectedApproveRejectDates.Should().Contain(gridRow.ApproveRejectDate);
+        }
+        finally
+        {
+            await SqlHelper.SetUtilityBillDraftAsync(project, company, billDateValue);
+        }
+    }
+
+    [Test]
+    public async Task T09_UtilityBillUpload_Approved_View()
+    {
+        const string billDate = "Jan 1, 2022";
+        const string project = Config.SetupProjectName1;
+        const string company = Config.SetupCompanyName1;
+        var billDateValue = new DateTime(2022, 1, 1);
+        const string expectedStatus = "APPROVED";
+
+        try
+        {
+            var approvedAt = await SqlHelper.SetUtilityBillApprovedAsync(project, company, billDateValue);
+            var expectedApproveRejectDates = BuildApproveRejectDateCandidates(approvedAt);
+
+            var utilityBillUploadPage = new UtilityBillUploadPage(Fixture.Page);
+            await utilityBillUploadPage.OpenAsync();
+
+            (await utilityBillUploadPage.IsEditBtnVisibleForBillAsync(billDate, project, company, expectedStatus)).Should().BeFalse();
+            (await utilityBillUploadPage.IsViewBtnVisibleForBillAsync(billDate, project, company, expectedStatus)).Should().BeTrue();
+
+            var gridRow = await utilityBillUploadPage.FindGridRowAsync(billDate, project, company, status: expectedStatus);
+            gridRow.Should().NotBeNull();
+            gridRow!.Status.Should().Be(expectedStatus);
+            expectedApproveRejectDates.Should().Contain(gridRow.ApproveRejectDate);
+        }
+        finally
+        {
+            await SqlHelper.SetUtilityBillDraftAsync(project, company, billDateValue);
+        }
+    }
+
     private static async Task AssertCurrentPageSortedAsync(
         UtilityBillUploadPage utilityBillUploadPage,
         IReadOnlyList<(string Project, string Company, string Date, string Status, string ImportDate, string ApproveRejectDate, string Source)> expected,
@@ -228,4 +290,24 @@ public class UtilityBillUploadTests : BaseTest
 
     private static string FormatSource(string source) =>
         string.IsNullOrWhiteSpace(source) ? "Manual" : source;
+
+    private static string[] BuildApproveRejectDateCandidates(DateTime source)
+    {
+        return new[]
+            {
+                source,
+                source.ToUniversalTime(),
+                source.AddDays(1),
+                source.ToUniversalTime().AddDays(1),
+                DateTime.Now,
+                DateTime.UtcNow,
+                DateTime.Now.AddDays(1),
+                DateTime.UtcNow.AddDays(1),
+                DateTime.Now.AddDays(-1),
+                DateTime.UtcNow.AddDays(-1),
+            }
+            .Select(d => d.ToString("MMM d, yyyy", CultureInfo.InvariantCulture))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
 }

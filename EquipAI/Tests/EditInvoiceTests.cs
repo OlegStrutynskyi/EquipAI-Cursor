@@ -276,26 +276,18 @@ public class EditInvoiceTests : BaseTest
         var updatedInvoiceNumber = "Invoice" + stamp;
         var updatedCompany = "Company" + stamp;
         var updatedAddress = "Address" + stamp;
-        var updatedProject = "Haskell";
         var updatedInvoiceDateInput = "2025-01-01";
         var updatedInvoiceDateDisplay = "Jan 1, 2025";
         var updatedTotalCost = "111.11";
-        var updatedCurrency = "EUR";
-        var updatedTotalDisplay = "111.11 EUR";
-        var updatedCategory = "Direct Fleet Emissions";
         var updatedGridStatus = "DRAFT";
         var updatedViewStatus = "Draft";
         var updatedSource = "Manual";
         var updatedDescription1 = "Description1" + stamp;
         var updatedQuantity1 = "500.55";
         var updatedUnitPrice1 = "2.22";
-        var updatedEmissionType1 = "Gas oil";
-        var updatedUnit1 = "Litre (L)";
         var addedDescription2 = "Description2" + stamp;
         var addedQuantity2 = "10.11";
         var addedUnitPrice2 = "1.11";
-        var addedEmissionType2 = "On-site diesel combustion";
-        var addedUnit2 = "US Gallon (US_GAL)";
         const int expectedLineItemRowCount = 2;
         object? invoiceId = null;
 
@@ -313,22 +305,23 @@ public class EditInvoiceTests : BaseTest
             await editInvoicePage.FillCompanyNameAsync(updatedCompany);
             await editInvoicePage.FillAddressAsync(updatedAddress);
             await editInvoicePage.FillDescriptionAsync(updatedDescription1);
-            await editInvoicePage.SelectProjectAsync(updatedProject);
+            var updatedProject = await editInvoicePage.SelectDifferentProjectAsync();
             await editInvoicePage.FillInvoiceDateAsync(updatedInvoiceDateInput);
             await editInvoicePage.FillTotalCostAsync(updatedTotalCost);
-            await editInvoicePage.SelectCurrencyAsync(updatedCurrency);
-            await editInvoicePage.SelectEmissionCategoryAsync(Config.SetupDefaultEmissionCategory2);
+            var updatedCurrency = await editInvoicePage.SelectDifferentCurrencyAsync();
+            var updatedTotalDisplay = $"111.11 {updatedCurrency}";
+            var updatedCategory = await editInvoicePage.SelectDifferentEmissionCategoryAsync();
             await editInvoicePage.FillQuantity1Async(updatedQuantity1);
             await editInvoicePage.FillUnitPrice1Async(updatedUnitPrice1);
-            await editInvoicePage.SelectEmissionType1Async(updatedEmissionType1);
-            await editInvoicePage.SelectUnit1Async(updatedUnit1);
+            var updatedEmissionType1 = await editInvoicePage.SelectDifferentEmissionType1Async();
+            var updatedUnit1 = await editInvoicePage.SelectDifferentUnit1Async();
 
             await editInvoicePage.ClickAddRowBtnAsync();
             await editInvoicePage.FillDescription2Async(addedDescription2);
             await editInvoicePage.FillQuantity2Async(addedQuantity2);
             await editInvoicePage.FillUnitPrice2Async(addedUnitPrice2);
-            await editInvoicePage.SelectEmissionType2Async(addedEmissionType2);
-            await editInvoicePage.SelectUnit2Async(addedUnit2);
+            var addedEmissionType2 = await editInvoicePage.SelectDifferentEmissionType2Async();
+            var addedUnit2 = await editInvoicePage.SelectDifferentUnit2Async();
 
             await editInvoicePage.ClickSaveAsDraftBtnAsync();
             await editInvoicePage.WaitForDraftSavedMessageAsync();
@@ -350,7 +343,7 @@ public class EditInvoiceTests : BaseTest
             (await viewInvoicePage.GetAddressAsync()).Should().Be(updatedAddress);
             (await viewInvoicePage.GetProjectAsync()).Should().Be(updatedProject);
             (await viewInvoicePage.GetInvoiceDateAsync()).Should().Be(updatedInvoiceDateDisplay);
-            (await viewInvoicePage.GetCategoryAsync()).Should().Be(updatedCategory);
+            (await viewInvoicePage.GetCategoryAsync()).Should().Be(ToViewEmissionCategory(updatedCategory));
             (await viewInvoicePage.GetTotalAsync()).Should().Be(updatedTotalDisplay);
             (await viewInvoicePage.GetLineItemRowCountAsync()).Should().Be(expectedLineItemRowCount);
             (await viewInvoicePage.GetDescription1Async()).Should().Be(updatedDescription1);
@@ -369,5 +362,12 @@ public class EditInvoiceTests : BaseTest
             if (invoiceId is not null)
                 await SqlHelper.RestoreSetupManualInvoiceAsync(invoiceId, addedDescription2);
         }
+    }
+
+    private static string ToViewEmissionCategory(string selectedOption)
+    {
+        const string scopeMarker = " (Scope ";
+        var scopeIndex = selectedOption.IndexOf(scopeMarker, StringComparison.Ordinal);
+        return scopeIndex < 0 ? selectedOption : selectedOption[..scopeIndex];
     }
 }
