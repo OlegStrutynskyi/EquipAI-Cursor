@@ -1396,6 +1396,43 @@ public static class SqlHelper
         return new InvoiceViewHeaderRow(company, address, project, invoiceDate, emissionCategory, total);
     }
 
+    public static async Task<InvoiceEditHeaderRow> GetInvoiceEditHeaderAsync(string companyName, string invoiceNumber)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.InvoiceNumber, i.CompanyName, i.Address, p.Name AS Project, i.InvoiceDate,
+                   CONCAT(c.DisplayName, ' (Scope ', c.GhgScope, ')') AS EmissionCategory,
+                   i.TotalCost, i.CurrencyCode
+            FROM [invoices].[Invoice] AS i
+            LEFT JOIN [projects].[Project] AS p
+                ON i.ProjectId = p.Id
+            LEFT JOIN [emissions].[EmissionCategory] AS c
+                ON i.EmissionCategoryId = c.Id
+            WHERE i.CompanyName = @companyName
+              AND i.InvoiceNumber = @invoiceNumber
+            """,
+            connection);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@invoiceNumber", invoiceNumber);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            throw new InvalidOperationException($"Invoice '{invoiceNumber}' for '{companyName}' was not found.");
+
+        var number = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+        var company = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+        var address = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+        var project = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+        DateTime? invoiceDate = reader.IsDBNull(4) ? null : ReadLocalDateTime(reader.GetValue(4));
+        var emissionCategory = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+        decimal? totalCost = reader.IsDBNull(6) ? null : Convert.ToDecimal(reader.GetValue(6));
+        var currencyCode = reader.IsDBNull(7) ? string.Empty : reader.GetString(7).Trim();
+        return new InvoiceEditHeaderRow(number, company, address, project, invoiceDate, emissionCategory, totalCost, currencyCode);
+    }
+
     public static async Task<IReadOnlyList<InvoiceViewLineItemRow>> GetInvoiceViewLineItemsAsync(string companyName, string invoiceNumber)
     {
         var rows = new List<InvoiceViewLineItemRow>();
@@ -2478,6 +2515,16 @@ public sealed record ScopeEmissionCategoryRow(string DisplayName, string Code);
 public sealed record EmissionCategoryGridRow(string DisplayName, int GhgScope);
 
 public sealed record EmissionTypeGridRow(string Code, string DisplayName, string DefaultUnit);
+
+public sealed record InvoiceEditHeaderRow(
+    string InvoiceNumber,
+    string CompanyName,
+    string Address,
+    string Project,
+    DateTime? InvoiceDate,
+    string EmissionCategory,
+    decimal? TotalCost,
+    string CurrencyCode);
 
 public sealed record InvoiceViewHeaderRow(
     string CompanyName,

@@ -1,3 +1,4 @@
+using System.Globalization;
 using EquipAI.Pages;
 using EquipAI.Utils;
 using FluentAssertions;
@@ -9,22 +10,14 @@ public class EditInvoiceTests : BaseTest
     [Test]
     public async Task T01_EditInvoice_DefaultView()
     {
+        const string companyName = Config.SetupCompanyName1;
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedTitle = "Edit Invoice";
         const string expectedMessage = "Review and edit this draft invoice, then approve or reject.";
-        const string expectedCompany = Config.SetupCompanyName1;
-        const string expectedAddress = Config.SetupInvoiceAddress1;
-        const string expectedProject = Config.SetupProjectName1;
-        const string expectedInvoiceDate = "2026-06-02";
-        const string expectedCategory = "Direct Fuel Emissions (Scope 1)";
-        const string expectedTotalCost = "1562.99";
-        const string expectedCurrency = "USD";
-        const string expectedDescription = Config.SetupInvoiceLineDescription1;
-        const string expectedQuantity = "421.29";
-        const string expectedUnitPrice = "3.71";
-        const string expectedCost = "1562.99";
-        const string expectedEmissionType = "On-site diesel combustion";
-        const string expectedUnit = "US Gallon (US_GAL)";
+
+        var header = await SqlHelper.GetInvoiceEditHeaderAsync(companyName, invoiceNumber);
+        var lineItems = await SqlHelper.GetInvoiceViewLineItemsAsync(companyName, invoiceNumber);
+        var invoiceDate = header.InvoiceDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -38,28 +31,34 @@ public class EditInvoiceTests : BaseTest
         (await editInvoicePage.IsCancelBtnVisibleAsync()).Should().BeTrue();
         (await editInvoicePage.IsSaveAsDraftBtnVisibleAsync()).Should().BeTrue();
 
-        // Header section
-        (await editInvoicePage.GetInvoiceNumberAsync()).Should().Be(invoiceNumber);
-        (await editInvoicePage.GetCompanyNameAsync()).Should().Be(expectedCompany);
-        (await editInvoicePage.GetAddressAsync()).Should().Be(expectedAddress);
-        (await editInvoicePage.GetProjectAsync()).Should().Be(expectedProject);
-        (await editInvoicePage.GetInvoiceDateAsync()).Should().Be(expectedInvoiceDate);
-        (await editInvoicePage.GetEmissionCategoryAsync()).Should().Be(expectedCategory);
-        (await editInvoicePage.GetTotalCostAsync()).Should().Be(expectedTotalCost);
-        (await editInvoicePage.GetCurrencyAsync()).Should().Be(expectedCurrency);
+        (await editInvoicePage.GetInvoiceNumberAsync()).Should().Be(header.InvoiceNumber);
+        (await editInvoicePage.GetCompanyNameAsync()).Should().Be(header.CompanyName);
+        (await editInvoicePage.GetAddressAsync()).Should().Be(header.Address);
+        (await editInvoicePage.GetProjectAsync()).Should().Be(header.Project);
+        (await editInvoicePage.GetInvoiceDateAsync()).Should().Be(invoiceDate);
+        (await editInvoicePage.GetEmissionCategoryAsync()).Should().Be(header.EmissionCategory);
+        (await editInvoicePage.GetTotalCostAsync()).Should().Be(FormatInputAmount(header.TotalCost));
+        (await editInvoicePage.GetCurrencyAsync()).Should().Be(header.CurrencyCode);
 
-        // Line items section
         (await editInvoicePage.IsAddRowBtnVisibleAsync()).Should().BeTrue();
         (await editInvoicePage.IsAddRowBtnEnabledAsync()).Should().BeTrue();
-        (await editInvoicePage.GetDescription1Async()).Should().Be(expectedDescription);
-        (await editInvoicePage.GetQuantity1Async()).Should().Be(expectedQuantity);
-        (await editInvoicePage.GetUnitPrice1Async()).Should().Be(expectedUnitPrice);
-        (await editInvoicePage.GetCost1Async()).Should().Be(expectedCost);
-        (await editInvoicePage.GetEmissionType1Async()).Should().Be(expectedEmissionType);
-        (await editInvoicePage.GetUnit1Async()).Should().Be(expectedUnit);
+        (await editInvoicePage.GetLineNumberCountAsync()).Should().Be(lineItems.Count);
+        foreach (var lineItem in lineItems)
+        {
+            (await editInvoicePage.GetLineDescriptionAsync(lineItem.LinePosition)).Should().Be(lineItem.LineDescription);
+            (await editInvoicePage.GetLineQuantityAsync(lineItem.LinePosition)).Should().Be(FormatInputAmount(lineItem.Quantity));
+            (await editInvoicePage.GetLineUnitPriceAsync(lineItem.LinePosition)).Should().Be(FormatInputAmount(lineItem.UnitPrice));
+            (await editInvoicePage.GetLineCostAsync(lineItem.LinePosition)).Should().Be(FormatInputAmount(lineItem.Cost));
+            (await editInvoicePage.GetLineEmissionTypeAsync(lineItem.LinePosition)).Should().Be(lineItem.EmissionType);
+            (await editInvoicePage.GetLineUnitAsync(lineItem.LinePosition)).Should().Be(lineItem.Unit);
+        }
+
         (await editInvoicePage.IsRemoveRowBtnVisibleAsync(1)).Should().BeTrue();
         (await editInvoicePage.IsRemoveRowBtnDisabledAsync(1)).Should().BeTrue();
     }
+
+    private static string FormatInputAmount(decimal? value) =>
+        value?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty;
 
     [Test]
     public async Task T02_EditInvoice_ClickBackBtn()

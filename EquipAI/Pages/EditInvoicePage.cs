@@ -229,6 +229,33 @@ public class EditInvoicePage : InvoiceFormPage
 
     public async Task<string> GetCurrencyAsync() => await GetSelectedOptionTextAsync(CurrencyDropdown);
 
+    public Task<string> GetLineDescriptionAsync(int lineNumber) => ReadLineInputAsync(lineNumber, "line-description");
+
+    public Task<string> GetLineQuantityAsync(int lineNumber) => ReadLineInputAsync(lineNumber, "quantity");
+
+    public Task<string> GetLineUnitPriceAsync(int lineNumber) => ReadLineInputAsync(lineNumber, "unit-price");
+
+    public Task<string> GetLineCostAsync(int lineNumber) => ReadLineInputAsync(lineNumber, "cost");
+
+    public Task<string> GetLineEmissionTypeAsync(int lineNumber) =>
+        GetSelectedOptionTextAsync(LineDropdown(lineNumber, "emission-type"));
+
+    public Task<string> GetLineUnitAsync(int lineNumber) =>
+        GetSelectedOptionTextAsync(LineDropdown(lineNumber, "unit-of-measure"));
+
+    private ILocator LineInput(int lineNumber, string idPart) =>
+        Page.Locator($"//legend[normalize-space()='Line {lineNumber}']/following-sibling::div//input[contains(@id,'{idPart}')]");
+
+    private ILocator LineDropdown(int lineNumber, string idPart) =>
+        Page.Locator($"//legend[normalize-space()='Line {lineNumber}']/following-sibling::div//*[@id[contains(.,'{idPart}')] and (self::select or self::button)]");
+
+    private async Task<string> ReadLineInputAsync(int lineNumber, string idPart)
+    {
+        var input = LineInput(lineNumber, idPart);
+        await input.WaitForAsync();
+        return (await input.InputValueAsync()).Trim();
+    }
+
     public async Task<string> GetDescription1Async()
     {
         await Description1Input.WaitForAsync();
