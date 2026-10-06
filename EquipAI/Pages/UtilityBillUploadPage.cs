@@ -63,6 +63,99 @@ public class UtilityBillUploadPage : BasePage
     public async Task<ImportPage> ClickEditBtnAsync(string projectName)
     {
         await ClickRowActionAsync(projectName, "Edit");
+        return await OpenReviewPdfImportPageAsync();
+    }
+
+    public async Task<UtilityBillGridRow?> FindGridRowAsync(
+        string billDate,
+        string? project = null,
+        string? company = null,
+        IReadOnlyCollection<string>? importDates = null,
+        string? status = null)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            foreach (var row in await ReadGridRowsOnCurrentPageAsync())
+            {
+                if (!row.Date.Equals(billDate, StringComparison.Ordinal))
+                    continue;
+                if (project is not null && !row.Project.Equals(project, StringComparison.Ordinal))
+                    continue;
+                if (company is not null && !row.Company.Equals(company, StringComparison.Ordinal))
+                    continue;
+                if (importDates is not null && !importDates.Contains(row.ImportDate, StringComparer.Ordinal))
+                    continue;
+                if (status is not null && !row.Status.Equals(status, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                return row;
+            }
+
+            if (!await TryGoToNextStablePageAsync())
+                return null;
+        }
+    }
+
+    public async Task<ViewInvoicePage> ClickViewBtnForRowAsync(string billDate, string project, string company, string status)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var row = Grid.Locator("tbody tr")
+                .Filter(new LocatorFilterOptions { HasText = billDate })
+                .Filter(new LocatorFilterOptions { HasText = project })
+                .Filter(new LocatorFilterOptions { HasText = company })
+                .Filter(new LocatorFilterOptions { HasText = status });
+            if (await row.CountAsync() > 0)
+            {
+                var viewBtn = row.First.Locator("button, a").Filter(new LocatorFilterOptions { HasTextString = "View" }).First;
+                await viewBtn.ClickAsync();
+
+                var viewInvoicePage = new ViewInvoicePage(Page);
+                await viewInvoicePage.GetTitleAsync();
+                return viewInvoicePage;
+            }
+
+            if (!await TryGoToNextStablePageAsync())
+                break;
+        }
+
+        throw new InvalidOperationException(
+            $"Utility bill with Bill Date '{billDate}', Project '{project}', Company '{company}', Status '{status}' was not found in the grid.");
+    }
+
+    public async Task<ImportPage> ClickEditBtnForRowAsync(string billDate, string importDate)
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var row = Grid.Locator("tbody tr")
+                .Filter(new LocatorFilterOptions { HasText = billDate })
+                .Filter(new LocatorFilterOptions { HasText = importDate });
+            if (await row.CountAsync() > 0)
+            {
+                var editBtn = row.First.Locator("button, a").Filter(new LocatorFilterOptions { HasTextString = "Edit" }).First;
+                await editBtn.ClickAsync();
+                return await OpenReviewPdfImportPageAsync();
+            }
+
+            if (!await TryGoToNextStablePageAsync())
+                break;
+        }
+
+        throw new InvalidOperationException(
+            $"Utility bill with Bill Date '{billDate}' and Import Date '{importDate}' was not found in the grid.");
+    }
+
+    private async Task<ImportPage> OpenReviewPdfImportPageAsync()
+    {
         var reviewTitle = Page.Locator("h1").Filter(new LocatorFilterOptions { HasTextString = "Review PDF Import" });
         await reviewTitle.First.WaitForAsync(new LocatorWaitForOptions
         {

@@ -275,6 +275,88 @@ public static class SqlHelper
         return approvedAt;
     }
 
+    public static Task SetUtilityBillRejectedAsync(string projectName, string companyName, DateTime billDate, string rejectionReason) =>
+        UpdateUtilityBillStatusAsync(
+            projectName,
+            companyName,
+            billDate,
+            rejectionReason,
+            """
+            UPDATE i
+            SET i.[Status] = 'Rejected',
+                i.[RejectionReason] = @rejectionReason,
+                i.[UpdatedAt] = @updatedAt
+            """);
+
+    public static Task SetUtilityBillApprovedAsync(string projectName, string companyName, DateTime billDate) =>
+        UpdateUtilityBillStatusAsync(
+            projectName,
+            companyName,
+            billDate,
+            rejectionReason: null,
+            """
+            UPDATE i
+            SET i.[Status] = 'Approved',
+                i.[ApprovedAt] = @approvedAt,
+                i.[ApprovedByUserId] = @approvedByUserId
+            """);
+
+    public static Task SetUtilityBillDraftAsync(string projectName, string companyName, DateTime billDate) =>
+        UpdateUtilityBillStatusAsync(
+            projectName,
+            companyName,
+            billDate,
+            rejectionReason: null,
+            """
+            UPDATE i
+            SET i.[Status] = 'Draft',
+                i.[RejectionReason] = NULL,
+                i.[ApprovedAt] = NULL,
+                i.[ApprovedByUserId] = NULL
+            """);
+
+    private static async Task UpdateUtilityBillStatusAsync(
+        string projectName,
+        string companyName,
+        DateTime billDate,
+        string? rejectionReason,
+        string setClause)
+    {
+        const string approvedByUserId = "367DA46B-C6A9-4FE0-8854-D5CFBCF545AA";
+        var timestamp = DateTime.Now;
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            $"""
+            {setClause}
+            FROM [invoices].[Invoice] AS i
+            INNER JOIN [projects].[Project] AS p
+                ON i.ProjectId = p.Id
+            INNER JOIN [ingestion].[InvoiceRecognition] AS r
+                ON i.Id = r.InvoiceId
+            WHERE p.Name = @projectName
+              AND i.CompanyName = @companyName
+              AND CAST(i.InvoiceDate AS date) = @billDate
+              AND i.IsDeleted = 0
+              AND r.DocumentKindId = 2
+            """,
+            connection);
+        command.Parameters.AddWithValue("@projectName", projectName);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@billDate", billDate.Date);
+        command.Parameters.AddWithValue("@rejectionReason", (object?)rejectionReason ?? DBNull.Value);
+        command.Parameters.AddWithValue("@updatedAt", timestamp.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue("@approvedAt", timestamp.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue("@approvedByUserId", Guid.Parse(approvedByUserId));
+
+        var updated = await command.ExecuteNonQueryAsync();
+        if (updated == 0)
+            throw new InvalidOperationException(
+                $"Utility bill for '{companyName}' on {billDate:yyyy-MM-dd} was not found.");
+    }
+
     public static async Task<object> GetInvoiceIdByInvoiceNumberAsync(string invoiceNumber)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -1198,6 +1280,161 @@ public static class SqlHelper
             DateTime? approveDate = reader.IsDBNull(6) ? null : ReadLocalDateTime(reader.GetValue(6));
             var source = reader.IsDBNull(7) ? string.Empty : reader.GetValue(7).ToString()?.Trim() ?? string.Empty;
             rows.Add(new UtilityBillGridDbRow(id, project, company, billDate, status, importDate, approveDate, source));
+        }
+
+        return rows;
+    }
+
+    public static async Task<UtilityBillViewHeaderRow> GetUtilityBillViewHeaderAsync(string companyName, DateTime billDate)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.CompanyName, i.Address, p.Name AS Project, i.InvoiceDate AS BillDate,
+                   CONCAT_WS(' ', i.TotalCost, i.CurrencyCode) AS Total
+            FROM [invoices].[Invoice] AS i
+            LEFT JOIN [projects].[Project] AS p
+                ON i.ProjectId = p.Id
+            WHERE i.CompanyName = @companyName
+              AND CAST(i.InvoiceDate AS date) = @billDate
+            """,
+            connection);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@billDate", billDate.Date);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            throw new InvalidOperationException($"Utility bill for '{companyName}' on {billDate:yyyy-MM-dd} was not found.");
+
+        var company = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+        var address = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+        var project = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+        DateTime? invoiceDate = reader.IsDBNull(3) ? null : ReadLocalDateTime(reader.GetValue(3));
+        var total = reader.IsDBNull(4) ? string.Empty : reader.GetValue(4).ToString()?.Trim() ?? string.Empty;
+        return new UtilityBillViewHeaderRow(company, address, project, invoiceDate, total);
+    }
+
+    public static async Task<IReadOnlyList<UtilityBillViewLineItemRow>> GetUtilityBillViewLineItemsAsync(string companyName, DateTime billDate)
+    {
+        var rows = new List<UtilityBillViewLineItemRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.LinePosition, i.LineDescription, i.Quantity, i.Cost, t.DisplayName, c.DisplayName,
+                   CONCAT(u.DisplayName, ' (', u.Code, ')') AS Unit
+            FROM [invoices].[InvoiceLineItem] AS i
+            LEFT JOIN [emissions].[EmissionType] AS t
+                ON i.EmissionTypeId = t.Id
+            LEFT JOIN [emissions].[EmissionCategory] AS c
+                ON i.CategoryId = c.Id
+            LEFT JOIN [emissions].[UnitOfMeasure] AS u
+                ON i.UnitOfMeasureId = u.Id
+            WHERE i.InvoiceId = (
+                SELECT Id
+                FROM [invoices].[Invoice]
+                WHERE CompanyName = @companyName
+                  AND CAST(InvoiceDate AS date) = @billDate
+            )
+            ORDER BY i.LinePosition
+            """,
+            connection);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@billDate", billDate.Date);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var linePosition = Convert.ToInt32(reader.GetValue(0));
+            var description = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            decimal? quantity = reader.IsDBNull(2) ? null : Convert.ToDecimal(reader.GetValue(2));
+            decimal? cost = reader.IsDBNull(3) ? null : Convert.ToDecimal(reader.GetValue(3));
+            var emissionType = reader.IsDBNull(4) ? string.Empty : reader.GetString(4).Trim();
+            var category = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+            var unit = reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim();
+            rows.Add(new UtilityBillViewLineItemRow(linePosition, description, quantity, cost, emissionType, category, unit));
+        }
+
+        return rows;
+    }
+
+    public static async Task<InvoiceViewHeaderRow> GetInvoiceViewHeaderAsync(string companyName, string invoiceNumber)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.CompanyName, i.Address, p.Name AS Project, i.InvoiceDate,
+                   c.DisplayName AS EmissionCategory, CONCAT_WS(' ', i.TotalCost, i.CurrencyCode) AS Total
+            FROM [invoices].[Invoice] AS i
+            LEFT JOIN [projects].[Project] AS p
+                ON i.ProjectId = p.Id
+            LEFT JOIN [emissions].[EmissionCategory] AS c
+                ON i.EmissionCategoryId = c.Id
+            WHERE i.CompanyName = @companyName
+              AND i.InvoiceNumber = @invoiceNumber
+            """,
+            connection);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@invoiceNumber", invoiceNumber);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            throw new InvalidOperationException($"Invoice '{invoiceNumber}' for '{companyName}' was not found.");
+
+        var company = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+        var address = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+        var project = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+        DateTime? invoiceDate = reader.IsDBNull(3) ? null : ReadLocalDateTime(reader.GetValue(3));
+        var emissionCategory = reader.IsDBNull(4) ? string.Empty : reader.GetString(4).Trim();
+        var total = reader.IsDBNull(5) ? string.Empty : reader.GetValue(5).ToString()?.Trim() ?? string.Empty;
+        return new InvoiceViewHeaderRow(company, address, project, invoiceDate, emissionCategory, total);
+    }
+
+    public static async Task<IReadOnlyList<InvoiceViewLineItemRow>> GetInvoiceViewLineItemsAsync(string companyName, string invoiceNumber)
+    {
+        var rows = new List<InvoiceViewLineItemRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.LinePosition, i.LineDescription, i.Quantity, i.UnitPrice, i.Cost,
+                   t.DisplayName AS EmissionType, CONCAT(u.DisplayName, ' (', u.Code, ')') AS Unit
+            FROM [invoices].[InvoiceLineItem] AS i
+            LEFT JOIN [emissions].[EmissionType] AS t
+                ON i.EmissionTypeId = t.Id
+            LEFT JOIN [emissions].[UnitOfMeasure] AS u
+                ON i.UnitOfMeasureId = u.Id
+            WHERE i.InvoiceId = (
+                SELECT Id
+                FROM [invoices].[Invoice]
+                WHERE CompanyName = @companyName
+                  AND InvoiceNumber = @invoiceNumber
+            )
+            ORDER BY i.LinePosition
+            """,
+            connection);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@invoiceNumber", invoiceNumber);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var linePosition = Convert.ToInt32(reader.GetValue(0));
+            var description = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            decimal? quantity = reader.IsDBNull(2) ? null : Convert.ToDecimal(reader.GetValue(2));
+            decimal? unitPrice = reader.IsDBNull(3) ? null : Convert.ToDecimal(reader.GetValue(3));
+            decimal? cost = reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4));
+            var emissionType = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+            var unit = reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim();
+            rows.Add(new InvoiceViewLineItemRow(linePosition, description, quantity, unitPrice, cost, emissionType, unit));
         }
 
         return rows;
@@ -2241,6 +2478,39 @@ public sealed record ScopeEmissionCategoryRow(string DisplayName, string Code);
 public sealed record EmissionCategoryGridRow(string DisplayName, int GhgScope);
 
 public sealed record EmissionTypeGridRow(string Code, string DisplayName, string DefaultUnit);
+
+public sealed record InvoiceViewHeaderRow(
+    string CompanyName,
+    string Address,
+    string Project,
+    DateTime? InvoiceDate,
+    string EmissionCategory,
+    string Total);
+
+public sealed record InvoiceViewLineItemRow(
+    int LinePosition,
+    string LineDescription,
+    decimal? Quantity,
+    decimal? UnitPrice,
+    decimal? Cost,
+    string EmissionType,
+    string Unit);
+
+public sealed record UtilityBillViewHeaderRow(
+    string CompanyName,
+    string Address,
+    string Project,
+    DateTime? BillDate,
+    string Total);
+
+public sealed record UtilityBillViewLineItemRow(
+    int LinePosition,
+    string LineDescription,
+    decimal? Quantity,
+    decimal? Cost,
+    string EmissionType,
+    string Category,
+    string Unit);
 
 public sealed record UtilityBillGridDbRow(
     long Id,

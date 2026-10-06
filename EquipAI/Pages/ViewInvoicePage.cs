@@ -83,6 +83,13 @@ public class ViewInvoicePage : BasePage
         return (await InvoiceDate.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
+    public async Task<string> GetBillDateAsync()
+    {
+        var billDate = Page.Locator("//dt[normalize-space()='Bill date']/following-sibling::dd[1]");
+        await billDate.WaitForAsync();
+        return (await billDate.TextContentAsync())?.Trim() ?? string.Empty;
+    }
+
     public async Task<string> GetCategoryAsync()
     {
         await Category.WaitForAsync();
@@ -167,10 +174,33 @@ public class ViewInvoicePage : BasePage
         return (await Unit2.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
+    public async Task<IReadOnlyList<string>> GetLineItemCellsAsync(int lineNumber)
+    {
+        var cells = Page.Locator($"//h2[@id='invoice-detail-lines-heading']/..//tbody/tr[td[normalize-space()='{lineNumber}']]/td");
+        await cells.First.WaitForAsync();
+        return (await cells.AllInnerTextsAsync())
+            .Select(cell => cell.Replace('\u00A0', ' ').Trim())
+            .ToList();
+    }
+
     public async Task<int> GetLineItemRowCountAsync()
     {
         await LineItemsSection.WaitForAsync();
         return await LineItemRows.CountAsync();
+    }
+
+    public async Task<ImportPage> ClickReviewImportBtnAsync()
+    {
+        var reviewImportBtn = Page.Locator("//button[normalize-space()='Review Import'] | //a[normalize-space()='Review Import']");
+        await reviewImportBtn.First.ClickAsync();
+
+        var reviewTitle = Page.Locator("h1").Filter(new LocatorFilterOptions { HasTextString = "Review PDF Import" });
+        await reviewTitle.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 30_000,
+        });
+        return new ImportPage(Page);
     }
 
     public async Task<EditInvoicePage> ClickEditDraftBtnAsync()
@@ -202,6 +232,15 @@ public class ViewInvoicePage : BasePage
     public Task<bool> IsStatusVisibleAsync() => Status.IsVisibleAsync();
     public Task<bool> IsSourceVisibleAsync() => Source.IsVisibleAsync();
     public Task<bool> IsEditDraftBtnVisibleAsync() => EditDraftBtn.IsVisibleAsync();
+
+    public async Task<bool> IsReviewImportBtnVisibleAsync()
+    {
+        var reviewImportBtn = Page.Locator("//button[normalize-space()='Review Import'] | //a[normalize-space()='Review Import']");
+        if (await reviewImportBtn.CountAsync() == 0)
+            return false;
+
+        return await reviewImportBtn.First.IsVisibleAsync();
+    }
     public Task<bool> IsHeaderSectionVisibleAsync() => HeaderSection.IsVisibleAsync();
     public Task<bool> IsLineItemsSectionVisibleAsync() => LineItemsSection.IsVisibleAsync();
 }

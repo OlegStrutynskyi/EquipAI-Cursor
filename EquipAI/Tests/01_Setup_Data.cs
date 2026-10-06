@@ -396,4 +396,63 @@ public class _01_Setup_Data : BaseTest
         gridRow.Status.Should().Be(expectedStatus);
         gridRow.Source.Should().Be(expectedSource);
     }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [CancelAfter(660_000)]
+    [Test]
+    public async Task T16_Setup_UploadUtilityBill()
+    {
+        const string fileName = "Test_Utility_Bill_01_2022.pdf";
+        const string billDate = "Jan 1, 2022";
+        const string project = Config.SetupProjectName1;
+        const string company = Config.SetupCompanyName1;
+        const string address = Config.SetupAddress1;
+        const string expectedStatus = "DRAFT";
+        var importDates = new[]
+        {
+            DateTime.Now.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            DateTime.Now.AddDays(1).ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+        };
+
+        var utilityBillUploadPage = new UtilityBillUploadPage(Fixture.Page);
+        await utilityBillUploadPage.OpenAsync();
+
+        var existingRow = await utilityBillUploadPage.FindGridRowAsync(billDate, project, company);
+        if (existingRow is not null)
+            Assert.Pass("Utility Bill already exists.");
+
+        var expectedToasterMessage = $"{fileName} has been uploaded and is being processed";
+        var importPage = await utilityBillUploadPage.ClickImportPDFBtnAsync();
+        await importPage.ImportPdfAsync(fileName, expectedToasterMessage);
+
+        UtilityBillGridRow? importedRow = null;
+        var deadline = DateTime.UtcNow.AddMinutes(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            await utilityBillUploadPage.OpenAsync();
+            importedRow = await utilityBillUploadPage.FindGridRowAsync(billDate, importDates: importDates, status: "Draft");
+            if (importedRow is not null)
+                break;
+
+            await Task.Delay(TimeSpan.FromSeconds(10));
+        }
+
+        importedRow.Should().NotBeNull(
+            $"Utility bill with Bill Date '{billDate}' was not found within 10 minutes.");
+
+        var reviewPage = await utilityBillUploadPage.ClickEditBtnForRowAsync(billDate, importedRow!.ImportDate);
+        (await reviewPage.GetTitleAsync()).Should().Be("Review PDF Import");
+        await reviewPage.FillReviewCompanyNameAsync(company);
+        await reviewPage.FillReviewAddressAsync(address);
+        await reviewPage.SelectReviewProjectAsync(project);
+        await reviewPage.ClickSaveAsDraftBtnAsync();
+        utilityBillUploadPage = await reviewPage.ClickBackToUtilityBillUploadAsync();
+
+        var savedRow = await utilityBillUploadPage.FindGridRowAsync(billDate, project, company, status: expectedStatus);
+        savedRow.Should().NotBeNull();
+        savedRow!.Date.Should().Be(billDate);
+        savedRow.Project.Should().Be(project);
+        savedRow.Company.Should().Be(company);
+        savedRow.Status.ToUpperInvariant().Should().Be(expectedStatus);
+    }
 }

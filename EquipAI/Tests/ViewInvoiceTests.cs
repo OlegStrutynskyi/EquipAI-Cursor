@@ -1,3 +1,4 @@
+using System.Globalization;
 using EquipAI.Pages;
 using EquipAI.Utils;
 using FluentAssertions;
@@ -10,56 +11,68 @@ public class ViewInvoiceTests : BaseTest
     public async Task T01_ViewInvoice_Manual_DefaultView()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
-        const string expectedAddress = Config.SetupInvoiceAddress1;
-        const string expectedCategory = "Internal Fuel";
-        const string expectedTotal = "1,562.99 USD";
-        const string expectedDescription = Config.SetupInvoiceLineDescription1;
-        const string expectedQty = "421.29";
-        const string expectedUnitPrice = "3.71";
-        const string expectedCost = "1,562.99";
-        const string expectedEmissionType = "On-site diesel combustion";
-        const string expectedUnit = "US Gallon (US_GAL)";
+        const string companyName = Config.SetupCompanyName1;
         const string expectedGridStatus = "DRAFT";
         const string expectedViewStatus = "Draft";
+
+        var header = await SqlHelper.GetInvoiceViewHeaderAsync(companyName, invoiceNumber);
+        var lineItems = await SqlHelper.GetInvoiceViewLineItemsAsync(companyName, invoiceNumber);
+        var invoiceDate = header.InvoiceDate?.ToString("MMM d, yyyy", CultureInfo.InvariantCulture) ?? string.Empty;
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
 
         var gridRow = await invoicesPage.GetInvoiceGridRowAsync(invoiceNumber);
         gridRow.Should().NotBeNull();
-        var expectedProject = gridRow!.Project;
-        var expectedInvoiceNumber = gridRow.InvoiceNumber;
-        var expectedCompany = gridRow.Company;
-        var expectedInvoiceDate = gridRow.Date;
-        var expectedType = gridRow.Source;
+        var expectedSource = gridRow!.Source;
+        gridRow.Project.Should().Be(header.Project);
+        gridRow.InvoiceNumber.Should().Be(invoiceNumber);
+        gridRow.Company.Should().Be(header.CompanyName);
+        gridRow.Date.Should().Be(invoiceDate);
         gridRow.Status.Should().Be(expectedGridStatus);
 
         var viewInvoicePage = await invoicesPage.ClickViewBtnAsync(invoiceNumber);
 
-        // Top section
         (await viewInvoicePage.IsBackBtnVisibleAsync()).Should().BeTrue();
-        (await viewInvoicePage.GetTitleAsync()).Should().Be("Invoice " + expectedInvoiceNumber);
+        (await viewInvoicePage.GetTitleAsync()).Should().Be("Invoice " + invoiceNumber);
         (await viewInvoicePage.GetStatusAsync()).Should().Be(expectedViewStatus);
-        (await viewInvoicePage.GetSourceAsync()).Should().Be(expectedType);
+        (await viewInvoicePage.GetSourceAsync()).Should().Be(expectedSource);
         (await viewInvoicePage.IsEditDraftBtnVisibleAsync()).Should().BeTrue();
 
-        // Header section
-        (await viewInvoicePage.GetCompanyNameAsync()).Should().Be(expectedCompany);
-        (await viewInvoicePage.GetAddressAsync()).Should().Be(expectedAddress);
-        (await viewInvoicePage.GetProjectAsync()).Should().Be(expectedProject);
-        (await viewInvoicePage.GetInvoiceDateAsync()).Should().Be(expectedInvoiceDate);
-        (await viewInvoicePage.GetCategoryAsync()).Should().Be(expectedCategory);
-        (await viewInvoicePage.GetTotalAsync()).Should().Be(expectedTotal);
+        (await viewInvoicePage.GetCompanyNameAsync()).Should().Be(header.CompanyName);
+        (await viewInvoicePage.GetAddressAsync()).Should().Be(header.Address);
+        (await viewInvoicePage.GetProjectAsync()).Should().Be(header.Project);
+        (await viewInvoicePage.GetInvoiceDateAsync()).Should().Be(invoiceDate);
+        (await viewInvoicePage.GetCategoryAsync()).Should().Be(header.EmissionCategory);
+        (await viewInvoicePage.GetTotalAsync()).Should().Be(FormatTotal(header.Total));
 
-        // Line items
-        (await viewInvoicePage.GetLineItemRowCountAsync()).Should().Be(1);
-        (await viewInvoicePage.GetDescription1Async()).Should().Be(expectedDescription);
-        (await viewInvoicePage.GetQuantity1Async()).Should().Be(expectedQty);
-        (await viewInvoicePage.GetUnitPrice1Async()).Should().Be(expectedUnitPrice);
-        (await viewInvoicePage.GetCost1Async()).Should().Be(expectedCost);
-        (await viewInvoicePage.GetEmissionType1Async()).Should().Be(expectedEmissionType);
-        (await viewInvoicePage.GetUnit1Async()).Should().Be(expectedUnit);
+        (await viewInvoicePage.GetLineItemRowCountAsync()).Should().Be(lineItems.Count);
+        foreach (var lineItem in lineItems)
+            (await viewInvoicePage.GetLineItemCellsAsync(lineItem.LinePosition)).Should().Equal(ToLineCells(lineItem));
     }
+
+    private static string FormatTotal(string total)
+    {
+        var parts = total.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 2 && decimal.TryParse(parts[0], NumberStyles.Number, CultureInfo.InvariantCulture, out var cost))
+            return $"{cost.ToString("N2", CultureInfo.GetCultureInfo("en-US"))} {parts[1]}";
+
+        return total;
+    }
+
+    private static string[] ToLineCells(InvoiceViewLineItemRow lineItem) =>
+    [
+        lineItem.LinePosition.ToString(CultureInfo.InvariantCulture),
+        lineItem.LineDescription,
+        FormatAmount(lineItem.Quantity),
+        FormatAmount(lineItem.UnitPrice),
+        FormatAmount(lineItem.Cost),
+        lineItem.EmissionType,
+        lineItem.Unit,
+    ];
+
+    private static string FormatAmount(decimal? value) =>
+        value?.ToString("N2", CultureInfo.GetCultureInfo("en-US")) ?? string.Empty;
 
     [Test]
     public async Task T02_ViewInvoice_ClickEditDraft()

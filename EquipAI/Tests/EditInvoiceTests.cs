@@ -16,7 +16,7 @@ public class EditInvoiceTests : BaseTest
         const string expectedAddress = Config.SetupInvoiceAddress1;
         const string expectedProject = Config.SetupProjectName1;
         const string expectedInvoiceDate = "2026-06-02";
-        const string expectedCategory = "Internal Fuel (Scope 1)";
+        const string expectedCategory = "Direct Fuel Emissions (Scope 1)";
         const string expectedTotalCost = "1562.99";
         const string expectedCurrency = "USD";
         const string expectedDescription = Config.SetupInvoiceLineDescription1;
@@ -283,7 +283,7 @@ public class EditInvoiceTests : BaseTest
         var updatedTotalCost = "111.11";
         var updatedCurrency = "EUR";
         var updatedTotalDisplay = "111.11 EUR";
-        var updatedCategory = "External Fuel";
+        var updatedCategory = "Direct Fleet Emissions";
         var updatedGridStatus = "DRAFT";
         var updatedViewStatus = "Draft";
         var updatedSource = "Manual";

@@ -23,6 +23,7 @@ public static class Config
     public const string SetupInvoiceNumber1 = "DONT-DELETE-Invoice-1";
     public const string SetupCompanyName1 = "DONT-DELETE-Company-1";
     public const string SetupInvoiceAddress1 = "DONT-DELETE-Address-1";
+    public const string SetupAddress1 = SetupInvoiceAddress1;
     public const string SetupInvoiceLineDescription1 = "DONT-DELETE-Description-1";
     public const string SetupCode1 = "DONTDELETECODE1";
     public const string SetupCode2 = "DONTDELETECODE2";

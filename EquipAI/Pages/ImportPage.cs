@@ -516,6 +516,72 @@ public class ImportPage : BasePage
         return invoicesPage;
     }
 
+    public async Task FillReviewCompanyNameAsync(string companyName)
+    {
+        var input = Page.Locator("//label[contains(normalize-space(),'Company')]/following::input[not(@type='hidden')][1]");
+        await input.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await input.FillAsync(companyName);
+    }
+
+    public async Task FillReviewAddressAsync(string address)
+    {
+        var input = Page.Locator("//label[contains(normalize-space(),'Address')]/following::input[not(@type='hidden')][1]");
+        await input.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await input.FillAsync(address);
+    }
+
+    public async Task SelectReviewProjectAsync(string projectName)
+    {
+        var dropdown = Page.Locator(
+            "//label[normalize-space()='Project']/following::*[self::select or self::button or @role='combobox'][1]");
+        await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+
+        var tagName = await dropdown.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+        if (tagName == "select")
+        {
+            await dropdown.SelectOptionAsync(new SelectOptionValue { Label = projectName });
+            return;
+        }
+
+        await dropdown.ClickAsync();
+        await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+
+        var search = SearchableSelectList.Locator("input");
+        if (await search.CountAsync() > 0)
+            await search.First.FillAsync(projectName);
+
+        var option = SearchableSelectList.Locator("[role='option']")
+            .Filter(new LocatorFilterOptions { HasTextString = projectName })
+            .First;
+        await option.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await option.ClickAsync();
+    }
+
+    public async Task ClickSaveAsDraftBtnAsync()
+    {
+        var saveAsDraftBtn = Page.Locator("//button[normalize-space()='Save as Draft']");
+        await saveAsDraftBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await saveAsDraftBtn.ClickAsync();
+
+        var savedMessage = Page.Locator("app-alert, .alert__body, .alert__content")
+            .Filter(new LocatorFilterOptions { HasTextString = "saved" });
+        try
+        {
+            await savedMessage.First.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30_000,
+            });
+        }
+        catch (TimeoutException)
+        {
+            await Assertions.Expect(saveAsDraftBtn).ToBeEnabledAsync(new LocatorAssertionsToBeEnabledOptions
+            {
+                Timeout = 30_000,
+            });
+        }
+    }
+
     public async Task<UtilityBillUploadPage> ClickBackToUtilityBillUploadAsync()
     {
         await BackBtn.ClickAsync();
