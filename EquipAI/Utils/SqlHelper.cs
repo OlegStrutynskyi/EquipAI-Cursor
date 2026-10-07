@@ -738,6 +738,48 @@ public static class SqlHelper
         await deleteSourceCommand.ExecuteNonQueryAsync();
     }
 
+    public static async Task<IReadOnlyList<TelemetryGridDbRow>> GetTelemetryGridRowsAsync(DateTime reportingMonth)
+    {
+        var rows = new List<TelemetryGridDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT e.ReportingMonth, e.EquipmentTag, e.EquipmentType,
+                   CONCAT_WS(' — ', p.Code, p.Name) AS Location,
+                   e.OperatingHours, e.FuelType, e.CreatedAt, s.SourceType, e.Id
+            FROM [telemetry].[EquipmentReading] AS e
+            LEFT JOIN [projects].[Project] AS p
+                ON e.ProjectId = p.Id
+            LEFT JOIN [sources].[ActivitySource] AS s
+                ON e.SourceId = s.Id
+            WHERE e.ReportingMonth = @reportingMonth
+              AND e.IsDeleted = 0
+            """,
+            connection);
+        command.Parameters.AddWithValue("@reportingMonth", reportingMonth.Date);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var month = ReadLocalDateTime(reader.GetValue(0));
+            var equipmentTag = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var equipmentType = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            var location = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            decimal? operatingHours = reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4));
+            var fuelType = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+            DateTime? createdAt = reader.IsDBNull(6) ? null : ReadLocalDateTime(reader.GetValue(6));
+            var sourceType = reader.IsDBNull(7) ? string.Empty : reader.GetValue(7).ToString()?.Trim() ?? string.Empty;
+            var id = Convert.ToInt64(reader.GetValue(8));
+            rows.Add(new TelemetryGridDbRow(
+                month, equipmentTag, equipmentType, location, operatingHours, fuelType, createdAt, sourceType, id));
+        }
+
+        return rows;
+    }
+
     public static async Task DeleteCustomFactorImportAsync(string batchId, int year = 2001)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -2871,6 +2913,17 @@ public sealed record UtilityBillGridDbRow(
     DateTime? ImportDate,
     DateTime? ApproveRejectDate,
     string Source);
+
+public sealed record TelemetryGridDbRow(
+    DateTime ReportingMonth,
+    string EquipmentTag,
+    string EquipmentType,
+    string Location,
+    decimal? OperatingHours,
+    string FuelType,
+    DateTime? CreatedAt,
+    string SourceType,
+    long Id);
 
 public sealed record InvoiceGridDbRow(
     long Id,

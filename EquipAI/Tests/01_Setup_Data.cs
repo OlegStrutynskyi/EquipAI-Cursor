@@ -455,4 +455,44 @@ public class _01_Setup_Data : BaseTest
         savedRow.Company.Should().Be(company);
         savedRow.Status.ToUpperInvariant().Should().Be(expectedStatus);
     }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T17_Setup_ImportTelemetry()
+    {
+        const string fileName = "Custom_06_22.xlsx";
+        const string monthValue = "2022-06";
+        const string monthDisplay = "June 2022";
+        const string equipmentType1 = "AUTOTEST TYPE 1";
+        const string equipmentType2 = "AUTOTEST TYPE 2";
+
+        var telemetryPage = new TelemetryPage(Fixture.Page);
+        await telemetryPage.OpenAsync();
+        await telemetryPage.SetMonthAsync(monthValue);
+        (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(monthDisplay);
+
+        if (HasAutotestTelemetry(await telemetryPage.GetGridRowsAsync(), equipmentType1, equipmentType2))
+            Assert.Pass("Telemetry records already exist.");
+
+        var importPage = await telemetryPage.ClickImportBtnAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        telemetryPage = await importPage.ClickSaveBtnAsync();
+
+        await telemetryPage.OpenAsync();
+        await telemetryPage.SetMonthAsync(monthValue);
+        (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(monthDisplay);
+
+        var gridRows = await telemetryPage.GetGridRowsAsync();
+        gridRows.Should().Contain(row => row.EquipmentType == equipmentType1);
+        gridRows.Should().Contain(row => row.EquipmentType == equipmentType2);
+    }
+
+    private static bool HasAutotestTelemetry(
+        IReadOnlyList<TelemetryGridRow> rows,
+        string equipmentType1,
+        string equipmentType2) =>
+        rows.Any(row => row.EquipmentType == equipmentType1)
+        && rows.Any(row => row.EquipmentType == equipmentType2);
 }

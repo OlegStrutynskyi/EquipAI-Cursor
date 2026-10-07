@@ -65,6 +65,80 @@ public class TelemetryPage : BasePage
             .ToList();
     }
 
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = Grid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName }).First;
+        await header.ScrollIntoViewIfNeededAsync();
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        var fingerprintBefore = await GetPageFingerprintAsync();
+        var showingBefore = await TryGetShowingRangeAsync();
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await Task.Delay(100);
+                continue;
+            }
+
+            var refreshDeadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < refreshDeadline)
+            {
+                var showingAfter = await TryGetShowingRangeAsync();
+                var onFirstPage = showingAfter is null || showingAfter.Value.Start == 1;
+                var fingerprintAfter = await GetPageFingerprintAsync();
+                if (onFirstPage
+                    && fingerprintAfter.Length > 0
+                    && !string.Equals(fingerprintAfter, fingerprintBefore, StringComparison.Ordinal))
+                {
+                    await WaitForGridSettledAsync();
+                    var settled = await GetPageFingerprintAsync();
+                    if (!string.Equals(settled, fingerprintBefore, StringComparison.Ordinal))
+                        return;
+                }
+
+                await Task.Delay(100);
+            }
+
+            if (showingBefore is null || showingBefore.Value.Start == 1)
+            {
+                await WaitForGridSettledAsync();
+                var settled = await GetPageFingerprintAsync();
+                if (!string.Equals(settled, fingerprintBefore, StringComparison.Ordinal))
+                    return;
+            }
+
+            break;
+        }
+
+        await WaitForGridSettledAsync();
+    }
+
+    public async Task<IReadOnlyList<TelemetryGridRow>> GetCurrentPageGridRowsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        try
+        {
+            var loading = Page.Locator(".table-wrapper--loading").First;
+            if (await loading.CountAsync() > 0)
+            {
+                await loading.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Detached,
+                    Timeout = 30_000,
+                });
+            }
+        }
+        catch (TimeoutException)
+        {
+        }
+
+        return await GetGridRowsOnCurrentPageAsync();
+    }
+
     public async Task<IReadOnlyList<TelemetryGridRow>> GetGridRowsAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -339,6 +413,27 @@ public class TelemetryPage : BasePage
         }
 
         return string.Empty;
+    }
+
+    private async Task<string> GetPageFingerprintAsync()
+    {
+        var rows = await GetGridRowsOnCurrentPageAsync();
+        return string.Join("||", rows.Take(3).Select(row => $"{row.EquipmentTag}|{row.OperatingHours}|{row.ImportDate}"));
+    }
+
+    private async Task WaitForGridSettledAsync()
+    {
+        string? previous = null;
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var snapshot = await GetPageFingerprintAsync();
+            if (previous is not null && snapshot.Length > 0 && snapshot == previous)
+                return;
+
+            previous = snapshot;
+            await Task.Delay(200);
+        }
     }
 }
 
