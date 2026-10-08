@@ -112,6 +112,22 @@ public class ProjectsTests : BaseTest
         }
     }
 
+    [Test]
+    public async Task T06_Projects_ClickProjectName()
+    {
+        var projects = await SqlHelper.GetProjectGridRowsAsync();
+        if (projects.Count == 0)
+            Assert.Pass("No Projects");
+
+        var projectsPage = new ProjectsPage(Fixture.Page);
+        await projectsPage.OpenAsync();
+
+        var projectName = await projectsPage.GetFirstRowNameAsync();
+        var projectDashboardPage = await projectsPage.ClickProjectNameAsync(projectName);
+
+        (await projectDashboardPage.GetPageTitleAsync()).Should().Be($"{projectName} Overview");
+    }
+
     private static async Task AssertFirstPageSortedAsync(
         ProjectsPage projectsPage,
         IReadOnlyList<ProjectGridRow> projects,

@@ -19,6 +19,7 @@ public static class Config
     public const string PdfBlobStorageSubscriptionId = "1deb1018-b4d6-4861-82cd-546490f3664e";
     public const string PdfBlobStorageContainerName = "invoices-pdf-qa";
 
+    public const string DefaultEnterpriseProjectName = "Haskell";
     public const string SetupProjectName1 = "DONT-DELETE-Project-1";
     public const string SetupInvoiceNumber1 = "DONT-DELETE-Invoice-1";
     public const string SetupCompanyName1 = "DONT-DELETE-Company-1";

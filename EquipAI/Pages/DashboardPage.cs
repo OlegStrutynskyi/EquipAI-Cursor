@@ -402,6 +402,15 @@ public class DashboardPage : BasePage
         return projectDashboardPage;
     }
 
+    public async Task<ProjectDashboardPage> ClickActiveProjectAsync(string projectName)
+    {
+        var link = ProjectNameLinks.GetByText(projectName, new LocatorGetByTextOptions { Exact = true });
+        await link.ClickAsync();
+        var projectDashboardPage = new ProjectDashboardPage(Page);
+        await projectDashboardPage.WaitForLoadedAsync();
+        return projectDashboardPage;
+    }
+
     public async Task<ProjectsPage> ClickViewAllProjectsLinkAsync()
     {
         await ViewAllProjectsLink.ClickAsync();

@@ -130,6 +130,38 @@ public class ProjectsPage : BasePage
         return results;
     }
 
+    public async Task<string> GetFirstRowNameAsync()
+    {
+        var records = await GetCurrentPageGridRecordsAsync();
+        if (records.Count == 0)
+            throw new InvalidOperationException("Projects grid has no rows.");
+
+        return records[0].Name;
+    }
+
+    public async Task<ProjectDashboardPage> ClickProjectNameAsync(string projectName)
+    {
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var nameLink = Grid.Locator("tbody tr td:nth-child(3) a")
+                .GetByText(projectName, new LocatorGetByTextOptions { Exact = true });
+            if (await nameLink.CountAsync() > 0)
+            {
+                await nameLink.First.ClickAsync();
+                break;
+            }
+
+            if (!await TryGoToNextGridPageAsync())
+                throw new InvalidOperationException($"Project '{projectName}' was not found in the grid.");
+        }
+
+        var projectDashboardPage = new ProjectDashboardPage(Page);
+        await projectDashboardPage.WaitForLoadedAsync();
+        return projectDashboardPage;
+    }
+
     public async Task<IReadOnlyList<ProjectGridRecord>> GetCurrentPageGridRecordsAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
