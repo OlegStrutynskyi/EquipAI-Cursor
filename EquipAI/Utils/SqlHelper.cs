@@ -242,7 +242,18 @@ public static class SqlHelper
                 [RejectionReason] = NULL,
                 [ApprovedAt] = NULL,
                 [ApprovedByUserId] = NULL
-            WHERE [InvoiceNumber] = @invoiceNumber
+            WHERE [InvoiceNumber] = @invoiceNumber;
+
+            UPDATE [invoices].[InvoiceLineItem]
+            SET [ApprovedActivityId] = NULL
+            WHERE [InvoiceId] = (
+                SELECT [Id] FROM [invoices].[Invoice] WHERE [InvoiceNumber] = @invoiceNumber
+            );
+
+            DELETE FROM [emissions].[Activity]
+            WHERE [SourceId] = (
+                SELECT [SourceId] FROM [invoices].[Invoice] WHERE [InvoiceNumber] = @invoiceNumber
+            );
             """,
             connection);
         command.Parameters.AddWithValue("@invoiceNumber", invoiceNumber);
@@ -301,8 +312,9 @@ public static class SqlHelper
                 i.[ApprovedByUserId] = @approvedByUserId
             """);
 
-    public static Task<DateTime> SetUtilityBillDraftAsync(string projectName, string companyName, DateTime billDate) =>
-        UpdateUtilityBillStatusAsync(
+    public static async Task<DateTime> SetUtilityBillDraftAsync(string projectName, string companyName, DateTime billDate)
+    {
+        var timestamp = await UpdateUtilityBillStatusAsync(
             projectName,
             companyName,
             billDate,
@@ -314,6 +326,51 @@ public static class SqlHelper
                 i.[ApprovedAt] = NULL,
                 i.[ApprovedByUserId] = NULL
             """);
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [invoices].[InvoiceLineItem]
+            SET [ApprovedActivityId] = NULL
+            WHERE [InvoiceId] = (
+                SELECT i.[Id]
+                FROM [invoices].[Invoice] AS i
+                INNER JOIN [projects].[Project] AS p
+                    ON i.ProjectId = p.Id
+                INNER JOIN [ingestion].[InvoiceRecognition] AS r
+                    ON i.Id = r.InvoiceId
+                WHERE p.Name = @projectName
+                  AND i.CompanyName = @companyName
+                  AND CAST(i.InvoiceDate AS date) = @billDate
+                  AND i.IsDeleted = 0
+                  AND r.DocumentKindId = 2
+            );
+
+            DELETE FROM [emissions].[Activity]
+            WHERE [SourceId] = (
+                SELECT i.[SourceId]
+                FROM [invoices].[Invoice] AS i
+                INNER JOIN [projects].[Project] AS p
+                    ON i.ProjectId = p.Id
+                INNER JOIN [ingestion].[InvoiceRecognition] AS r
+                    ON i.Id = r.InvoiceId
+                WHERE p.Name = @projectName
+                  AND i.CompanyName = @companyName
+                  AND CAST(i.InvoiceDate AS date) = @billDate
+                  AND i.IsDeleted = 0
+                  AND r.DocumentKindId = 2
+            );
+            """,
+            connection);
+        command.Parameters.AddWithValue("@projectName", projectName);
+        command.Parameters.AddWithValue("@companyName", companyName);
+        command.Parameters.AddWithValue("@billDate", billDate.Date);
+        await command.ExecuteNonQueryAsync();
+
+        return timestamp;
+    }
 
     private static async Task<DateTime> UpdateUtilityBillStatusAsync(
         string projectName,
