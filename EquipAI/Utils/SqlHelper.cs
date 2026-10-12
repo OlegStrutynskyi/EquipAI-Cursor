@@ -837,6 +837,48 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task<IReadOnlyList<TelemetryGridDbRow>> GetProjectTelemetryReadingsAsync(string projectName)
+    {
+        var rows = new List<TelemetryGridDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT e.ReportingMonth, e.EquipmentTag, e.EquipmentType,
+                   CONCAT_WS(' — ', p.Code, p.Name) AS Location,
+                   e.OperatingHours, e.FuelType, e.CreatedAt, s.SourceType, e.Id
+            FROM [telemetry].[EquipmentReading] AS e
+            LEFT JOIN [projects].[Project] AS p
+                ON e.ProjectId = p.Id
+            LEFT JOIN [sources].[ActivitySource] AS s
+                ON e.SourceId = s.Id
+            WHERE e.IsDeleted = 0 AND p.Name = @ProjectName
+            ORDER BY e.ReportingMonth, e.EquipmentTag, e.Id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@ProjectName", projectName);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var month = ReadLocalDateTime(reader.GetValue(0));
+            var equipmentTag = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var equipmentType = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            var location = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            decimal? operatingHours = reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4));
+            var fuelType = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+            DateTime? createdAt = reader.IsDBNull(6) ? null : ReadLocalDateTime(reader.GetValue(6));
+            var sourceType = reader.IsDBNull(7) ? string.Empty : reader.GetValue(7).ToString()?.Trim() ?? string.Empty;
+            var id = reader.IsDBNull(8) ? 0L : Convert.ToInt64(reader.GetValue(8));
+            rows.Add(new TelemetryGridDbRow(
+                month, equipmentTag, equipmentType, location, operatingHours, fuelType, createdAt, sourceType, id));
+        }
+
+        return rows;
+    }
+
     public static async Task DeleteCustomFactorImportAsync(string batchId, int year = 2001)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -2754,6 +2796,37 @@ public static class SqlHelper
         return years;
     }
 
+    public static async Task<IReadOnlyList<string>> GetProjectActivityYearsAsync(string projectName)
+    {
+        var years = new List<string>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT DISTINCT YEAR(a.ActivityDate) AS ActivityYear
+            FROM [emissions].[Activity] AS a
+            INNER JOIN [projects].[Project] AS p
+                ON a.ProjectId = p.Id
+            WHERE a.IsDeleted = 0
+              AND p.IsDeleted = 0
+              AND p.Name LIKE @ProjectName
+            ORDER BY ActivityYear DESC
+            """,
+            connection);
+        command.Parameters.AddWithValue("@ProjectName", $"%{projectName}%");
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            if (!reader.IsDBNull(0))
+                years.Add(reader.GetInt32(0).ToString());
+        }
+
+        return years;
+    }
+
     public static async Task<IReadOnlyList<ChartMonthEmissionsRow>> GetChartScopeMonthlyEmissionsAsync(int year, int ghgScope)
     {
         var rows = new List<ChartMonthEmissionsRow>();
@@ -2823,6 +2896,206 @@ public static class SqlHelper
             var month = Convert.ToInt32(reader.GetValue(0));
             var tonnes = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
             rows.Add(new ChartMonthEmissionsRow(month, tonnes));
+        }
+
+        return rows;
+    }
+
+    public static async Task<IReadOnlyList<ChartMonthEmissionsRow>> GetProjectChartScopeMonthlyEmissionsAsync(
+        string projectName,
+        int year,
+        int ghgScope)
+    {
+        var rows = new List<ChartMonthEmissionsRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            DECLARE @PeriodStart date = DATEFROMPARTS(@Year, 1, 1);
+            DECLARE @PeriodEnd   date = IIF(@Year = YEAR(GETUTCDATE()),
+                                            CAST(GETUTCDATE() AS date),
+                                            DATEFROMPARTS(@Year, 12, 31));
+
+            SELECT
+                CAST(MONTH(a.ActivityDate) AS tinyint) AS Month,
+                COALESCE(SUM(a.Quantity * ef.Co2eTonnesPerActivityUnit), 0) AS Co2eTonnes
+            FROM projects.Project AS p
+            INNER JOIN emissions.Activity AS a
+                ON a.ProjectId = p.Id AND a.IsDeleted = 0
+                AND a.ActivityDate >= @PeriodStart
+                AND a.ActivityDate <= @PeriodEnd
+            INNER JOIN emissions.EmissionCategory AS ec
+                ON ec.Id = a.CategoryId AND ec.IsDeleted = 0
+            LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
+            LEFT JOIN factors.FactorLibraryVersion AS flv
+                ON flv.IsDeleted = 0
+                AND flv.Year = COALESCE(
+                    (
+                        SELECT TOP (1) flvExact.Year
+                        FROM factors.FactorLibraryVersion AS flvExact
+                        WHERE flvExact.IsDeleted = 0
+                          AND flvExact.Year = YEAR(a.ActivityDate)
+                          AND EXISTS (
+                              SELECT 1
+                              FROM factors.EmissionFactor AS efExact
+                              WHERE efExact.FactorLibraryVersionId = flvExact.Id
+                                AND efExact.IsDeleted = 0)
+                    ),
+                    (
+                        SELECT MAX(flvLatest.Year)
+                        FROM factors.FactorLibraryVersion AS flvLatest
+                        WHERE flvLatest.IsDeleted = 0
+                          AND EXISTS (
+                              SELECT 1
+                              FROM factors.EmissionFactor AS efLatest
+                              WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
+                                AND efLatest.IsDeleted = 0)
+                    ))
+            LEFT JOIN factors.EmissionFactor AS ef
+                ON ef.FactorLibraryVersionId = flv.Id
+                AND ef.TypeId = t.Id
+                AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
+                AND ef.IsDeleted = 0
+            WHERE p.IsDeleted = 0
+              AND p.Name LIKE @ProjectName
+              AND ec.GhgScope = @GhgScope
+            GROUP BY ec.GhgScope, MONTH(a.ActivityDate)
+            HAVING COALESCE(SUM(a.Quantity * ef.Co2eTonnesPerActivityUnit), 0) > 0
+            ORDER BY Month;
+            """,
+            connection);
+        command.Parameters.AddWithValue("@ProjectName", $"%{projectName}%");
+        command.Parameters.AddWithValue("@Year", year);
+        command.Parameters.AddWithValue("@GhgScope", ghgScope);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var month = Convert.ToInt32(reader.GetValue(0));
+            var tonnes = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
+            rows.Add(new ChartMonthEmissionsRow(month, tonnes));
+        }
+
+        return rows;
+    }
+
+    public static async Task<IReadOnlyList<ProjectFuelInvoiceDbRow>> GetProjectFuelInvoicesAsync(string projectName)
+    {
+        var rows = new List<ProjectFuelInvoiceDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.InvoiceNumber, i.CompanyName, i.InvoiceDate, i.Status, i.CreatedAt, i.TotalCost, i.CurrencyCode, s.SourceType, c.DisplayName
+            FROM [invoices].[Invoice] AS i
+            FULL JOIN [ingestion].[InvoiceRecognition] AS r
+                ON i.Id = r.InvoiceId
+            LEFT JOIN [projects].[Project] AS p
+                ON i.ProjectId = p.Id
+            LEFT JOIN [sources].[ActivitySource] AS s
+                ON i.SourceId = s.Id
+            LEFT JOIN [emissions].[EmissionCategory] AS c
+                ON i.EmissionCategoryId = c.Id
+            WHERE i.IsDeleted = 0 AND p.Name = @ProjectName
+              AND (r.DocumentKindId != 2 OR r.DocumentKindId IS NULL)
+            ORDER BY i.InvoiceNumber
+            """,
+            connection);
+        command.Parameters.AddWithValue("@ProjectName", projectName);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var invoiceNumber = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var company = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            DateTime? invoiceDate = reader.IsDBNull(2) ? null : ReadLocalDateTime(reader.GetValue(2));
+            var status = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            DateTime? createdAt = reader.IsDBNull(4) ? null : ReadLocalDateTime(reader.GetValue(4));
+            decimal? totalCost = reader.IsDBNull(5) ? null : Convert.ToDecimal(reader.GetValue(5));
+            var currencyCode = reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim();
+            var source = reader.IsDBNull(7) ? string.Empty : reader.GetValue(7).ToString()?.Trim() ?? string.Empty;
+            var category = reader.IsDBNull(8) ? string.Empty : reader.GetString(8).Trim();
+            rows.Add(new ProjectFuelInvoiceDbRow(
+                invoiceNumber,
+                company,
+                invoiceDate,
+                status,
+                createdAt,
+                totalCost,
+                currencyCode,
+                source,
+                category));
+        }
+
+        return rows;
+    }
+
+    public static async Task<IReadOnlyList<ProjectOfficeBillDbRow>> GetProjectOfficeBillsAsync(string projectName)
+    {
+        var rows = new List<ProjectOfficeBillDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT i.CompanyName AS Company, i.InvoiceDate AS BillDate, i.Status, i.CreatedAt AS ImportDate, i.TotalCost, i.CurrencyCode, s.SourceType,
+                   COALESCE(
+                       (
+                           SELECT STRING_AGG(cat.DisplayName, ', ') WITHIN GROUP (ORDER BY cat.DisplayName)
+                           FROM (
+                               SELECT DISTINCT cLine.DisplayName
+                               FROM [invoices].[InvoiceLineItem] AS li
+                               INNER JOIN [emissions].[EmissionCategory] AS cLine
+                                   ON li.CategoryId = cLine.Id
+                               WHERE li.InvoiceId = i.Id
+                                 AND cLine.DisplayName IS NOT NULL
+                           ) AS cat
+                       ),
+                       c.DisplayName) AS DisplayName,
+                   i.Id
+            FROM [invoices].[Invoice] AS i
+            FULL JOIN [ingestion].[InvoiceRecognition] AS r
+                ON i.Id = r.InvoiceId
+            LEFT JOIN [projects].[Project] AS p
+                ON i.ProjectId = p.Id
+            LEFT JOIN [sources].[ActivitySource] AS s
+                ON i.SourceId = s.Id
+            LEFT JOIN [emissions].[EmissionCategory] AS c
+                ON i.EmissionCategoryId = c.Id
+            WHERE i.IsDeleted = 0 AND p.Name = @ProjectName
+              AND r.DocumentKindId = 2
+            ORDER BY i.CreatedAt, i.CompanyName, i.InvoiceDate, i.Id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@ProjectName", projectName);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var company = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            DateTime? billDate = reader.IsDBNull(1) ? null : ReadLocalDateTime(reader.GetValue(1));
+            var status = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            DateTime? importDate = reader.IsDBNull(3) ? null : ReadLocalDateTime(reader.GetValue(3));
+            decimal? totalCost = reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4));
+            var currencyCode = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+            var source = reader.IsDBNull(6) ? string.Empty : reader.GetValue(6).ToString()?.Trim() ?? string.Empty;
+            var category = reader.IsDBNull(7) ? string.Empty : reader.GetString(7).Trim();
+            var id = reader.IsDBNull(8) ? 0L : Convert.ToInt64(reader.GetValue(8));
+            rows.Add(new ProjectOfficeBillDbRow(
+                company,
+                billDate,
+                status,
+                importDate,
+                totalCost,
+                currencyCode,
+                source,
+                category,
+                id));
         }
 
         return rows;
@@ -3175,6 +3448,28 @@ public sealed record TelemetryGridDbRow(
     DateTime? CreatedAt,
     string SourceType,
     long Id);
+
+public sealed record ProjectOfficeBillDbRow(
+    string Company,
+    DateTime? BillDate,
+    string Status,
+    DateTime? ImportDate,
+    decimal? TotalCost,
+    string CurrencyCode,
+    string SourceType,
+    string Category,
+    long Id);
+
+public sealed record ProjectFuelInvoiceDbRow(
+    string InvoiceNumber,
+    string CompanyName,
+    DateTime? InvoiceDate,
+    string Status,
+    DateTime? CreatedAt,
+    decimal? TotalCost,
+    string CurrencyCode,
+    string SourceType,
+    string Category);
 
 public sealed record InvoiceGridDbRow(
     long Id,
