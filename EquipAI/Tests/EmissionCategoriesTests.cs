@@ -21,7 +21,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T02_EmissionCategories_GridColumns()
+    public async Task T02_EmissionCategories_Grid_Columns()
     {
         var expectedColumns = new[]
         {
@@ -37,7 +37,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T03_EmissionCategories_GridRecords()
+    public async Task T03_EmissionCategories_Grid_Records()
     {
         var emissionCategoriesPage = new EmissionCategoriesPage(Fixture.Page);
         await emissionCategoriesPage.OpenAsync();
@@ -56,7 +56,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T04_EmissionCategories_GridSorting()
+    public async Task T04_EmissionCategories_Grid_Sorting()
     {
         var columns = new[] { "DISPLAY NAME", "GHG SCOPE" };
 
@@ -87,7 +87,21 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T05_EmissionCategories_ClickEditBtn()
+    public async Task T05_EmissionCategories_Grid_Search()
+    {
+        var emissionCategoriesPage = new EmissionCategoriesPage(Fixture.Page);
+        await emissionCategoriesPage.OpenAsync();
+
+        (await emissionCategoriesPage.IsSearchInputVisibleAsync()).Should().BeTrue();
+        (await emissionCategoriesPage.GetSearchPlaceholderAsync()).Should().Be("Search categories or data...");
+
+        await AssertEmissionCategorySearchAsync(emissionCategoriesPage, RandomCategorySearch());
+        await AssertEmissionCategorySearchAsync(emissionCategoriesPage, "Fuel");
+        await AssertEmissionCategorySearchAsync(emissionCategoriesPage, "pe 1");
+    }
+
+    [Test]
+    public async Task T06_EmissionCategories_ClickEditBtn()
     {
         const string expectedPageTitle = "Edit Emission Category";
 
@@ -99,7 +113,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T06_EmissionCategories_Edit_DefaultView()
+    public async Task T07_EmissionCategories_Edit_DefaultView()
     {
         const string expectedPageTitle = "Edit Emission Category";
 
@@ -121,7 +135,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T07_EmissionCategories_Edit_EmptyDisplayName()
+    public async Task T08_EmissionCategories_Edit_EmptyDisplayName()
     {
         const string expectedDisplayNameError = "Display name is required.";
 
@@ -135,7 +149,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T08_EmissionCategories_Edit_DisplayNameTooLong()
+    public async Task T09_EmissionCategories_Edit_DisplayNameTooLong()
     {
         const string expectedDisplayNameError = "Display name must be at most 256 characters.";
         var tooLongDisplayName = GenerateRandomString(257);
@@ -151,7 +165,7 @@ public class EmissionCategoriesTests : BaseTest
     }
 
     [Test]
-    public async Task T09_EmissionCategories_Edit_Success()
+    public async Task T10_EmissionCategories_Edit_Success()
     {
         var updatedDisplayName = $"Name{DateTime.Now:yyyyMMddHHmmss}";
         object? emissionCategoryId = null;
@@ -189,6 +203,38 @@ public class EmissionCategoriesTests : BaseTest
             }
         }
     }
+
+    private static async Task AssertEmissionCategorySearchAsync(EmissionCategoriesPage page, string term)
+    {
+        await page.SearchAsync(term);
+
+        var expected = (await SqlHelper.GetEmissionCategoryGridRowsAsync())
+            .Select(category => (category.DisplayName, GhgScope: $"Scope {category.GhgScope}"))
+            .Where(row => CategoryMatchesSearch(row, term))
+            .ToList();
+
+        if (expected.Count == 0)
+        {
+            (await page.GetGridEmptyMessageAsync()).Should().Be("No emission categories match your search.");
+            return;
+        }
+
+        var actual = await page.GetGridRowsAsync();
+        actual.Should().BeEquivalentTo(expected);
+        actual.Should().OnlyContain(row => CategoryMatchesSearch(row, term));
+    }
+
+    private static string RandomCategorySearch()
+    {
+        var chars = GenerateRandomAlphanumericString(10).ToCharArray();
+        chars[0] = (char)('a' + Random.Shared.Next(26));
+        chars[1] = (char)('0' + Random.Shared.Next(10));
+        return new string(chars);
+    }
+
+    private static bool CategoryMatchesSearch((string DisplayName, string GhgScope) row, string term) =>
+        string.Join(' ', row.DisplayName, row.GhgScope)
+            .Contains(term, StringComparison.OrdinalIgnoreCase);
 
     private static List<(string DisplayName, string GhgScope)> ExpectedSortedCategories(
         IReadOnlyList<(string DisplayName, string GhgScope)> categories,

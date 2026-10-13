@@ -9,6 +9,7 @@ public class EmissionCategoriesPage : BasePage
     private ILocator PageTitle => Page.Locator("//h1[contains(@id,'title')]")
         .Filter(new LocatorFilterOptions { HasTextString = "Emission Categories" });
     private ILocator Message => Page.Locator("//p[@class='page-header__lead']");
+    private ILocator SearchInput => Page.Locator("//input[@id='admin-emission-categories-search']");
     private ILocator Grid => Page.Locator("table.table");
     private ILocator DisplayNameCells => Grid.Locator("tbody tr td:nth-child(1)");
     private ILocator GhgScopeCells => Grid.Locator("tbody tr td:nth-child(2)");
@@ -44,6 +45,117 @@ public class EmissionCategoriesPage : BasePage
     }
 
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
+
+    public async Task<bool> IsSearchInputVisibleAsync()
+    {
+        try
+        {
+            await SearchInput.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string> GetSearchPlaceholderAsync() =>
+        (await SearchInput.GetAttributeAsync("placeholder"))?.Trim() ?? string.Empty;
+
+    public async Task SearchAsync(string text)
+    {
+        var before = NormalizeGridText(await Grid.Locator("tbody").InnerTextAsync());
+        var response = Page.WaitForResponseAsync(
+            response => IsCategoriesSearchResponse(response, text),
+            new PageWaitForResponseOptions { Timeout = 15_000 });
+        await SearchInput.FillAsync(text);
+        await response;
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await IsGridLoadingAsync())
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            var current = NormalizeGridText(await Grid.Locator("tbody").InnerTextAsync());
+            if (current == before)
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            if (await IsEmptySearchMessageVisibleAsync())
+                return;
+
+            var rows = await GetGridRowsOnCurrentPageAsync();
+            if (rows.Count > 0 && rows.All(row => RowContains(row, text)))
+                return;
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Emission categories search for '{text}' did not finish.");
+    }
+
+    public async Task<string> GetGridEmptyMessageAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText(
+            "No emission categories match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        await message.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        return NormalizeGridText(await message.First.InnerTextAsync());
+    }
+
+    private static bool IsCategoriesSearchResponse(IResponse response, string text)
+    {
+        if (!response.Ok || !response.Url.Contains("/api/admin/emission-categories", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var query = new Uri(response.Url).Query.TrimStart('?');
+        foreach (var part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = part.IndexOf('=');
+            if (separator <= 0)
+                continue;
+
+            var key = Uri.UnescapeDataString(part[..separator]);
+            var value = Uri.UnescapeDataString(part[(separator + 1)..].Replace("+", " "));
+            if (key.Equals("Search", StringComparison.OrdinalIgnoreCase)
+                && value.Equals(text, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private async Task<bool> IsGridLoadingAsync() =>
+        await Page.Locator(".table-wrapper--loading").CountAsync() > 0;
+
+    private async Task<bool> IsEmptySearchMessageVisibleAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText(
+            "No emission categories match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        return await message.CountAsync() > 0 && await message.First.IsVisibleAsync();
+    }
+
+    private static bool RowContains((string DisplayName, string GhgScope) row, string term) =>
+        string.Join(' ', row.DisplayName, row.GhgScope)
+            .Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeGridText(string value) =>
+        System.Text.RegularExpressions.Regex.Replace(value.Replace('\u00A0', ' '), @"\s+", " ").Trim();
 
     public async Task ClickGridColumnAsync(string columnName)
     {

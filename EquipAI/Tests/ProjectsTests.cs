@@ -114,7 +114,21 @@ public class ProjectsTests : BaseTest
     }
 
     [Test]
-    public async Task T06_Projects_ClickProjectName()
+    public async Task T06_Projects_Grid_Search()
+    {
+        var projectsPage = new ProjectsPage(Fixture.Page);
+        await projectsPage.OpenAsync();
+
+        (await projectsPage.IsSearchInputVisibleAsync()).Should().BeTrue();
+        (await projectsPage.GetSearchPlaceholderAsync()).Should().Be("Search projects or data...");
+
+        await AssertProjectSearchAsync(projectsPage, RandomProjectSearch());
+        await AssertProjectSearchAsync(projectsPage, "test");
+        await AssertProjectSearchAsync(projectsPage, "123456");
+    }
+
+    [Test]
+    public async Task T07_Projects_ClickProjectName()
     {
         var projects = await SqlHelper.GetProjectGridRowsAsync();
         if (projects.Count == 0)
@@ -144,6 +158,47 @@ public class ProjectsTests : BaseTest
 
     private static string FormatProjectStartDate(DateTime value) =>
         value.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
+
+    private static string RandomProjectSearch()
+    {
+        var chars = GenerateRandomAlphanumericString(10).ToCharArray();
+        chars[0] = (char)('a' + Random.Shared.Next(26));
+        chars[1] = (char)('0' + Random.Shared.Next(10));
+        return new string(chars);
+    }
+
+    private static async Task AssertProjectSearchAsync(ProjectsPage projectsPage, string term)
+    {
+        await projectsPage.SearchAsync(term);
+
+        var expected = (await SqlHelper.GetProjectGridRowsAsync())
+            .Where(row => ProjectMatchesSearch(row, term))
+            .Select(project => new ProjectGridRecord(
+                project.Code,
+                project.Name,
+                project.Address,
+                project.StartDate is null ? "—" : FormatProjectStartDate(project.StartDate.Value),
+                project.IsActive ? "ACTIVE" : "INACTIVE"))
+            .ToList();
+
+        if (expected.Count == 0)
+        {
+            (await projectsPage.GetGridEmptyMessageAsync()).Should().Be("No projects match your search.");
+            return;
+        }
+
+        var actual = await projectsPage.GetAllGridRecordsAsync();
+        actual.Should().BeEquivalentTo(expected);
+        actual.Should().OnlyContain(row => RowContains(row, term));
+    }
+
+    private static bool RowContains(ProjectGridRecord row, string term) =>
+        string.Join(' ', row.Code, row.Name, row.Address)
+            .Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static bool ProjectMatchesSearch(ProjectGridRow row, string term) =>
+        string.Join(' ', row.Code, row.Name, row.Address)
+            .Contains(term, StringComparison.OrdinalIgnoreCase);
 
     private static List<ProjectGridRecord> ExpectedSortedRecords(
         IReadOnlyList<ProjectGridRow> projects,

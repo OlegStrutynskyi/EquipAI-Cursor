@@ -11,6 +11,7 @@ public class ProjectsPage : BasePage
         .Filter(new LocatorFilterOptions { HasTextString = "Projects" });
     private ILocator SynchronizeFromProcoreBtn => Page.Locator("//button[normalize-space()='Synchronize from Procore']");
     private ILocator SynchDate => Page.Locator("//span[@class='text-muted']");
+    private ILocator SearchInput => Page.Locator("//input[@id='admin-projects-search']");
     private ILocator Grid => Page.Locator("table.table");
     private ILocator NextPageBtn => Page.Locator(
         "//nav[contains(@class,'pagination')]//button[@aria-label='Next page' or normalize-space()='Next']");
@@ -36,6 +37,72 @@ public class ProjectsPage : BasePage
     public Task<bool> IsSynchronizeFromProcoreBtnEnabledAsync() => SynchronizeFromProcoreBtn.IsEnabledAsync();
     public Task<bool> IsSynchDateVisibleAsync() => SynchDate.IsVisibleAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
+
+    public async Task<bool> IsSearchInputVisibleAsync()
+    {
+        try
+        {
+            await SearchInput.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string> GetSearchPlaceholderAsync() =>
+        (await SearchInput.GetAttributeAsync("placeholder"))?.Trim() ?? string.Empty;
+
+    public async Task SearchAsync(string text)
+    {
+        var response = Page.WaitForResponseAsync(
+            response => IsProjectsSearchResponse(response, text),
+            new PageWaitForResponseOptions { Timeout = 15_000 });
+        await SearchInput.FillAsync(text);
+        await response;
+        await WaitForGridDataAsync();
+    }
+
+    public async Task<string> GetGridEmptyMessageAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText("No projects match your search.", new LocatorGetByTextOptions
+        {
+            Exact = true
+        });
+        await message.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        return CollapseWhitespace(await message.First.InnerTextAsync());
+    }
+
+    private static bool IsProjectsSearchResponse(IResponse response, string text)
+    {
+        if (!response.Ok || !response.Url.Contains("/api/admin/projects", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var query = new Uri(response.Url).Query.TrimStart('?');
+        foreach (var part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = part.IndexOf('=');
+            if (separator <= 0)
+                continue;
+
+            var key = Uri.UnescapeDataString(part[..separator]);
+            var value = Uri.UnescapeDataString(part[(separator + 1)..]);
+            if (key.Equals("Search", StringComparison.OrdinalIgnoreCase)
+                && value.Equals(text, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
 
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {
@@ -353,6 +420,8 @@ public class ProjectsPage : BasePage
                   .some(tr => {
                     if (tr.closest('.table-wrapper--loading')) return false;
                     if (tr.querySelector('.table__skeleton-bar')) return false;
+                    const text = (tr.innerText || '').replace(/\s+/g, ' ').trim();
+                    if (text.includes('No projects match your search.')) return true;
                     const cells = tr.querySelectorAll('td');
                     return cells.length > 1 && (cells[1].innerText || '').trim().length > 0;
                   })
