@@ -1147,10 +1147,40 @@ public static class SqlHelper
         return (dimension, scaleToCanonical);
     }
 
+    public static async Task<IReadOnlyList<UnitGridRow>> GetUnitGridRowsAsync()
+    {
+        var rows = new List<UnitGridRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT Code, DisplayName, Symbol, Dimension, ScaleToCanonical
+            FROM [emissions].[UnitOfMeasure]
+            WHERE IsDeleted = 0
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var code = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var displayName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var symbol = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            int? dimension = reader.IsDBNull(3) ? null : Convert.ToInt32(reader.GetValue(3));
+            decimal? scale = reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4));
+            rows.Add(new UnitGridRow(code, displayName, symbol, dimension, scale));
+        }
+
+        return rows;
+    }
+
     public static async Task RestoreUnitOfMeasureAsync(
         object id,
         string code,
         string displayName,
+        string symbol,
         int? dimension = null,
         decimal? scaleToCanonical = null)
     {
@@ -1162,6 +1192,7 @@ public static class SqlHelper
             UPDATE [emissions].[UnitOfMeasure]
             SET Code = @code,
                 DisplayName = @displayName,
+                Symbol = @symbol,
                 Dimension = @dimension,
                 ScaleToCanonical = @scaleToCanonical
             WHERE Id = @id
@@ -1169,6 +1200,7 @@ public static class SqlHelper
             connection);
         command.Parameters.AddWithValue("@code", code);
         command.Parameters.AddWithValue("@displayName", displayName);
+        command.Parameters.AddWithValue("@symbol", symbol);
         command.Parameters.AddWithValue("@dimension", dimension is null ? DBNull.Value : dimension);
         command.Parameters.AddWithValue("@scaleToCanonical", scaleToCanonical is null ? DBNull.Value : scaleToCanonical);
         command.Parameters.AddWithValue("@id", id);
@@ -3493,6 +3525,13 @@ public sealed record FactorImportBatchGridDbRow(
 public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
 
 public sealed record ProjectGridRow(string Code, string Name, string Address, DateTime? StartDate, bool IsActive);
+
+public sealed record UnitGridRow(
+    string Code,
+    string DisplayName,
+    string Symbol,
+    int? Dimension,
+    decimal? Scale);
 
 public sealed record UnitAliasGridRow(string AliasText, string ResolvesTo);
 

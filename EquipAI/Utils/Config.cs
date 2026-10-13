@@ -38,6 +38,8 @@ public static class Config
     public const string SetupDefaultEmissionCategory2 = "Direct Fleet Emissions (Scope 1)";
     public const string SetupUnitName1 = "DONT DELETE UNIT 1";
     public const string SetupUnitName2 = "DONT DELETE UNIT 2";
+    public const string SetupUnitSymbol1 = "SYMBOL 1";
+    public const string SetupUnitSymbol2 = "SYMBOL 2";
     public const string SetupEmissionTypeName1 = "DONT DELETE EMISSION TYPE 1";
     public const string SetupEmissionTypeName2 = "DONT DELETE EMISSION TYPE 2";
     public const string SetupEmissionTypeName3 = "DONT DELETE EMISSION TYPE 3";

@@ -8,6 +8,7 @@ public class UnitsPage : BasePage
 
     private ILocator Message => Page.Locator("//p[@class='page-header__lead']");
     private ILocator AddUnitBtn => Page.Locator("//button[normalize-space()='Add unit']");
+    private ILocator SearchInput => Page.Locator("//input[@id='admin-units-search']");
     private ILocator Grid => Page.Locator("//table[@class='table']");
     private ILocator CodeCells => Page.Locator("//table[@class='table']//tbody/tr/td[1]");
     private ILocator DisplayNameCells => Page.Locator("//table[@class='table']//tbody/tr/td[2]");
@@ -45,6 +46,141 @@ public class UnitsPage : BasePage
     public Task<bool> IsAddUnitBtnEnabledAsync() => AddUnitBtn.IsEnabledAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
 
+    public async Task<bool> IsSearchInputVisibleAsync()
+    {
+        try
+        {
+            await SearchInput.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string> GetSearchPlaceholderAsync() =>
+        (await SearchInput.GetAttributeAsync("placeholder"))?.Trim() ?? string.Empty;
+
+    public async Task SearchAsync(string text)
+    {
+        var before = NormalizeGridText(await Grid.Locator("tbody").InnerTextAsync());
+        var response = Page.WaitForResponseAsync(
+            response => IsUnitsSearchResponse(response, text),
+            new PageWaitForResponseOptions { Timeout = 15_000 });
+        await SearchInput.FillAsync(text);
+        await response;
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await IsGridLoadingAsync())
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            var current = NormalizeGridText(await Grid.Locator("tbody").InnerTextAsync());
+            if (current == before)
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            if (await IsEmptySearchMessageVisibleAsync())
+                return;
+
+            var rows = await GetGridRecordsOnCurrentPageAsync();
+            if (rows.Count > 0 && rows.All(row => RowContainsSearch(row, text)))
+                return;
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Units search for '{text}' did not finish.");
+    }
+
+    public async Task<string> GetGridEmptyMessageAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText(
+            "No units match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        await message.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        return NormalizeGridText(await message.First.InnerTextAsync());
+    }
+
+    public async Task ClickGridColumnAsync(string columnName)
+    {
+        var header = Grid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName });
+        var ariaBefore = await header.GetAttributeAsync("aria-sort");
+        var fingerprintBefore = await GetCurrentPageFingerprintAsync();
+        await header.Locator("button.table__sort").ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ariaAfter = await header.GetAttributeAsync("aria-sort");
+            if (string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            {
+                await Task.Delay(100);
+                continue;
+            }
+
+            var refreshDeadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < refreshDeadline)
+            {
+                var fingerprintAfter = await GetCurrentPageFingerprintAsync();
+                if (fingerprintAfter.Length > 0
+                    && !string.Equals(fingerprintAfter, fingerprintBefore, StringComparison.Ordinal))
+                    return;
+
+                await Task.Delay(100);
+            }
+
+            return;
+        }
+
+        throw new TimeoutException($"Column '{columnName}' sort did not change from '{ariaBefore ?? "none"}'.");
+    }
+
+    public async Task<IReadOnlyList<UnitGridRecord>> GetCurrentPageGridRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        return await GetGridRecordsOnCurrentPageAsync();
+    }
+
+    public async Task<IReadOnlyList<UnitGridRecord>> GetAllGridRecordsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        await GoToFirstGridPageAsync();
+
+        var results = new List<UnitGridRecord>();
+        var seenCodes = new HashSet<string>(StringComparer.Ordinal);
+        while (true)
+        {
+            foreach (var row in await GetGridRecordsOnCurrentPageAsync())
+            {
+                if (seenCodes.Add(row.Code))
+                    results.Add(row);
+            }
+
+            if (!await TryGoToNextGridPageAsync())
+                break;
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -79,7 +215,19 @@ public class UnitsPage : BasePage
         return (cells[0], cells[1]);
     }
 
+    public async Task<string> GetSymbolByCodeAsync(string code)
+    {
+        var cells = await GetRowCellsByCodeAsync(code);
+        return cells.Length > 2 ? cells[2] : string.Empty;
+    }
+
     public async Task<(string Dimension, string Scale)> GetDimensionAndScaleByCodeAsync(string code)
+    {
+        var cells = await GetRowCellsByCodeAsync(code);
+        return (cells.Length > 3 ? cells[3] : string.Empty, cells.Length > 4 ? cells[4] : string.Empty);
+    }
+
+    private async Task<string[]> GetRowCellsByCodeAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
 
@@ -91,7 +239,7 @@ public class UnitsPage : BasePage
             {
                 var match = await FindRowCellsByCodeOnCurrentPageAsync(code);
                 if (match is not null)
-                    return (match[2], match[3]);
+                    return match;
 
                 if (!await TryGoToNextGridPageAsync())
                     break;
@@ -295,6 +443,74 @@ public class UnitsPage : BasePage
             """);
     }
 
+    private async Task<IReadOnlyList<UnitGridRecord>> GetGridRecordsOnCurrentPageAsync()
+    {
+        var rows = await Grid.EvaluateAsync<string[][]>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => !tr.querySelector(':scope > td .table__skeleton-bar'))
+              .map(tr => [...tr.querySelectorAll(':scope > td')].slice(0, 5).map(td => {
+                const rendered = (td.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const title = (td.getAttribute('title') || td.querySelector('[title]')?.getAttribute('title') || '').replace(/\u00a0/g, ' ').trim();
+                const full = (td.textContent || '').replace(/\u00a0/g, ' ').trim();
+                return [title, full, rendered].sort((a, b) => b.length - a.length)[0];
+              }))
+              .filter(cells => cells.length > 4 && cells[0])
+            """);
+
+        return rows
+            .Select(cells => new UnitGridRecord(
+                Code: cells[0],
+                DisplayName: cells.Length > 1 ? cells[1] : string.Empty,
+                Symbol: cells.Length > 2 ? cells[2] : string.Empty,
+                Dimension: cells.Length > 3 ? cells[3] : string.Empty,
+                Scale: cells.Length > 4 ? cells[4] : string.Empty))
+            .ToList();
+    }
+
+    private async Task<string> GetCurrentPageFingerprintAsync() =>
+        string.Join("|", (await GetGridRecordsOnCurrentPageAsync()).Select(row => row.Code));
+
+    private static bool IsUnitsSearchResponse(IResponse response, string text)
+    {
+        if (!response.Ok || !response.Url.Contains("/api/admin/reference-data/units", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var query = new Uri(response.Url).Query.TrimStart('?');
+        foreach (var part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = part.IndexOf('=');
+            if (separator <= 0)
+                continue;
+
+            var key = Uri.UnescapeDataString(part[..separator]);
+            var value = Uri.UnescapeDataString(part[(separator + 1)..].Replace("+", " "));
+            if (key.Equals("Search", StringComparison.OrdinalIgnoreCase)
+                && value.Equals(text, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private async Task<bool> IsGridLoadingAsync() =>
+        await Page.Locator(".table-wrapper--loading").CountAsync() > 0;
+
+    private async Task<bool> IsEmptySearchMessageVisibleAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText(
+            "No units match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        return await message.CountAsync() > 0 && await message.First.IsVisibleAsync();
+    }
+
+    private static bool RowContainsSearch(UnitGridRecord row, string term) =>
+        string.Join(' ', row.Code, row.DisplayName, row.Symbol, row.Dimension)
+            .Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeGridText(string value) =>
+        System.Text.RegularExpressions.Regex.Replace(value.Replace('\u00A0', ' '), @"\s+", " ").Trim();
+
     private async Task WaitForGridDataAsync()
     {
         try
@@ -449,3 +665,10 @@ public class UnitsPage : BasePage
             """);
     }
 }
+
+public sealed record UnitGridRecord(
+    string Code,
+    string DisplayName,
+    string Symbol,
+    string Dimension,
+    string Scale);

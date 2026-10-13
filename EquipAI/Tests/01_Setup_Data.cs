@@ -76,6 +76,7 @@ public class _01_Setup_Data : BaseTest
     {
         const string code = Config.SetupCode1;
         const string displayName = Config.SetupUnitName1;
+        const string symbol = Config.SetupUnitSymbol1;
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -86,9 +87,11 @@ public class _01_Setup_Data : BaseTest
         var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
         await addUnitPage.FillCodeAsync(code);
         await addUnitPage.FillDisplayNameAsync(displayName);
+        await addUnitPage.FillSymbolAsync(symbol);
         unitsPage = await addUnitPage.CreateUnitAsync();
 
         (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
+        (await unitsPage.GetSymbolByCodeAsync(code)).Should().Be(symbol);
     }
 
     [Explicit("Manual setup test. Run before the test suite.")]
@@ -97,6 +100,7 @@ public class _01_Setup_Data : BaseTest
     {
         const string code = Config.SetupCode2;
         const string displayName = Config.SetupUnitName2;
+        const string symbol = Config.SetupUnitSymbol2;
 
         var unitsPage = new UnitsPage(Fixture.Page);
         await unitsPage.OpenAsync();
@@ -107,9 +111,11 @@ public class _01_Setup_Data : BaseTest
         var addUnitPage = await unitsPage.ClickAddUnitBtnAsync();
         await addUnitPage.FillCodeAsync(code);
         await addUnitPage.FillDisplayNameAsync(displayName);
+        await addUnitPage.FillSymbolAsync(symbol);
         unitsPage = await addUnitPage.CreateUnitAsync();
 
         (await unitsPage.IsCodeInGridAsync(code)).Should().BeTrue();
+        (await unitsPage.GetSymbolByCodeAsync(code)).Should().Be(symbol);
     }
 
     [Explicit("Manual setup test. Run before the test suite.")]

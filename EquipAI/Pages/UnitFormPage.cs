@@ -10,6 +10,9 @@ public abstract class UnitFormPage : BasePage
     protected ILocator CodeError => Page.Locator("//input[@id='unit-code']/following-sibling::span");
     protected ILocator DisplayNameInput => Page.Locator("//input[@id='unit-display-name']");
     protected ILocator DisplayNameError => Page.Locator("//input[@id='unit-display-name']/following-sibling::span");
+    protected ILocator SymbolInput => Page.Locator("//input[@id='unit-symbol']");
+    protected ILocator SymbolMessage => Page.Locator("//span[@id='unit-symbol-hint']");
+    protected ILocator SymbolError => Page.Locator("//span[@id='unit-symbol-hint']/following-sibling::span[contains(@class,'form-hint--error')]");
     protected ILocator DimensionDropdown => Page.Locator("#unit-dimension");
     protected ILocator DimensionList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
     protected ILocator DimensionOptions => DimensionList.Locator("[role='option']");
@@ -20,6 +23,7 @@ public abstract class UnitFormPage : BasePage
 
     public Task<bool> IsCodeInputVisibleAsync() => CodeInput.IsVisibleAsync();
     public Task<bool> IsDisplayNameInputVisibleAsync() => DisplayNameInput.IsVisibleAsync();
+    public Task<bool> IsSymbolInputVisibleAsync() => SymbolInput.IsVisibleAsync();
     public Task<bool> IsDimensionDropdownVisibleAsync() => DimensionDropdown.IsVisibleAsync();
     public Task<bool> IsScaleInputVisibleAsync() => ScaleInput.IsVisibleAsync();
     public Task<bool> IsScaleHelpMessageVisibleAsync() => ScaleHelpMessage.IsVisibleAsync();
@@ -36,6 +40,12 @@ public abstract class UnitFormPage : BasePage
     {
         await DisplayNameInput.WaitForAsync();
         return (await DisplayNameInput.InputValueAsync()).Trim();
+    }
+
+    public async Task<string> GetSymbolMessageAsync()
+    {
+        await SymbolMessage.WaitForAsync();
+        return (await SymbolMessage.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
     public async Task<string> GetScaleHelpMessageAsync()
@@ -62,6 +72,11 @@ public abstract class UnitFormPage : BasePage
     public async Task FillDisplayNameAsync(string displayName)
     {
         await DisplayNameInput.FillAsync(displayName);
+    }
+
+    public async Task FillSymbolAsync(string symbol)
+    {
+        await SymbolInput.FillAsync(symbol);
     }
 
     public async Task SelectDimensionAsync(string optionText)
@@ -121,6 +136,7 @@ public abstract class UnitFormPage : BasePage
 
     public async Task<string> GetCodeErrorAsync() => await GetErrorTextAsync(CodeError);
     public async Task<string> GetDisplayNameErrorAsync() => await GetErrorTextAsync(DisplayNameError);
+    public async Task<string> GetSymbolErrorAsync() => await GetErrorTextAsync(SymbolError);
 
     public async Task<string> GetAlertMessageAsync()
     {
