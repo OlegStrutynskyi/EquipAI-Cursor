@@ -24,6 +24,20 @@ public class EditEmissionCategoryPage : BasePage
             .WaitForAsync();
     }
 
+    public new async Task<string> GetPageTitleAsync()
+    {
+        var title = Page.Locator("//h1[contains(@class,'page-title') or contains(@id,'title')]").First;
+        await title.WaitForAsync();
+        return await title.EvaluateAsync<string>(
+            """
+            el => {
+              const clone = el.cloneNode(true);
+              clone.querySelectorAll('.page-header__subtitle').forEach(node => node.remove());
+              return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+            }
+            """);
+    }
+
     public async Task<string> GetSubtitleAsync()
     {
         await Subtitle.WaitForAsync();

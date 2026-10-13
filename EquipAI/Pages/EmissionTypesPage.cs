@@ -18,6 +18,7 @@ public class EmissionTypesPage : BasePage
     private ILocator DeactivateDialogCancelBtn => Page.Locator("//div[@role='alertdialog']//button[normalize-space()='Cancel']");
     private ILocator DeactivateDialogConfirmBtn => Page.Locator("//div[@role='alertdialog']//button[normalize-space()='Deactivate']");
     private ILocator NextPageBtn => Page.Locator("//button[normalize-space()='Next']").First;
+    private ILocator SearchInput => Page.Locator("#admin-emission-types-search");
 
     public async Task OpenAsync()
     {
@@ -204,6 +205,34 @@ public class EmissionTypesPage : BasePage
                     (await CodeCells.AllInnerTextsAsync()).FirstOrDefault()?.Trim() ?? string.Empty))
                 return false;
         }
+    }
+
+    private async Task<ILocator?> FindRowByCodeAcrossPagesAsync(string code)
+    {
+        await GoToFirstGridPageAsync();
+        while (true)
+        {
+            var index = await FindRowIndexByCodeOnCurrentPageAsync(code);
+            if (index is not null)
+                return Grid.Locator("tbody tr").Nth(index.Value);
+
+            var codes = await CodeCells.AllInnerTextsAsync();
+            if (!await TryGoToNextGridPageAsync(codes.FirstOrDefault()?.Trim() ?? string.Empty))
+                return null;
+        }
+    }
+
+    private async Task<int?> FindRowIndexByCodeOnCurrentPageAsync(string code)
+    {
+        var cells = CodeCells;
+        var count = await cells.CountAsync();
+        for (var i = 0; i < count; i++)
+        {
+            if (await CellMatchesAsync(cells.Nth(i), code))
+                return i;
+        }
+
+        return null;
     }
 
     private async Task<bool> IsCodeOnCurrentPageAsync(string code)
@@ -473,10 +502,30 @@ public class EmissionTypesPage : BasePage
     public async Task ClickDeactivateBtnAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='table']//tr[td[1][normalize-space()='{code}']]");
+        await SearchEmissionTypesAsync(code);
+        var row = await FindRowByCodeAcrossPagesAsync(code)
+            ?? throw new InvalidOperationException($"Code '{code}' was not found in the emission types grid.");
         await row.GetByRole(AriaRole.Button, new() { Name = "Deactivate" }).ClickAsync();
         await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
+
+    private async Task SearchEmissionTypesAsync(string code)
+    {
+        await SearchInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await SearchInput.FillAsync(code);
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!await IsGridLoadingAsync() && await IsCodeOnCurrentPageAsync(code))
+                return;
+
+            await Task.Delay(200);
+        }
+    }
+
+    private async Task<bool> IsGridLoadingAsync() =>
+        await Page.Locator(".table-wrapper--loading").CountAsync() > 0;
 
     public async Task<string> GetDeactivateDialogTitleAsync()
     {

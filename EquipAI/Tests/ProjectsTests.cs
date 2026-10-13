@@ -56,6 +56,7 @@ public class ProjectsTests : BaseTest
             "ADDRESS",
             "START DATE",
             "STATUS",
+            "ACTIONS",
         };
 
         var projectsPage = new ProjectsPage(Fixture.Page);
@@ -139,8 +140,7 @@ public class ProjectsTests : BaseTest
         actual.Should().Equal(expected, $"{column} {(ascending ? "ASC" : "DESC")}");
     }
 
-    private static string FormatSynchDate(DateTime value) =>
-        value.ToString("d MMM yyyy, HH:mm", CultureInfo.GetCultureInfo("en-GB"));
+    private static string FormatSynchDate(DateTime value) => ProjectsPage.FormatSynchDate(value);
 
     private static string FormatProjectStartDate(DateTime value) =>
         value.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);

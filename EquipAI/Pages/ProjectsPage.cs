@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Playwright;
 
 namespace EquipAI.Pages;
@@ -99,12 +100,58 @@ public class ProjectsPage : BasePage
         {
             var text = await GetSynchDateTextAsync();
             if (!string.Equals(text, previousText, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(text))
-                return text;
+                return FormatSynchDateForUser(text);
 
             await Task.Delay(500);
         }
 
         throw new TimeoutException($"Synch date stayed '{previousText}'.");
+    }
+
+    public static string FormatSynchDate(DateTime value) =>
+        value.ToString("d MMM yyyy, HH:mm", CultureInfo.CurrentCulture);
+
+    private static string FormatSynchDateForUser(string text)
+    {
+        if (!TryParseSynchDate(text, out var date))
+            return text;
+
+        return FormatSynchDate(date);
+    }
+
+    private static bool TryParseSynchDate(string text, out DateTime value)
+    {
+        var cultures = new[]
+        {
+            CultureInfo.CurrentCulture,
+            CultureInfo.GetCultureInfo("en-US"),
+            CultureInfo.GetCultureInfo("en-GB"),
+            CultureInfo.InvariantCulture,
+        };
+        var formats = new[]
+        {
+            "d MMM yyyy, HH:mm",
+            "d MMM yyyy, H:mm",
+            "MMM d, yyyy · h:mm tt",
+            "MMM d, yyyy, h:mm tt",
+            "MMM d, yyyy h:mm tt",
+            "M/d/yyyy, h:mm tt",
+            "M/d/yyyy h:mm tt",
+            "dd.MM.yyyy, HH:mm",
+            "dd.MM.yyyy HH:mm",
+        };
+
+        foreach (var culture in cultures)
+        {
+            if (DateTime.TryParseExact(text, formats, culture, DateTimeStyles.AllowWhiteSpaces, out value))
+                return true;
+
+            if (DateTime.TryParse(text, culture, DateTimeStyles.AllowWhiteSpaces, out value))
+                return true;
+        }
+
+        value = default;
+        return false;
     }
 
     public async Task<IReadOnlyList<(string Code, string Name)>> GetAllCodesAndNamesAsync()
