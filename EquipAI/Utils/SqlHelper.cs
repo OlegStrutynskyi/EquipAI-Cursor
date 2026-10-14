@@ -27,6 +27,143 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
+    public static async Task<IReadOnlyList<UserGridRow>> GetUserGridRowsAsync()
+    {
+        var rows = new List<UserGridRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT Email, CONCAT_WS(' ', FirstName, LastName) AS Name, Capabilities
+            FROM [dbo].[AspNetUsers]
+            WHERE UserName NOT LIKE 'system'
+            ORDER BY Email
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var email = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var capabilities = reader.IsDBNull(2) ? 0 : Convert.ToInt32(reader.GetValue(2));
+            rows.Add(new UserGridRow(email, name, capabilities));
+        }
+
+        return rows;
+    }
+
+    public static async Task<string> GetAspNetUserIdByEmailAsync(string email)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            "SELECT Id FROM [dbo].[AspNetUsers] WHERE Email = @email",
+            connection);
+        command.Parameters.AddWithValue("@email", email);
+        var result = await command.ExecuteScalarAsync();
+        var userId = result is null || result is DBNull ? null : result.ToString();
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new InvalidOperationException($"User '{email}' was not found.");
+
+        return userId;
+    }
+
+    public static async Task ResetAspNetUserToDefaultAsync(string userId)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE [dbo].[AspNetUsers]
+            SET UserName = @userName,
+                NormalizedUserName = @normalizedUserName,
+                Email = @email,
+                NormalizedEmail = @normalizedEmail,
+                FirstName = NULL,
+                LastName = NULL,
+                Capabilities = 0
+            WHERE Id = @id
+            """,
+            connection);
+        command.Parameters.AddWithValue("@userName", "testuser3@devessence.com");
+        command.Parameters.AddWithValue("@normalizedUserName", "TESTUSER3@DEVESSENCE.COM");
+        command.Parameters.AddWithValue("@email", "testuser3@devessence.com");
+        command.Parameters.AddWithValue("@normalizedEmail", "TESTUSER3@DEVESSENCE.COM");
+        command.Parameters.AddWithValue("@id", userId);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task DeleteUserByEmailAsync(string email)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+
+        string? userId;
+        await using (var lookup = new SqlCommand(
+            "SELECT Id FROM [dbo].[AspNetUsers] WHERE Email = @email",
+            connection,
+            transaction))
+        {
+            lookup.Parameters.AddWithValue("@email", email);
+            var result = await lookup.ExecuteScalarAsync();
+            userId = result is null || result is DBNull ? null : result.ToString();
+        }
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            await transaction.CommitAsync();
+            return;
+        }
+
+        var childTables = new List<(string Schema, string Table, string Column)>();
+        await using (var children = new SqlCommand(
+            """
+            SELECT OBJECT_SCHEMA_NAME(fk.parent_object_id),
+                   OBJECT_NAME(fk.parent_object_id),
+                   COL_NAME(fkc.parent_object_id, fkc.parent_column_id)
+            FROM sys.foreign_keys fk
+            JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+            WHERE fk.referenced_object_id = OBJECT_ID(N'dbo.AspNetUsers')
+            """,
+            connection,
+            transaction))
+        await using (var reader = await children.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                if (reader.IsDBNull(0) || reader.IsDBNull(1) || reader.IsDBNull(2))
+                    continue;
+
+                childTables.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            }
+        }
+
+        foreach (var (schema, table, column) in childTables)
+        {
+            var sql = $"DELETE FROM [{schema.Replace("]", "]]")}].[{table.Replace("]", "]]")}] WHERE [{column.Replace("]", "]]")}] = @id";
+            await using var deleteChild = new SqlCommand(sql, connection, transaction);
+            deleteChild.Parameters.AddWithValue("@id", userId);
+            await deleteChild.ExecuteNonQueryAsync();
+        }
+
+        await using (var deleteUser = new SqlCommand(
+            "DELETE FROM [dbo].[AspNetUsers] WHERE Id = @id",
+            connection,
+            transaction))
+        {
+            deleteUser.Parameters.AddWithValue("@id", userId);
+            await deleteUser.ExecuteNonQueryAsync();
+        }
+
+        await transaction.CommitAsync();
+    }
+
     public static async Task<IReadOnlyList<string>> GetProjectNamesAsync()
     {
         var projectNames = new List<string>();
@@ -3525,6 +3662,8 @@ public sealed record FactorImportBatchGridDbRow(
 public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
 
 public sealed record ProjectGridRow(string Code, string Name, string Address, DateTime? StartDate, bool IsActive);
+
+public sealed record UserGridRow(string Email, string Name, int Capabilities);
 
 public sealed record UnitGridRow(
     string Code,

@@ -48,7 +48,7 @@ public class BaseTest
     }
 
     protected static Task SetUserCapabilitiesAndLoginAsync(PlaywrightFixture fixture, int capabilities) =>
-        SetUserCapabilitiesAndLoginAsync(fixture, Config.MicrosoftEmail, capabilities);
+        SetUserCapabilitiesAndLoginAsync(fixture, Config.TestUserEmail, capabilities);
 
     protected Task SetUserCapabilitiesAndLoginAsync(int capabilities) =>
         SetUserCapabilitiesAndLoginAsync(Fixture, capabilities);

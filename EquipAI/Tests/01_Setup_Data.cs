@@ -495,6 +495,60 @@ public class _01_Setup_Data : BaseTest
         gridRows.Should().Contain(row => row.EquipmentType == equipmentType2);
     }
 
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T18_Setup_CreateTestUser2()
+    {
+        var email = Config.TestUserEmail2;
+        var expectedRoles = new[]
+        {
+            "DataSteward",
+            "ProjectManager",
+            "ProjectsOperator",
+            "SuperAdmin",
+            "UserManager",
+        };
+        var expected = new UserGridRecord(
+            email,
+            $"{Config.TestUserFirstName2} {Config.TestUserLastName2}",
+            string.Join(", ", expectedRoles));
+
+        var usersPage = new UsersPage(Fixture.Page);
+        await usersPage.OpenAsync();
+
+        if (await usersPage.IsUserInGridAsync(email))
+            Assert.Pass("Test User 2 already exists.");
+
+        var addUserPage = await usersPage.ClickAddUserBtnAsync();
+        await addUserPage.FillEmailAsync(email);
+        await addUserPage.FillFirstNameAsync(Config.TestUserFirstName2);
+        await addUserPage.FillLastNameAsync(Config.TestUserLastName2);
+        foreach (var role in expectedRoles)
+            await addUserPage.SelectRoleAsync(role);
+        usersPage = await addUserPage.CreateUserAsync();
+
+        (await usersPage.GetGridRecordByEmailAsync(email)).Should().Be(expected);
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T19_Setup_CreateTestUser3()
+    {
+        var email = Config.TestUserEmail3;
+        var expected = new UserGridRecord(email, "—", "None");
+
+        var usersPage = new UsersPage(Fixture.Page);
+        await usersPage.OpenAsync();
+
+        if (await usersPage.IsUserInGridAsync(email))
+            Assert.Pass("Test User 3 already exists.");
+
+        var addUserPage = await usersPage.ClickAddUserBtnAsync();
+        await addUserPage.FillEmailAsync(email);
+        usersPage = await addUserPage.CreateUserAsync();
+        (await usersPage.GetGridRecordByEmailAsync(email)).Should().Be(expected);        
+    }
+
     private static bool HasAutotestTelemetry(
         IReadOnlyList<TelemetryGridRow> rows,
         string equipmentType1,

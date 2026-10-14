@@ -4,12 +4,22 @@ public static class Config
 {
     public const string BaseUrl = "https://qa-equipai.devessence.com/";
 
-    public const string MicrosoftEmail = "oleg.strutynskyi03@devessence.com";
+    public const string TestUserEmail = "oleg.strutynskyi03@devessence.com";
     public const string MicrosoftPassword = "wbjy&K5KWcHNM#e1";
     public const string MicrosoftSecretKey = "dypnrvjk67prb6mv";
 
-    public const string TestUser3FirstName = "Oleg3";
-    public const string TestUser3LastName = "Strutynskyi3";
+    public const string TestUserFirstName = "Oleg3";
+    public const string TestUserLastName = "Strutynskyi3";
+
+    public const string TestUserEmail2 = "testuser2@devessence.com";
+    public const string TestUserFirstName2 = "John";
+    public const string TestUserLastName2 = "Smith";
+    public const string TestUserEmail3 = "testuser3@devessence.com";
+    public const string TestUserFirstName3 = "Jane";
+    public const string TestUserLastName3 = "Doe";
+    public const string TestUserEmail4 = "testuser4@devessence.com";
+    public const string TestUserFirstName4 = "Bob";
+    public const string TestUserLastName4 = "Johnson";
 
     public const string SqlConnectionString =
         "Server=tcp:sql-equipai-eu.database.windows.net,1433;Initial Catalog=equipai-qa;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=\"Active Directory Default\";";

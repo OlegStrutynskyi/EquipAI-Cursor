@@ -19,7 +19,7 @@ public static class MicrosoftLoginHelper
 
         await fixture.Page.WaitForURLAsync("**/login.microsoftonline.com/**");
 
-        await fixture.Page.Locator("input[name='loginfmt']").FillAsync(Config.MicrosoftEmail);
+        await fixture.Page.Locator("input[name='loginfmt']").FillAsync(Config.TestUserEmail);
         await fixture.Page.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 
         var passwordInput = fixture.Page.Locator("input[name='passwd']");
