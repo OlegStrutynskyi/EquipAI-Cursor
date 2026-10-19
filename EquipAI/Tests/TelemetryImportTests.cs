@@ -121,7 +121,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T12_TelemetryImport_Herc_SuccessImport()
     {
         const string fileName = "Herc_07_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "Herc";
         const string expectedFuelType = "—";
         const string expectedSource = "Herc";
@@ -188,7 +188,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T13_TelemetryImport_Herc_CancelImport()
     {
         const string fileName = "Herc_07_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "Herc";
         const string expectedFuelType = "—";
 
@@ -226,7 +226,7 @@ public class TelemetryImportTests : BaseTest
         (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
         var telemetryPage = await importPage.ClickBackToTelemetryAsync();
-        await telemetryPage.SetMonthAsync("2026-07");
+        await telemetryPage.SetMonthAsync(expectedMonthYear);
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
         (await telemetryPage.GetGridRowByEquipmentTagAsync("9207403")).Should().BeNull();
@@ -237,7 +237,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T14_TelemetryImport_Herc_EmptyFields()
     {
         const string fileName = "Herc_07_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "Herc";
         const string expectedMonthYearError = "Month/Year is required.";
         const string expectedCompanyError = "Company is required.";
@@ -429,7 +429,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T24_TelemetryImport_JCB_SuccessImport()
     {
         const string fileName = "JCB_07_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "JCB";
         const string expectedFuelType = "—";
         const string expectedSource = "JCB";
@@ -529,7 +529,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T25_TelemetryImport_JCB_CancelImport()
     {
         const string fileName = "JCB_07_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "JCB";
         const string expectedFuelType = "—";
 
@@ -585,7 +585,7 @@ public class TelemetryImportTests : BaseTest
         (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
         var telemetryPage = await importPage.ClickBackToTelemetryAsync();
-        await telemetryPage.SetMonthAsync("2026-07");
+        await telemetryPage.SetMonthAsync(expectedMonthYear);
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
         (await telemetryPage.GetGridRowByEquipmentTagAsync("210342678")).Should().BeNull();
@@ -599,7 +599,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T26_TelemetryImport_JCB_EmptyFields()
     {
         const string fileName = "JCB_07_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "JCB";
         const string expectedMonthYearError = "Month/Year is required.";
         const string expectedCompanyError = "Company is required.";
@@ -785,7 +785,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T36_TelemetryImport_Custom_SuccessImport()
     {
         const string fileName = "Custom_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string expectedMonthYear = "08/2026";
         const string expectedCompany = "Custom";
         const string expectedSource = "Custom";
         var expectedImportDate = DateTime.Now.ToString("MMM d, yyyy", CultureInfo.InvariantCulture);
@@ -850,7 +850,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T37_TelemetryImport_Custom_CancelImport()
     {
         const string fileName = "Custom_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string expectedMonthYear = "08/2026";
         const string expectedCompany = "Custom";
 
         await SqlHelper.DeleteTelemetryByExternalReferenceAsync(fileName);
@@ -887,7 +887,7 @@ public class TelemetryImportTests : BaseTest
         (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
         var telemetryPage = await importPage.ClickBackToTelemetryAsync();
-        await telemetryPage.SetMonthAsync("2026-08");
+        await telemetryPage.SetMonthAsync(expectedMonthYear);
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
         (await telemetryPage.GetGridRowByEquipmentTagAsync("111-2221")).Should().BeNull();
@@ -898,7 +898,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T38_TelemetryImport_Custom_EmptyFields()
     {
         const string fileName = "Custom_08_26.xlsx";
-        const string expectedMonthYear = "August 2026";
+        const string expectedMonthYear = "08/2026";
         const string expectedCompany = "Custom";
         const string expectedMonthYearError = "Month/Year is required.";
         const string expectedCompanyError = "Company is required.";
@@ -1027,9 +1027,9 @@ public class TelemetryImportTests : BaseTest
     {
         const string fileName = "Custom_08_26.xlsx";
         const string expectedCompany = "Custom";
-        const string initialMonthYear = "August 2026";
-        const string changedMonthYear = "June 2025";
-        const string changedMonthValue = "2025-06";
+        const string initialMonthYear = "08/2026";
+        const string changedMonthYear = "06/2025";
+        const string changedMonthValue = "06/2025";
 
         try
         {
@@ -1181,7 +1181,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T51_TelemetryImport_United_SuccessImport()
     {
         const string fileName = "United_7_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "United";
         const string expectedFuelType = "—";
         const string expectedSource = "United";
@@ -1293,7 +1293,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T52_TelemetryImport_United_CancelImport()
     {
         const string fileName = "United_7_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "United";
         const string expectedFuelType = "—";
 
@@ -1331,7 +1331,7 @@ public class TelemetryImportTests : BaseTest
         (await importPage.IsSelectFileSectionVisibleAsync()).Should().BeTrue();
 
         var telemetryPage = await importPage.ClickBackToTelemetryAsync();
-        await telemetryPage.SetMonthAsync("2026-07");
+        await telemetryPage.SetMonthAsync(expectedMonthYear);
 
         (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(expectedMonthYear);
         (await telemetryPage.GetGridRowByEquipmentTagAsync("12302337")).Should().BeNull();
@@ -1342,7 +1342,7 @@ public class TelemetryImportTests : BaseTest
     public async Task T53_TelemetryImport_United_EmptyFields()
     {
         const string fileName = "United_7_26_new_correct.xlsx";
-        const string expectedMonthYear = "July 2026";
+        const string expectedMonthYear = "07/2026";
         const string expectedCompany = "United";
         const string expectedMonthYearError = "Month/Year is required.";
         const string expectedCompanyError = "Company is required.";

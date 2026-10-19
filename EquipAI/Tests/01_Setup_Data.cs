@@ -468,7 +468,7 @@ public class _01_Setup_Data : BaseTest
     {
         const string fileName = "Custom_06_22.xlsx";
         const string monthValue = "2022-06";
-        const string monthDisplay = "June 2022";
+        const string monthDisplay = "06/2022";
         const string equipmentType1 = "AUTOTEST TYPE 1";
         const string equipmentType2 = "AUTOTEST TYPE 2";
 

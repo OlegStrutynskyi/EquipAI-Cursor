@@ -63,7 +63,7 @@ public class TelemetryTests : BaseTest
     public async Task T04_Telemetry_GridRecords()
     {
         const string monthValue = "2022-06";
-        const string monthDisplay = "June 2022";
+        const string monthDisplay = "06/2022";
 
         var telemetryPage = new TelemetryPage(Fixture.Page);
         await telemetryPage.OpenAsync();

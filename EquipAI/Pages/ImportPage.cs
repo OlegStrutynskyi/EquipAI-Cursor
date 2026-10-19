@@ -31,7 +31,7 @@ public class ImportPage : BasePage
     private ILocator PreviewTable => Page.Locator("//table[contains(@class,'table')]");
     private ILocator ReportingMonthInput => Page.Locator("#telemetry-reporting-month");
     private ILocator CompanyInput => Page.Locator("#telemetry-company-name");
-    private ILocator MonthYearError => Page.Locator("//input[@id='telemetry-reporting-month']/following-sibling::span");
+    private ILocator MonthYearError => Page.Locator("//input[@id='telemetry-reporting-month']/ancestor::app-date-input/following-sibling::span");
     private ILocator CompanyError => Page.Locator("//input[@id='telemetry-company-name']/following-sibling::span");
     private ILocator UnrecognizedRowsAlert => Page.Locator("//app-alert[@aria-label='Unrecognized row validation messages']");
     private ILocator ValidationLead => Page.Locator("//p[@class='telemetry-import__validation-lead']");

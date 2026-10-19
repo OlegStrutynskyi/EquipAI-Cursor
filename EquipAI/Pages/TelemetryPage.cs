@@ -49,8 +49,25 @@ public class TelemetryPage : BasePage
     public async Task SetMonthAsync(string yearMonth)
     {
         await MonthField.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await MonthField.FillAsync(yearMonth);
+        var valueToFill = ToMonthInputValue(yearMonth);
+
+        await MonthField.FillAsync(valueToFill);
         await MonthField.BlurAsync();
+        if (!await MonthFieldShowsAsync(yearMonth))
+        {
+            await MonthField.EvaluateAsync(
+                """
+                (input, value) => {
+                  const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value');
+                  descriptor?.set?.call(input, value);
+                  input.dispatchEvent(new Event('input', { bubbles: true }));
+                  input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                """,
+                valueToFill);
+            await MonthField.BlurAsync();
+        }
+
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
@@ -391,18 +408,33 @@ public class TelemetryPage : BasePage
     public async Task<string> GetMonthFieldDisplayValueAsync()
     {
         var value = await GetMonthFieldValueAsync();
-        if (DateTime.TryParseExact(
-                value,
-                "yyyy-MM",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var monthValue))
-        {
-            return monthValue.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-        }
+        if (TryParseMonth(value, out var monthValue))
+            return monthValue.ToString("MM/yyyy", CultureInfo.InvariantCulture);
 
         return value;
     }
+
+    private async Task<bool> MonthFieldShowsAsync(string yearMonth)
+    {
+        var current = await GetMonthFieldValueAsync();
+        if (!TryParseMonth(yearMonth, out var requested) || !TryParseMonth(current, out var actual))
+            return string.Equals(current, ToMonthInputValue(yearMonth), StringComparison.Ordinal);
+
+        return actual.Year == requested.Year && actual.Month == requested.Month;
+    }
+
+    private static string ToMonthInputValue(string yearMonth) =>
+        TryParseMonth(yearMonth, out var month)
+            ? month.ToString("MM/yyyy", CultureInfo.InvariantCulture)
+            : yearMonth;
+
+    private static bool TryParseMonth(string value, out DateTime month) =>
+        DateTime.TryParseExact(
+            value?.Trim(),
+            ["yyyy-MM", "MM/yyyy", "M/yyyy"],
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out month);
 
     private static string GetCell(IReadOnlyDictionary<string, string> values, params string[] keys)
     {
