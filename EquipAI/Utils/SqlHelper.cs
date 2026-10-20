@@ -228,6 +228,32 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task<IReadOnlyList<(string Code, string Name)>> GetProjectsWithOfficesAsync()
+    {
+        var rows = new List<(string Code, string Name)>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT Code, Name
+            FROM [projects].[Project]
+            WHERE HasOffices = 1 AND IsDeleted = 0
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var code = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            rows.Add((code, name));
+        }
+
+        return rows;
+    }
+
     public static async Task<bool?> TryGetProjectIsDeletedByNameAsync(string name)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);

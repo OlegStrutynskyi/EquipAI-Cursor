@@ -276,6 +276,78 @@ public class ProjectsPage : BasePage
         return projectDashboardPage;
     }
 
+    public async Task<IReadOnlyList<(string Name, bool HasOfficesButton)>> GetOfficesButtonRowsAsync()
+    {
+        await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WaitForGridDataAsync();
+        await GoToFirstGridPageAsync();
+
+        var results = new List<(string Name, bool HasOfficesButton)>();
+        while (true)
+        {
+            results.AddRange(await GetOfficesButtonRowsOnCurrentPageAsync());
+            if (!await TryGoToNextGridPageAsync())
+                break;
+        }
+
+        return results;
+    }
+
+    public async Task<OfficesPage> ClickOfficesBtnAsync(string projectCode, string projectName)
+    {
+        await GoToFirstGridPageAsync();
+
+        while (true)
+        {
+            var row = Grid.Locator("tbody tr")
+                .Filter(new LocatorFilterOptions
+                {
+                    Has = Page.Locator("td:nth-child(2)").GetByText(projectCode, new LocatorGetByTextOptions { Exact = true })
+                })
+                .Filter(new LocatorFilterOptions
+                {
+                    Has = Page.Locator("td:nth-child(3)").GetByText(projectName, new LocatorGetByTextOptions { Exact = true })
+                });
+            var button = row.Locator("a").GetByText("Offices", new LocatorGetByTextOptions { Exact = true });
+            if (await button.CountAsync() > 0)
+            {
+                await button.First.ClickAsync();
+                break;
+            }
+
+            if (!await TryGoToNextGridPageAsync())
+                throw new InvalidOperationException($"Offices button for '{projectCode} — {projectName}' was not found.");
+        }
+
+        await Page.WaitForURLAsync(url => url.Contains("/admin/offices", StringComparison.OrdinalIgnoreCase));
+        var officesPage = new OfficesPage(Page);
+        await officesPage.WaitForLoadedAsync();
+        return officesPage;
+    }
+
+    private async Task<IReadOnlyList<(string Name, bool HasOfficesButton)>> GetOfficesButtonRowsOnCurrentPageAsync()
+    {
+        var rows = await Grid.EvaluateAsync<string[][]>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => !tr.querySelector(':scope > td .table__skeleton-bar'))
+              .map(tr => {
+                const nameCell = tr.querySelectorAll(':scope > td')[2];
+                const rendered = (nameCell?.innerText || '').replace(/\u00a0/g, ' ').trim();
+                const full = (nameCell?.textContent || '').replace(/\u00a0/g, ' ').trim();
+                const name = (full.length > rendered.length ? full : rendered).replace(/\s+/g, ' ').trim();
+                const link = [...tr.querySelectorAll('a')].find(a => (a.innerText || '').replace(/\s+/g, ' ').trim() === 'Offices');
+                const visible = !!link && link.getClientRects().length > 0;
+                return [name, visible ? '1' : '0'];
+              })
+              .filter(row => row[0])
+            """);
+
+        return rows
+            .Select(row => (Name: row[0], HasOfficesButton: row[1] == "1"))
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<ProjectGridRecord>> GetCurrentPageGridRecordsAsync()
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });

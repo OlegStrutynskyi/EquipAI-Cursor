@@ -143,6 +143,33 @@ public class ProjectsTests : BaseTest
         (await projectDashboardPage.GetPageTitleAsync()).Should().Be($"{projectName} Overview");
     }
 
+    [Test]
+    public async Task T08_Projects_ClickOfficesBtn()
+    {
+        var projects = await SqlHelper.GetProjectsWithOfficesAsync();
+        if (projects.Count == 0)
+            Assert.Pass("There are no offices.");
+
+        var projectsPage = new ProjectsPage(Fixture.Page);
+        await projectsPage.OpenAsync();
+
+        var rows = await projectsPage.GetOfficesButtonRowsAsync();
+        var expectedNames = projects.Select(project => project.Name).Distinct(StringComparer.Ordinal).ToList();
+        foreach (var row in rows)
+            row.HasOfficesButton.Should().Be(expectedNames.Contains(row.Name), $"project '{row.Name}'");
+
+        rows.Select(row => row.Name).Should().Contain(expectedNames);
+
+        foreach (var project in projects)
+        {
+            await projectsPage.OpenAsync();
+            var officesPage = await projectsPage.ClickOfficesBtnAsync(project.Code, project.Name);
+
+            (await officesPage.GetPageTitleAsync()).Should().Be("Offices");
+            (await officesPage.GetSubtitleAsync()).Should().Be($"{project.Code} — {project.Name}");
+        }
+    }
+
     private static async Task AssertFirstPageSortedAsync(
         ProjectsPage projectsPage,
         IReadOnlyList<ProjectGridRow> projects,
