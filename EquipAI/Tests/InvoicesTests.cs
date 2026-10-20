@@ -56,7 +56,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T05_Invoices_GridColumns()
+    public async Task T05_Invoices_Grid_Columns()
     {
         var expectedColumns = new[]
         {
@@ -78,7 +78,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T06_Invoices_GridRecords()
+    public async Task T06_Invoices_Grid_Records()
     {
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -107,7 +107,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T07_Invoices_GridSorting()
+    public async Task T07_Invoices_Grid_Sorting()
     {
         var columns = new[]
         {
@@ -149,7 +149,25 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T08_Invoices_Manual_Data()
+    public async Task T08_Invoices_Grid_Search()
+    {
+        var invoicesPage = new InvoicesPage(Fixture.Page);
+        await invoicesPage.OpenAsync();
+
+        (await invoicesPage.IsSearchInputVisibleAsync()).Should().BeTrue();
+        (await invoicesPage.GetSearchPlaceholderAsync()).Should().Be("Search invoices or data...");
+
+        await invoicesPage.SearchAsync(RandomInvoiceSearch());
+        (await invoicesPage.GetGridEmptyMessageAsync()).Should().Be("No invoices match your search.");
+
+        await AssertDisplayedInvoicesContainAsync(invoicesPage, "Haskell");
+        await AssertDisplayedInvoicesContainAsync(invoicesPage, "INV");
+        await AssertDisplayedInvoicesContainAsync(invoicesPage, "delete");
+        await AssertDisplayedInvoicesContainAsync(invoicesPage, "invoice");
+    }
+
+    [Test]
+    public async Task T09_Invoices_Manual_Data()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedProject = Config.SetupProjectName1;
@@ -174,7 +192,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T09_Invoices_ClickViewBtn()
+    public async Task T10_Invoices_ClickViewBtn()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
 
@@ -186,7 +204,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T10_Invoices_ClickEditBtn()
+    public async Task T11_Invoices_ClickEditBtn()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedTitle = "Edit Invoice";
@@ -201,7 +219,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T11_Invoices_Rejected_View()
+    public async Task T12_Invoices_Rejected_View()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedStatus = "REJECTED";
@@ -229,7 +247,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T12_Invoices_Approved_View()
+    public async Task T13_Invoices_Approved_View()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string expectedStatus = "APPROVED";
@@ -257,7 +275,7 @@ public class InvoicesTests : BaseTest
     }
 
     [Test]
-    public async Task T13_Invoices_InvoicesCount()
+    public async Task T14_Invoices_InvoicesCount()
     {
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();
@@ -266,6 +284,26 @@ public class InvoicesTests : BaseTest
         var totalFromGrid = await invoicesPage.GetInvoiceNumberCountFromAllPagesAsync();
 
         totalFromGrid.Should().Be(totalFromPaginationSummary);
+    }
+
+    private static async Task AssertDisplayedInvoicesContainAsync(InvoicesPage invoicesPage, string term)
+    {
+        await invoicesPage.SearchAsync(term);
+        var rows = await invoicesPage.GetAllInvoiceGridRowsAsync();
+        rows.Should().NotBeEmpty();
+        rows.Should().OnlyContain(row => InvoiceRowContains(row, term));
+    }
+
+    private static bool InvoiceRowContains(InvoiceGridRow row, string term) =>
+        string.Join(' ', row.Project, row.InvoiceNumber, row.Company, row.Date, row.Status, row.ImportDate, row.ApproveRejectDate, row.Source)
+            .Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static string RandomInvoiceSearch()
+    {
+        var chars = GenerateRandomAlphanumericString(10).ToCharArray();
+        chars[0] = (char)('a' + Random.Shared.Next(26));
+        chars[1] = (char)('0' + Random.Shared.Next(10));
+        return new string(chars);
     }
 
     private static async Task AssertCurrentPageSortedAsync(

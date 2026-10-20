@@ -15,6 +15,7 @@ public class InvoicesPage : BasePage
     private ILocator FuelInvoicesTab => Page.Locator("//button[normalize-space()='Fuel Invoices'] | //a[normalize-space()='Fuel Invoices']");
     private ILocator UtilityBillsTab => Page.Locator("//button[normalize-space()='Utility Bills'] | //a[normalize-space()='Utility Bills']");
     private ILocator CreateBtn => Page.Locator("//a[normalize-space()='Create']");
+    private ILocator SearchInput => Page.Locator("#invoice-list-search");
     private ILocator InvoicesGrid => Page.Locator("table.table.invoice-list__table, table.table").Locator("visible=true").First;
     private ILocator PreviousBtn => Page.Locator("//button[normalize-space()='Previous']").Last;
     private ILocator NextBtn => Page.Locator("//button[normalize-space()='Next']").Last;
@@ -48,6 +49,99 @@ public class InvoicesPage : BasePage
     public Task<bool> IsImportUtilityBillBtnVisibleAsync() => ImportUtilityBillBtn.IsVisibleAsync();
     public Task<bool> IsCreateBtnVisibleAsync() => CreateBtn.IsVisibleAsync();
     public Task<bool> IsInvoicesGridVisibleAsync() => InvoicesGrid.IsVisibleAsync();
+
+    public async Task<bool> IsSearchInputVisibleAsync()
+    {
+        try
+        {
+            await SearchInput.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string> GetSearchPlaceholderAsync() =>
+        (await SearchInput.GetAttributeAsync("placeholder"))?.Trim() ?? string.Empty;
+
+    public async Task SearchAsync(string text)
+    {
+        var response = Page.WaitForResponseAsync(
+            response => IsInvoicesSearchResponse(response, text),
+            new PageWaitForResponseOptions { Timeout = 15_000 });
+        await SearchInput.FillAsync(text);
+        await response;
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await IsEmptySearchMessageVisibleAsync())
+                return;
+
+            if (await InvoicesGrid.Locator(".table__skeleton-bar").CountAsync() == 0
+                && await InvoicesGrid.Locator("tbody tr td:nth-child(2)").CountAsync() > 0)
+                return;
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Invoices search for '{text}' did not finish.");
+    }
+
+    public async Task<string> GetGridEmptyMessageAsync()
+    {
+        var message = InvoicesGrid.Locator("tbody").GetByText(
+            "No invoices match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        await message.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        return NormalizeGridText(await message.First.InnerTextAsync());
+    }
+
+    private async Task<bool> IsEmptySearchMessageVisibleAsync()
+    {
+        var message = InvoicesGrid.Locator("tbody").GetByText(
+            "No invoices match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        return await message.CountAsync() > 0 && await message.First.IsVisibleAsync();
+    }
+
+    private static bool IsInvoicesSearchResponse(IResponse response, string text)
+    {
+        if (!response.Ok || !Uri.TryCreate(response.Url, UriKind.Absolute, out var uri))
+            return false;
+
+        if (!uri.AbsolutePath.Equals("/api/invoices", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var query = uri.Query.TrimStart('?');
+        foreach (var part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = part.IndexOf('=');
+            if (separator <= 0)
+                continue;
+
+            var key = Uri.UnescapeDataString(part[..separator]);
+            var value = Uri.UnescapeDataString(part[(separator + 1)..].Replace("+", " "));
+            if (key.Equals("Search", StringComparison.OrdinalIgnoreCase)
+                && value.Equals(text, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeGridText(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text.Replace('\u00A0', ' '), @"\s+", " ").Trim();
 
     public async Task SelectUtilityBillsTabAsync()
     {
