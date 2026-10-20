@@ -32,4 +32,16 @@ public class HeaderTests : BaseTest
 
         (await sideMenuPage.IsSideMenuVisibleAsync()).Should().BeTrue();
     }
+
+    [Test]
+    public async Task T03_Header_ClickAskEquipAIBtn()
+    {
+        var dashboardPage = new DashboardPage(Fixture.Page);
+        await dashboardPage.OpenAsync();
+
+        var headerPage = new HeaderPage(Fixture.Page);
+        await headerPage.ClickAskEquipAIBtnAsync();
+
+        (await headerPage.IsChatWindowVisibleAsync()).Should().BeTrue();
+    }
 }

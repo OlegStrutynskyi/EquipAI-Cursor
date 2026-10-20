@@ -9,6 +9,7 @@ public class HeaderPage : BasePage
     private ILocator MenuIcon => Page.Locator("//button[@aria-label='Open menu']//app-menu-toggle-icon");
     private ILocator AppLogo => Page.Locator("//div[@class='header-left-bar']//app-logo");
     private ILocator AskEquipAIBtn => Page.Locator("//button[normalize-space()='Ask EquipAI']");
+    private ILocator ChatWindow => Page.Locator("//div[@role='dialog']");
     private ILocator NotificationIcon => Page.Locator("//div[@class='header-right-bar']//app-notification-icon");
     private ILocator UserName => Page.Locator("//div[@class='user-account-info-text']");
     private ILocator UserRole => Page.Locator("//div[@class='user-account-info-text-role']");
@@ -27,4 +28,12 @@ public class HeaderPage : BasePage
         await MenuIcon.ClickAsync();
         return new SideMenuPage(Page);
     }
+
+    public async Task ClickAskEquipAIBtnAsync()
+    {
+        await AskEquipAIBtn.ClickAsync();
+        await ChatWindow.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    public Task<bool> IsChatWindowVisibleAsync() => ChatWindow.IsVisibleAsync();
 }
