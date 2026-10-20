@@ -157,13 +157,11 @@ public class InvoicesTests : BaseTest
         (await invoicesPage.IsSearchInputVisibleAsync()).Should().BeTrue();
         (await invoicesPage.GetSearchPlaceholderAsync()).Should().Be("Search invoices or data...");
 
-        await invoicesPage.SearchAsync(RandomInvoiceSearch());
-        (await invoicesPage.GetGridEmptyMessageAsync()).Should().Be("No invoices match your search.");
-
-        await AssertDisplayedInvoicesContainAsync(invoicesPage, "Haskell");
-        await AssertDisplayedInvoicesContainAsync(invoicesPage, "INV");
-        await AssertDisplayedInvoicesContainAsync(invoicesPage, "delete");
-        await AssertDisplayedInvoicesContainAsync(invoicesPage, "invoice");
+        await AssertInvoiceSearchAsync(invoicesPage, RandomInvoiceSearch());
+        await AssertInvoiceSearchAsync(invoicesPage, "Haskell");
+        await AssertInvoiceSearchAsync(invoicesPage, "INV");
+        await AssertInvoiceSearchAsync(invoicesPage, "delete");
+        await AssertInvoiceSearchAsync(invoicesPage, "invoice");
     }
 
     [Test]
@@ -286,15 +284,31 @@ public class InvoicesTests : BaseTest
         totalFromGrid.Should().Be(totalFromPaginationSummary);
     }
 
-    private static async Task AssertDisplayedInvoicesContainAsync(InvoicesPage invoicesPage, string term)
+    private static async Task AssertInvoiceSearchAsync(InvoicesPage invoicesPage, string term)
     {
         await invoicesPage.SearchAsync(term);
-        var rows = await invoicesPage.GetAllInvoiceGridRowsAsync();
-        rows.Should().NotBeEmpty();
-        rows.Should().OnlyContain(row => InvoiceRowContains(row, term));
+
+        var expected = (await SqlHelper.GetInvoiceGridRowsAsync())
+            .Select(ToGridRow)
+            .Where(row => InvoiceRowContains(row, term))
+            .ToList();
+
+        if (expected.Count == 0)
+        {
+            (await invoicesPage.GetGridEmptyMessageAsync()).Should().Be("No invoices match your search.");
+            return;
+        }
+
+        var actual = (await invoicesPage.GetAllInvoiceGridRowsAsync())
+            .Select(ToActualRow)
+            .ToList();
+        actual.Should().BeEquivalentTo(expected);
+        actual.Should().OnlyContain(row => InvoiceRowContains(row, term));
     }
 
-    private static bool InvoiceRowContains(InvoiceGridRow row, string term) =>
+    private static bool InvoiceRowContains(
+        (string Project, string InvoiceNumber, string Company, string Date, string Status, string ImportDate, string ApproveRejectDate, string Source) row,
+        string term) =>
         string.Join(' ', row.Project, row.InvoiceNumber, row.Company, row.Date, row.Status, row.ImportDate, row.ApproveRejectDate, row.Source)
             .Contains(term, StringComparison.OrdinalIgnoreCase);
 

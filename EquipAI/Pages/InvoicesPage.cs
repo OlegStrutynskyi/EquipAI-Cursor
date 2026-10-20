@@ -72,6 +72,7 @@ public class InvoicesPage : BasePage
 
     public async Task SearchAsync(string text)
     {
+        var before = NormalizeGridText(await InvoicesGrid.Locator("tbody").InnerTextAsync());
         var response = Page.WaitForResponseAsync(
             response => IsInvoicesSearchResponse(response, text),
             new PageWaitForResponseOptions { Timeout = 15_000 });
@@ -81,11 +82,23 @@ public class InvoicesPage : BasePage
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
+            if (await InvoicesGrid.Locator(".table__skeleton-bar").CountAsync() > 0)
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            var current = NormalizeGridText(await InvoicesGrid.Locator("tbody").InnerTextAsync());
+            if (current == before)
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
             if (await IsEmptySearchMessageVisibleAsync())
                 return;
 
-            if (await InvoicesGrid.Locator(".table__skeleton-bar").CountAsync() == 0
-                && await InvoicesGrid.Locator("tbody tr td:nth-child(2)").CountAsync() > 0)
+            if (await InvoicesGrid.Locator("tbody tr td:nth-child(2)").CountAsync() > 0)
                 return;
 
             await Task.Delay(50);

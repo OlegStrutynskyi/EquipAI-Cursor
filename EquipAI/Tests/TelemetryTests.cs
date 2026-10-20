@@ -39,7 +39,7 @@ public class TelemetryTests : BaseTest
     }
 
     [Test]
-    public async Task T03_Telemetry_GridColumns()
+    public async Task T03_Telemetry_Grid_Columns()
     {
         var expectedColumns = new[]
         {
@@ -60,7 +60,7 @@ public class TelemetryTests : BaseTest
     }
 
     [Test]
-    public async Task T04_Telemetry_GridRecords()
+    public async Task T04_Telemetry_Grid_Records()
     {
         const string monthValue = "2022-06";
         const string monthDisplay = "06/2022";
@@ -91,7 +91,7 @@ public class TelemetryTests : BaseTest
     }
 
     [Test]
-    public async Task T05_Telemetry_GridSorting()
+    public async Task T05_Telemetry_Grid_Sorting()
     {
         const string monthValue = "2022-06";
         var columns = new[]
@@ -132,6 +132,74 @@ public class TelemetryTests : BaseTest
                 ExpectedSortedReadings(readings, "EQUIPMENT TAG", ascending: true),
                 $"{column} reset to EQUIPMENT TAG ASC");
         }
+    }
+
+    [Test]
+    public async Task T06_Telemetry_Grid_Search()
+    {
+        const string monthValue = "2022-06";
+        const string monthDisplay = "06/2022";
+
+        var telemetryPage = new TelemetryPage(Fixture.Page);
+        await telemetryPage.OpenAsync();
+
+        (await telemetryPage.IsSearchInputVisibleAsync()).Should().BeTrue();
+        (await telemetryPage.GetSearchPlaceholderAsync()).Should().Be("Search equipment or data...");
+
+        await telemetryPage.SetMonthAsync(monthValue);
+        (await telemetryPage.GetMonthFieldDisplayValueAsync()).Should().Be(monthDisplay);
+
+        await AssertTelemetrySearchAsync(telemetryPage, RandomTelemetrySearch());
+        await AssertTelemetrySearchAsync(telemetryPage, "222");
+        await AssertTelemetrySearchAsync(telemetryPage, "\"type 1\"");
+        await AssertTelemetrySearchAsync(telemetryPage, "delete");
+        await AssertTelemetrySearchAsync(telemetryPage, "haskell");
+        await AssertTelemetrySearchAsync(telemetryPage, "custom");
+    }
+
+    private static async Task AssertTelemetrySearchAsync(TelemetryPage telemetryPage, string term)
+    {
+        await telemetryPage.SearchAsync(term);
+
+        var phrase = SearchPhrase(term);
+        var expected = (await SqlHelper.GetTelemetryGridRowsAsync(new DateTime(2022, 6, 1)))
+            .Select(ToGridRow)
+            .Where(row => TelemetryRowContains(row, phrase))
+            .ToList();
+
+        if (expected.Count == 0)
+        {
+            (await telemetryPage.GetGridEmptyMessageAsync()).Should().Be("No telemetry readings match your search.");
+            return;
+        }
+
+        var actual = (await telemetryPage.GetGridRowsAsync())
+            .Select(ToActualRow)
+            .ToList();
+        actual.Should().BeEquivalentTo(expected);
+        actual.Should().OnlyContain(row => TelemetryRowContains(row, phrase));
+    }
+
+    private static string SearchPhrase(string term)
+    {
+        var trimmed = term.Trim();
+        return trimmed.Length >= 2 && trimmed[0] == '"' && trimmed[^1] == '"'
+            ? trimmed[1..^1]
+            : trimmed;
+    }
+
+    private static bool TelemetryRowContains(
+        (string Month, string EquipmentTag, string EquipmentType, string Location, string OperatingHours, string FuelType, string ImportDate, string Source) row,
+        string term) =>
+        string.Join(' ', row.Month, row.EquipmentTag, row.EquipmentType, row.Location, row.OperatingHours, row.FuelType, row.ImportDate, row.Source)
+            .Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static string RandomTelemetrySearch()
+    {
+        var chars = GenerateRandomAlphanumericString(10).ToCharArray();
+        chars[0] = (char)('a' + Random.Shared.Next(26));
+        chars[1] = (char)('0' + Random.Shared.Next(10));
+        return new string(chars);
     }
 
     private static async Task AssertCurrentPageSortedAsync(

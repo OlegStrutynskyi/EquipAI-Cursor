@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using EquipAI.Utils;
 using Microsoft.Playwright;
 
@@ -14,6 +15,7 @@ public class TelemetryPage : BasePage
     private ILocator ImportBtn => Page.Locator("//a[normalize-space()='Import'] | //button[normalize-space()='Import']");
     private ILocator MonthLabel => Page.Locator("label[for='telemetry-month'] span.form-label");
     private ILocator MonthField => Page.Locator("#telemetry-month");
+    private ILocator SearchInput => Page.Locator("#telemetry-list-search");
     private ILocator Grid => Page.Locator("table.table.telemetry-list__table, table.table")
         .Locator("visible=true").First;
 
@@ -45,6 +47,133 @@ public class TelemetryPage : BasePage
     public Task<bool> IsMonthLabelVisibleAsync() => MonthLabel.IsVisibleAsync();
     public Task<bool> IsMonthFieldVisibleAsync() => MonthField.IsVisibleAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
+
+    public async Task<bool> IsSearchInputVisibleAsync()
+    {
+        try
+        {
+            await SearchInput.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string> GetSearchPlaceholderAsync() =>
+        (await SearchInput.GetAttributeAsync("placeholder"))?.Trim() ?? string.Empty;
+
+    public async Task SearchAsync(string text)
+    {
+        var responseTask = Page.WaitForResponseAsync(
+            response => IsTelemetrySearchResponse(response, text),
+            new PageWaitForResponseOptions { Timeout = 15_000 });
+        await SearchInput.FillAsync(text);
+        var response = await responseTask;
+        var expectedTags = await ReadSearchEquipmentTagsAsync(response);
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await Grid.Locator(".table__skeleton-bar").CountAsync() > 0)
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            if (expectedTags.Count == 0)
+            {
+                if (await IsEmptySearchMessageVisibleAsync())
+                    return;
+            }
+            else
+            {
+                var actualTags = (await GetGridRowsOnCurrentPageAsync())
+                    .Select(row => row.EquipmentTag)
+                    .ToList();
+                if (actualTags.SequenceEqual(expectedTags))
+                    return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Telemetry search for '{text}' did not finish.");
+    }
+
+    public async Task<string> GetGridEmptyMessageAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText(
+            "No telemetry readings match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        await message.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        return NormalizeGridText(await message.First.InnerTextAsync());
+    }
+
+    private async Task<bool> IsEmptySearchMessageVisibleAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText(
+            "No telemetry readings match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        return await message.CountAsync() > 0 && await message.First.IsVisibleAsync();
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadSearchEquipmentTagsAsync(IResponse response)
+    {
+        using var document = JsonDocument.Parse(await response.TextAsync());
+        if (!document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var tags = new List<string>();
+        foreach (var item in items.EnumerateArray())
+        {
+            if (!item.TryGetProperty("equipmentTag", out var tag) || tag.ValueKind != JsonValueKind.String)
+                continue;
+
+            var value = tag.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+                tags.Add(value);
+        }
+
+        return tags;
+    }
+
+    private static bool IsTelemetrySearchResponse(IResponse response, string text)
+    {
+        if (!response.Ok || !Uri.TryCreate(response.Url, UriKind.Absolute, out var uri))
+            return false;
+
+        if (!uri.AbsolutePath.Equals("/api/telemetry", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var query = uri.Query.TrimStart('?');
+        foreach (var part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = part.IndexOf('=');
+            if (separator <= 0)
+                continue;
+
+            var key = Uri.UnescapeDataString(part[..separator]);
+            var value = Uri.UnescapeDataString(part[(separator + 1)..].Replace("+", " "));
+            if (key.Equals("Search", StringComparison.OrdinalIgnoreCase)
+                && value.Equals(text, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeGridText(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text.Replace('\u00A0', ' '), @"\s+", " ").Trim();
 
     public async Task SetMonthAsync(string yearMonth)
     {

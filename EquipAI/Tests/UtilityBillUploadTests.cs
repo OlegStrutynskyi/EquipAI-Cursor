@@ -35,7 +35,7 @@ public class UtilityBillUploadTests : BaseTest
     }
 
     [Test]
-    public async Task T03_UtilityBillUpload_GridColumns()
+    public async Task T03_UtilityBillUpload_Grid_Columns()
     {
         var expectedColumns = new[]
         {
@@ -56,7 +56,7 @@ public class UtilityBillUploadTests : BaseTest
     }
 
     [Test]
-    public async Task T04_UtilityBillUpload_GridRecords()
+    public async Task T04_UtilityBillUpload_Grid_Records()
     {
         var utilityBillUploadPage = new UtilityBillUploadPage(Fixture.Page);
         await utilityBillUploadPage.OpenAsync();
@@ -85,7 +85,7 @@ public class UtilityBillUploadTests : BaseTest
     }
 
     [Test]
-    public async Task T05_UtilityBillUpload_GridSorting()
+    public async Task T05_UtilityBillUpload_Grid_Sorting()
     {
         var columns = new[]
         {
@@ -126,7 +126,22 @@ public class UtilityBillUploadTests : BaseTest
     }
 
     [Test]
-    public async Task T06_UtilityBillUpload_ClickViewBtn()
+    public async Task T06_UtilityBillUpload_Grid_Search()
+    {
+        var utilityBillUploadPage = new UtilityBillUploadPage(Fixture.Page);
+        await utilityBillUploadPage.OpenAsync();
+
+        (await utilityBillUploadPage.IsSearchInputVisibleAsync()).Should().BeTrue();
+        (await utilityBillUploadPage.GetSearchPlaceholderAsync()).Should().Be("Search bills or data...");
+
+        await AssertUtilityBillSearchAsync(utilityBillUploadPage, RandomUtilityBillSearch());
+        await AssertUtilityBillSearchAsync(utilityBillUploadPage, "haskell");
+        await AssertUtilityBillSearchAsync(utilityBillUploadPage, "COMPANY");
+        await AssertUtilityBillSearchAsync(utilityBillUploadPage, "invoice");
+    }
+
+    [Test]
+    public async Task T07_UtilityBillUpload_ClickViewBtn()
     {
         const string expectedTitle = "Utility Bill";
 
@@ -138,7 +153,7 @@ public class UtilityBillUploadTests : BaseTest
     }
 
     [Test]
-    public async Task T07_UtilityBillUpload_ClickEditBtn()
+    public async Task T08_UtilityBillUpload_ClickEditBtn()
     {
         const string expectedTitle = "Review PDF Import";
 
@@ -150,7 +165,7 @@ public class UtilityBillUploadTests : BaseTest
     }
 
     [Test]
-    public async Task T08_UtilityBillUpload_Rejected_View()
+    public async Task T09_UtilityBillUpload_Rejected_View()
     {
         const string billDate = "Jan 1, 2022";
         const string project = Config.SetupProjectName1;
@@ -181,7 +196,7 @@ public class UtilityBillUploadTests : BaseTest
     }
 
     [Test]
-    public async Task T09_UtilityBillUpload_Approved_View()
+    public async Task T10_UtilityBillUpload_Approved_View()
     {
         const string billDate = "Jan 1, 2022";
         const string project = Config.SetupProjectName1;
@@ -209,6 +224,42 @@ public class UtilityBillUploadTests : BaseTest
         {
             await SqlHelper.SetUtilityBillDraftAsync(project, company, billDateValue);
         }
+    }
+
+    private static async Task AssertUtilityBillSearchAsync(UtilityBillUploadPage utilityBillUploadPage, string term)
+    {
+        await utilityBillUploadPage.SearchAsync(term);
+
+        var expected = (await SqlHelper.GetUtilityBillGridRowsAsync())
+            .Select(ToGridRow)
+            .Where(row => UtilityBillRowContains(row, term))
+            .ToList();
+
+        if (expected.Count == 0)
+        {
+            (await utilityBillUploadPage.GetGridEmptyMessageAsync()).Should().Be("No bills match your search.");
+            return;
+        }
+
+        var actual = (await utilityBillUploadPage.GetAllGridRowsAsync())
+            .Select(ToActualRow)
+            .ToList();
+        actual.Should().BeEquivalentTo(expected);
+        actual.Should().OnlyContain(row => UtilityBillRowContains(row, term));
+    }
+
+    private static bool UtilityBillRowContains(
+        (string Project, string Company, string Date, string Status, string ImportDate, string ApproveRejectDate, string Source) row,
+        string term) =>
+        string.Join(' ', row.Project, row.Company, row.Date, row.Status, row.ImportDate, row.ApproveRejectDate, row.Source)
+            .Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private static string RandomUtilityBillSearch()
+    {
+        var chars = GenerateRandomAlphanumericString(10).ToCharArray();
+        chars[0] = (char)('a' + Random.Shared.Next(26));
+        chars[1] = (char)('0' + Random.Shared.Next(10));
+        return new string(chars);
     }
 
     private static async Task AssertCurrentPageSortedAsync(

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using EquipAI.Utils;
 using Microsoft.Playwright;
 
@@ -41,6 +43,151 @@ public class UtilityBillUploadPage : BasePage
 
     public Task<bool> IsImportPDFBtnVisibleAsync() => ImportPDFBtn.IsVisibleAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
+
+    private ILocator SearchInput => Page.Locator("#invoice-list-search");
+
+    public async Task<bool> IsSearchInputVisibleAsync()
+    {
+        try
+        {
+            await SearchInput.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10_000
+            });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string> GetSearchPlaceholderAsync() =>
+        (await SearchInput.GetAttributeAsync("placeholder"))?.Trim() ?? string.Empty;
+
+    public async Task SearchAsync(string text)
+    {
+        var responseTask = Page.WaitForResponseAsync(
+            response => IsUtilityBillSearchResponse(response, text),
+            new PageWaitForResponseOptions { Timeout = 15_000 });
+        await SearchInput.FillAsync(text);
+        var response = await responseTask;
+        var expectedKeys = await ReadSearchKeysAsync(response);
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await Grid.Locator(".table__skeleton-bar").CountAsync() > 0)
+            {
+                await Task.Delay(50);
+                continue;
+            }
+
+            if (expectedKeys.Count == 0)
+            {
+                if (await IsEmptySearchMessageVisibleAsync())
+                    return;
+            }
+            else
+            {
+                var actualKeys = (await ReadGridRowsOnCurrentPageAsync())
+                    .Select(row => $"{row.Company}|{row.Date}")
+                    .ToList();
+                if (actualKeys.SequenceEqual(expectedKeys))
+                    return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Utility bill search for '{text}' did not finish.");
+    }
+
+    public async Task<string> GetGridEmptyMessageAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText(
+            "No bills match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        await message.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10_000
+        });
+        return NormalizeGridText(await message.First.InnerTextAsync());
+    }
+
+    private async Task<bool> IsEmptySearchMessageVisibleAsync()
+    {
+        var message = Grid.Locator("tbody").GetByText(
+            "No bills match your search.",
+            new LocatorGetByTextOptions { Exact = true });
+        return await message.CountAsync() > 0 && await message.First.IsVisibleAsync();
+    }
+
+    private static bool IsUtilityBillSearchResponse(IResponse response, string text)
+    {
+        if (!response.Ok || !Uri.TryCreate(response.Url, UriKind.Absolute, out var uri))
+            return false;
+
+        if (!uri.AbsolutePath.Equals("/api/invoices", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var query = uri.Query.TrimStart('?');
+        foreach (var part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = part.IndexOf('=');
+            if (separator <= 0)
+                continue;
+
+            var key = Uri.UnescapeDataString(part[..separator]);
+            var value = Uri.UnescapeDataString(part[(separator + 1)..].Replace("+", " "));
+            if (key.Equals("Search", StringComparison.OrdinalIgnoreCase)
+                && value.Equals(text, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadSearchKeysAsync(IResponse response)
+    {
+        using var document = JsonDocument.Parse(await response.TextAsync());
+        if (!document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var keys = new List<string>();
+        foreach (var item in items.EnumerateArray())
+        {
+            var company = ReadJsonString(item, "companyName");
+            var date = ReadJsonString(item, "invoiceDate");
+            keys.Add($"{DisplayOrDash(company)}|{FormatMediumDate(date)}");
+        }
+
+        return keys;
+    }
+
+    private static string? ReadJsonString(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static string DisplayOrDash(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
+
+    private static string FormatMediumDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.StartsWith("0001-", StringComparison.Ordinal))
+            return "—";
+
+        var datePart = value.Length >= 10 ? value[..10] : value;
+        return DateTime.TryParseExact(datePart, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+            ? date.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)
+            : value.Trim();
+    }
+
+    private static string NormalizeGridText(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text.Replace('\u00A0', ' '), @"\s+", " ").Trim();
 
     public async Task<ImportPage> ClickImportPDFBtnAsync()
     {
