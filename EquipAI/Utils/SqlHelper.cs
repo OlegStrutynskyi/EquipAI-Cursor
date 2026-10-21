@@ -254,6 +254,52 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task<IReadOnlyList<OfficeGridDbRow>> GetOfficeGridRowsAsync()
+    {
+        var rows = new List<OfficeGridDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT CONCAT_WS(N' — ', p.Code, p.Name) AS Project,
+                   o.Name,
+                   CONCAT_WS(', ',
+                       NULLIF(a.AddressLine1, ''),
+                       NULLIF(a.AddressLine2, ''),
+                       NULLIF(a.City, ''),
+                       NULLIF(CONCAT_WS(' ', a.StateProvince, a.PostalCode), '')) AS Address,
+                   NULLIF(a.CountryCode, '') AS CountryCode,
+                   o.StartDate,
+                   o.EndDate,
+                   o.AreaSquareFeet
+            FROM [projects].[Office] AS o
+            LEFT JOIN [projects].[Project] AS p
+                ON o.ProjectId = p.Id
+            LEFT JOIN [projects].[Address] AS a
+                ON o.AddressId = a.Id
+            WHERE o.IsDeleted = 0
+            ORDER BY o.Name
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var project = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            var name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var address = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            var countryCode = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            DateTime? startDate = reader.IsDBNull(4) ? null : ReadLocalDateTime(reader.GetValue(4));
+            DateTime? endDate = reader.IsDBNull(5) ? null : ReadLocalDateTime(reader.GetValue(5));
+            decimal? area = reader.IsDBNull(6) ? null : Convert.ToDecimal(reader.GetValue(6));
+            rows.Add(new OfficeGridDbRow(project, name, address, countryCode, startDate, endDate, area));
+        }
+
+        return rows;
+    }
+
     public static async Task<bool?> TryGetProjectIsDeletedByNameAsync(string name)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -3688,6 +3734,15 @@ public sealed record FactorImportBatchGridDbRow(
 public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
 
 public sealed record ProjectGridRow(string Code, string Name, string Address, DateTime? StartDate, bool IsActive);
+
+public sealed record OfficeGridDbRow(
+    string Project,
+    string Name,
+    string Address,
+    string CountryCode,
+    DateTime? StartDate,
+    DateTime? EndDate,
+    decimal? AreaSquareFeet);
 
 public sealed record UserGridRow(string Email, string Name, int Capabilities);
 
