@@ -13,6 +13,7 @@ public class SideMenuPage : BasePage
 
     private ILocator CompanyDashboardLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Company Dashboard" });
     private ILocator ProjectsLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Projects" });
+    private ILocator OfficesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Offices" });
     private ILocator EmissionHubLink => PrimaryNav.Locator(".nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission Hub" });
     private ILocator EmissionCategoriesLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Emission Categories" });
     private ILocator FactorImportLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Factor Import" });
@@ -68,6 +69,7 @@ public class SideMenuPage : BasePage
 
     public Task ClickCompanyDashboardAsync() => ClickLinkAsync(CompanyDashboardLink);
     public Task ClickProjectsAsync() => ClickLinkAsync(ProjectsLink);
+    public Task ClickOfficesAsync() => ClickLinkAsync(OfficesLink);
     public Task ClickUnitsAsync() => ClickLinkAsync(UnitsLink);
     public Task ClickUsersAsync() => ClickLinkAsync(UsersLink);
 
