@@ -254,6 +254,33 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task<IReadOnlyList<string>> GetOfficeProjectDropdownOptionsAsync()
+    {
+        var options = new List<string>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT CONCAT_WS(N' — ', Code, Name)
+            FROM [projects].[Project]
+            WHERE HasOffices = 1 AND IsDeleted = 0
+            ORDER BY Code
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var option = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            if (!string.IsNullOrEmpty(option))
+                options.Add(option);
+        }
+
+        return options;
+    }
+
     public static async Task<IReadOnlyList<OfficeGridDbRow>> GetOfficeGridRowsAsync()
     {
         var rows = new List<OfficeGridDbRow>();
