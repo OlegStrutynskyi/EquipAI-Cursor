@@ -106,7 +106,8 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T11_TelemetryImport_Herc_NoMonthYear()
     {
-        const string expectedMonthYear = "--------- ----";
+        const string expectedMonthYearError = "Month/Year is required.";
+        const string expectedCompany = "Herc";
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
@@ -114,7 +115,8 @@ public class TelemetryImportTests : BaseTest
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
     }
 
     [Test]
@@ -414,7 +416,8 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T23_TelemetryImport_JCB_NoMonthYear()
     {
-        const string expectedMonthYear = "--------- ----";
+        const string expectedMonthYearError = "Month/Year is required.";
+        const string expectedCompany = "JCB";
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
@@ -422,7 +425,8 @@ public class TelemetryImportTests : BaseTest
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
     }
 
     [Test]
@@ -776,9 +780,17 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T35_TelemetryImport_Custom_NoMonthYear()
     {
-        await AssertImportAlertAsync(
-            "Custom_no_MonthYear.xlsx",
-            "File name must match 'CompanyName_Month_Year.xlsx' (example: Herc_07_26.xlsx).");
+        const string expectedMonthYearError = "Month/Year is required.";
+        const string expectedCompany = "Custom";
+
+        var importPage = new ImportPage(Fixture.Page);
+        await importPage.OpenTelemetryAsync();
+        await importPage.UploadFileAsync("Custom_no_MonthYear.xlsx");
+        await importPage.ClickImportBtnAsync();
+
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        (await importPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
     }
 
     [Test]
@@ -1166,7 +1178,8 @@ public class TelemetryImportTests : BaseTest
     [Test]
     public async Task T50_TelemetryImport_United_NoMonthYear()
     {
-        const string expectedMonthYear = "--------- ----";
+        const string expectedMonthYearError = "Month/Year is required.";
+        const string expectedCompany = "United";
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
@@ -1174,7 +1187,8 @@ public class TelemetryImportTests : BaseTest
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
-        (await importPage.GetReportingMonthValueAsync()).Should().Be(expectedMonthYear);
+        (await importPage.GetMonthYearErrorAsync()).Should().Be(expectedMonthYearError);
+        (await importPage.GetCompanyValueAsync()).Should().Be(expectedCompany);
     }
 
     [Test]
