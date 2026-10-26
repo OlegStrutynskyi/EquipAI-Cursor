@@ -215,7 +215,7 @@ public class UsersTests : BaseTest
     [Test]
     public async Task T13_Users_AddUser_TakenEmail()
     {
-        const string expectedAlertMessage = "Request failed.";
+        const string expectedAlertMessage = $"Email '{Config.TestUserEmail}' is already taken.";
 
         var usersPage = new UsersPage(Fixture.Page);
         await usersPage.OpenAsync();
