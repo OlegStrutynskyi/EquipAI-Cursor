@@ -37,10 +37,20 @@ public class ProjectDashboardTests_Haskell : BaseTest
     }
 
     [Test]
-    public async Task T03_HaskellDashboard_Total_View()
+    public async Task T03_HaskellDashboard_YearDropdown()
+    {
+        var emissionYears = await SqlHelper.GetProjectActivityYearsAsync(Config.DefaultEnterpriseProjectName);
+        var expectedYears = new[] { "All" }.Concat(emissionYears).ToList();
+
+        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
+        var actualYears = await projectDashboardPage.GetYearDropdownOptionsAsync();
+        actualYears.Should().Equal(expectedYears);
+    }
+
+    [Test]
+    public async Task T04_HaskellDashboard_Total_View()
     {
         const string expectedTitle = "Total Carbon Emissions";
-        const string expectedSubtitle = "All time";
 
         var totalCo2eTonnes = await SqlHelper.GetActiveProjectTotalCo2eTonnesAsync(Config.DefaultEnterpriseProjectName) ?? 0m;
         var rounded = Math.Round(totalCo2eTonnes, 1, MidpointRounding.AwayFromZero);
@@ -50,8 +60,47 @@ public class ProjectDashboardTests_Haskell : BaseTest
 
         (await projectDashboardPage.IsTotalEmissionsIconVisibleAsync()).Should().BeTrue();
         (await projectDashboardPage.GetTotalEmissionsTitleAsync()).Should().Be(expectedTitle);
-        (await projectDashboardPage.GetTotalEmissionsSubtitleAsync()).Should().Be(expectedSubtitle);
         (await projectDashboardPage.GetTotalEmissionsValueAsync()).Should().Be(expectedTotal);
+        (await projectDashboardPage.IsScopeButtonVisibleAsync(1)).Should().BeTrue();
+        (await projectDashboardPage.IsScopeButtonVisibleAsync(2)).Should().BeTrue();
+        (await projectDashboardPage.IsScopeButtonVisibleAsync(3)).Should().BeTrue();
+        (await projectDashboardPage.IsScopeTotalTextVisibleAsync()).Should().BeTrue();
+
+        var yearOptions = await projectDashboardPage.GetYearDropdownOptionsAsync();
+        var allIndex = -1;
+        for (var i = 0; i < yearOptions.Count; i++)
+        {
+            if (!yearOptions[i].Equals("All", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            allIndex = i;
+            break;
+        }
+
+        if (allIndex < 0 || allIndex >= yearOptions.Count - 1)
+            return;
+
+        var selectedYear = yearOptions[allIndex + 1];
+        var yearTotal = await SqlHelper.GetActiveProjectTotalCo2eTonnesAsync(
+            Config.DefaultEnterpriseProjectName,
+            int.Parse(selectedYear, CultureInfo.InvariantCulture)) ?? 0m;
+        var expectedYearTotal = Math.Round(yearTotal, 1, MidpointRounding.AwayFromZero)
+            .ToString("#,##0.0", CultureInfo.InvariantCulture) + " tCO2e";
+
+        await projectDashboardPage.SelectYearAsync(selectedYear);
+
+        var actualYearTotal = string.Empty;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            actualYearTotal = await projectDashboardPage.GetTotalEmissionsValueAsync();
+            if (actualYearTotal == expectedYearTotal)
+                break;
+
+            await Task.Delay(200);
+        }
+
+        actualYearTotal.Should().Be(expectedYearTotal);
         (await projectDashboardPage.IsScopeButtonVisibleAsync(1)).Should().BeTrue();
         (await projectDashboardPage.IsScopeButtonVisibleAsync(2)).Should().BeTrue();
         (await projectDashboardPage.IsScopeButtonVisibleAsync(3)).Should().BeTrue();
@@ -59,96 +108,31 @@ public class ProjectDashboardTests_Haskell : BaseTest
     }
 
     [Test]
-    public Task T04_HaskellDashboard_Total_Scope1() => AssertScopeTotalAsync(scope: 1, selectScope: false);
+    public Task T05_HaskellDashboard_Total_Scope1() =>
+        AssertScopeTotalAsync(scope: 1, selectScope: false, checkYearAfterAll: true);
 
     [Test]
-    public Task T05_HaskellDashboard_Total_Scope2() => AssertScopeTotalAsync(scope: 2, selectScope: true);
+    public Task T06_HaskellDashboard_Total_Scope2() =>
+        AssertScopeTotalAsync(scope: 2, selectScope: true, checkYearAfterAll: true);
 
     [Test]
-    public Task T06_HaskellDashboard_Total_Scope3() => AssertScopeTotalAsync(scope: 3, selectScope: true);
+    public Task T07_HaskellDashboard_Total_Scope3() =>
+        AssertScopeTotalAsync(scope: 3, selectScope: true, checkYearAfterAll: true);
 
     [Test]
-    public async Task T07_HaskellDashboard_Chart_YearDropdown()
-    {
-        var currentYear = DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
-        var dbYears = (await SqlHelper.GetProjectActivityYearsAsync(Config.DefaultEnterpriseProjectName)).ToList();
-        var expectedYears = dbYears.Contains(currentYear, StringComparer.Ordinal)
-            ? dbYears
-            : new[] { currentYear }.Concat(dbYears).ToList();
-
-        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
-        var actualYears = await projectDashboardPage.GetYearDropdownOptionsAsync();
-        actualYears.Should().Equal(expectedYears);
-    }
+    public Task T08_HaskellDashboard_Chart_Scope1() =>
+        AssertChartAllThenYearAfterAllAsync(scope: 1);
 
     [Test]
-    public async Task T08_HaskellDashboard_Chart_CurrentYearScope1()
-    {
-        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
-        await AssertChartScopeMatchesDbAsync(projectDashboardPage, DateTime.UtcNow.Year, scope: 1);
-    }
+    public Task T09_HaskellDashboard_Chart_Scope2() =>
+        AssertChartAllThenYearAfterAllAsync(scope: 2);
 
     [Test]
-    public async Task T09_HaskellDashboard_Chart_CurrentYearScope2()
-    {
-        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
-        await AssertChartScopeMatchesDbAsync(projectDashboardPage, DateTime.UtcNow.Year, scope: 2);
-    }
+    public Task T10_HaskellDashboard_Chart_Scope3() =>
+        AssertChartAllThenYearAfterAllAsync(scope: 3);
 
     [Test]
-    public async Task T10_HaskellDashboard_Chart_CurrentYearScope3()
-    {
-        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
-        await AssertChartScopeMatchesDbAsync(projectDashboardPage, DateTime.UtcNow.Year, scope: 3);
-    }
-
-    [Test]
-    public async Task T11_HaskellDashboard_Chart_NextYearOptionScope1()
-    {
-        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
-        var yearOption = GetNextYearOptionAfterCurrent(await projectDashboardPage.GetYearDropdownOptionsAsync());
-        if (yearOption is null)
-            Assert.Pass("No next year option after current year");
-
-        await AssertChartScopeMatchesDbAsync(
-            projectDashboardPage,
-            int.Parse(yearOption, CultureInfo.InvariantCulture),
-            scope: 1,
-            yearOption);
-    }
-
-    [Test]
-    public async Task T12_HaskellDashboard_Chart_NextYearOptionScope2()
-    {
-        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
-        var yearOption = GetNextYearOptionAfterCurrent(await projectDashboardPage.GetYearDropdownOptionsAsync());
-        if (yearOption is null)
-            Assert.Pass("No next year option after current year");
-
-        await AssertChartScopeMatchesDbAsync(
-            projectDashboardPage,
-            int.Parse(yearOption, CultureInfo.InvariantCulture),
-            scope: 2,
-            yearOption);
-    }
-
-    [Test]
-    public async Task T13_HaskellDashboard_Chart_NextYearOptionScope3()
-    {
-        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
-        var yearOption = GetNextYearOptionAfterCurrent(await projectDashboardPage.GetYearDropdownOptionsAsync());
-        if (yearOption is null)
-            Assert.Pass("No next year option after current year");
-
-        await AssertChartScopeMatchesDbAsync(
-            projectDashboardPage,
-            int.Parse(yearOption, CultureInfo.InvariantCulture),
-            scope: 3,
-            yearOption);
-    }
-
-    [Test]
-    public async Task T14_HaskellDashboard_Data_Fuel()
+    public async Task T11_HaskellDashboard_Data_Fuel()
     {
         var expectedColumns = new[]
         {
@@ -203,7 +187,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
     }
 
     [Test]
-    public async Task T15_HaskellDashboard_Data_Office()
+    public async Task T12_HaskellDashboard_Data_Office()
     {
         var expectedColumns = new[]
         {
@@ -267,7 +251,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
     }
 
     [Test]
-    public async Task T16_HaskellDashboard_Data_Telemetry()
+    public async Task T13_HaskellDashboard_Data_Telemetry()
     {
         var expectedColumns = new[]
         {
@@ -329,7 +313,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
         actual.Should().Equal(expected);
     }
 
-    private async Task AssertScopeTotalAsync(int scope, bool selectScope)
+    private async Task AssertScopeTotalAsync(int scope, bool selectScope, bool checkYearAfterAll = false)
     {
         var projectName = Config.DefaultEnterpriseProjectName;
         var expectedTotal = await SqlHelper.GetProjectScopeTotalCo2eTonnesAsync(projectName, scope);
@@ -339,38 +323,104 @@ public class ProjectDashboardTests_Haskell : BaseTest
             await projectDashboardPage.ClickScopeButtonAsync(scope);
 
         (await projectDashboardPage.IsScopeButtonSelectedAsync(scope)).Should().BeTrue();
+        await AssertDisplayedScopeAsync(projectDashboardPage, projectName, scope, expectedTotal);
 
+        if (checkYearAfterAll)
+            await AssertScopeForYearAfterAllAsync(projectDashboardPage, projectName, scope);
+    }
+
+    private async Task AssertScopeForYearAfterAllAsync(
+        ProjectDashboardPage projectDashboardPage,
+        string projectName,
+        int scope)
+    {
+        var yearOptions = await projectDashboardPage.GetYearDropdownOptionsAsync();
+        string? selectedYear = null;
+        for (var i = 0; i < yearOptions.Count - 1; i++)
+        {
+            if (!yearOptions[i].Equals("All", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            selectedYear = yearOptions[i + 1];
+            break;
+        }
+
+        if (selectedYear is null)
+            return;
+
+        var year = int.Parse(selectedYear, CultureInfo.InvariantCulture);
+        var expectedTotal = await SqlHelper.GetProjectScopeTotalCo2eTonnesAsync(projectName, scope, year);
+        await projectDashboardPage.SelectYearAsync(selectedYear);
+        await AssertDisplayedScopeAsync(projectDashboardPage, projectName, scope, expectedTotal, year);
+    }
+
+    private async Task AssertDisplayedScopeAsync(
+        ProjectDashboardPage projectDashboardPage,
+        string projectName,
+        int scope,
+        decimal expectedTotal,
+        int? year = null)
+    {
         if (expectedTotal == 0m)
         {
-            (await projectDashboardPage.GetScopeTotalValueAsync()).Should().Be("0");
+            var emptyDeadline = DateTime.UtcNow.AddSeconds(15);
+            var emptyValue = string.Empty;
+            while (DateTime.UtcNow < emptyDeadline)
+            {
+                emptyValue = await projectDashboardPage.GetScopeTotalValueAsync();
+                if (emptyValue == "0")
+                    break;
+
+                await Task.Delay(200);
+            }
+
+            emptyValue.Should().Be("0");
             (await projectDashboardPage.GetScopeTotalTextAsync()).Should().Be($"Total Scope {scope} \u2013 0 tCO2e");
             (await projectDashboardPage.GetScopeEmptyMessageAsync()).Should().Be($"No Scope {scope} emissions recorded.");
             return;
         }
 
         var expectedValue = FormatTonnes(expectedTotal);
-        (await projectDashboardPage.GetScopeTotalValueAsync()).Should().Be(expectedValue);
-        (await projectDashboardPage.GetScopeTotalTextAsync()).Should().Be($"Total Scope {scope} \u2013 {expectedValue} tCO2e");
-
-        var expectedLines = (await SqlHelper.GetProjectScopeEmissionTypesAsync(projectName, scope))
+        var expectedLines = (await SqlHelper.GetProjectScopeEmissionTypesAsync(projectName, scope, year))
             .Select(row => $"{row.TypeName} {FormatEmissionValue(row.Co2eTonnes)} tCO2e {FormatQuantity(row.Quantity)} {row.UnitSymbol}")
             .ToList();
-        var actualLines = await projectDashboardPage.GetScopeEmissionLinesAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        var actualValue = string.Empty;
+        IReadOnlyList<string> actualLines = [];
+        while (DateTime.UtcNow < deadline)
+        {
+            actualValue = await projectDashboardPage.GetScopeTotalValueAsync();
+            try
+            {
+                actualLines = await projectDashboardPage.GetScopeEmissionLinesAsync();
+            }
+            catch (InvalidOperationException)
+            {
+                actualLines = [];
+            }
+
+            if (actualValue == expectedValue && actualLines.SequenceEqual(expectedLines))
+                break;
+
+            await Task.Delay(200);
+        }
+
+        actualValue.Should().Be(expectedValue);
+        (await projectDashboardPage.GetScopeTotalTextAsync()).Should().Be($"Total Scope {scope} \u2013 {expectedValue} tCO2e");
         actualLines.Should().Equal(expectedLines);
     }
 
     private async Task<ProjectDashboardPage> OpenDefaultProjectDashboardAsync()
     {
+        var projectName = Config.DefaultEnterpriseProjectName;
         var projectsPage = new ProjectsPage(Fixture.Page);
         await projectsPage.OpenAsync();
-        return await projectsPage.ClickProjectNameAsync(Config.DefaultEnterpriseProjectName);
+        await projectsPage.SearchAsync(projectName);
+        return await projectsPage.ClickProjectNameAsync(projectName);
     }
 
-    private static string FormatTonnes(decimal tonnes)
-    {
-        var rounded = Math.Round(tonnes, 1, MidpointRounding.AwayFromZero);
-        return rounded.ToString("#,##0.0", CultureInfo.InvariantCulture);
-    }
+    private static string FormatTonnes(decimal tonnes) => FormatEmissionValue(tonnes);
 
     private static string FormatQuantity(decimal quantity) => FormatEmissionValue(quantity);
 
@@ -378,24 +428,37 @@ public class ProjectDashboardTests_Haskell : BaseTest
         ProjectDashboardPage projectDashboardPage,
         int year,
         int scope,
-        string? yearOption = null)
+        string? yearOption = null,
+        bool completeTestOnNoData = true)
     {
         var expectedRows = await SqlHelper.GetProjectChartScopeMonthlyEmissionsAsync(
             Config.DefaultEnterpriseProjectName,
             year,
             scope);
         if (expectedRows.Count == 0)
-            Assert.Pass("No data for this Scope");
+        {
+            if (completeTestOnNoData)
+                Assert.Pass("No data for this Scope");
+            return;
+        }
 
         await projectDashboardPage.SelectYearAsync(yearOption ?? year.ToString(CultureInfo.InvariantCulture));
         await projectDashboardPage.SelectChartScopeAsync(scope);
 
         if (!await projectDashboardPage.HasChartLineAsync())
-            Assert.Pass("No data for this Scope");
+        {
+            if (completeTestOnNoData)
+                Assert.Pass("No data for this Scope");
+            return;
+        }
 
         var chartValuesByMonth = await projectDashboardPage.GetChartMonthlyTonnesAsync();
         if (chartValuesByMonth.Count == 0 || chartValuesByMonth.Values.All(value => value == 0m))
-            Assert.Pass("No data for this Scope");
+        {
+            if (completeTestOnNoData)
+                Assert.Pass("No data for this Scope");
+            return;
+        }
 
         foreach (var row in expectedRows)
         {
@@ -406,31 +469,83 @@ public class ProjectDashboardTests_Haskell : BaseTest
         }
     }
 
+    private static async Task AssertChartAllYearsMatchDbAsync(ProjectDashboardPage projectDashboardPage, int scope)
+    {
+        var expectedRows = await SqlHelper.GetProjectChartScopeYearlyEmissionsAsync(Config.DefaultEnterpriseProjectName, scope);
+        if (expectedRows.Count == 0)
+            return;
+
+        await projectDashboardPage.SelectChartScopeAsync(scope);
+        if (!await projectDashboardPage.HasChartLineAsync())
+            return;
+
+        var chartValuesByYear = await projectDashboardPage.GetChartYearlyTonnesAsync();
+        foreach (var row in expectedRows)
+        {
+            chartValuesByYear.Should().ContainKey(row.Year);
+            var actualValue = chartValuesByYear[row.Year];
+            var expectedValue = RoundToChartDisplayPrecision(row.Co2eTonnes, actualValue);
+            actualValue.Should().Be(expectedValue, $"year {row.Year}");
+        }
+    }
+
+    private async Task AssertChartAllThenYearAfterAllAsync(int scope)
+    {
+        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
+        await projectDashboardPage.SelectYearAsync("All");
+        await AssertChartSubtitleAsync(projectDashboardPage, "All");
+        await AssertChartAllYearsMatchDbAsync(projectDashboardPage, scope);
+
+        var selectedYear = GetYearAfterAll(await projectDashboardPage.GetYearDropdownOptionsAsync());
+        if (selectedYear is null)
+            return;
+
+        await projectDashboardPage.SelectYearAsync(selectedYear);
+        await AssertChartSubtitleAsync(projectDashboardPage, selectedYear);
+        await AssertChartScopeMatchesDbAsync(
+            projectDashboardPage,
+            int.Parse(selectedYear, CultureInfo.InvariantCulture),
+            scope,
+            selectedYear);
+    }
+
+    private static async Task AssertChartSubtitleAsync(ProjectDashboardPage projectDashboardPage, string yearOption)
+    {
+        var expected = yearOption.Equals("All", StringComparison.OrdinalIgnoreCase)
+            ? "tCO2e \u00b7 Yearly, all years on record"
+            : $"tCO2e \u00b7 Monthly, {yearOption}";
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        var actual = string.Empty;
+        while (DateTime.UtcNow < deadline)
+        {
+            actual = await projectDashboardPage.GetChartSubtitleAsync();
+            if (actual == expected)
+                break;
+
+            await Task.Delay(200);
+        }
+
+        actual.Should().Be(expected);
+    }
+
+    private static string? GetYearAfterAll(IReadOnlyList<string> yearOptions)
+    {
+        for (var i = 0; i < yearOptions.Count - 1; i++)
+        {
+            if (yearOptions[i].Equals("All", StringComparison.OrdinalIgnoreCase))
+                return yearOptions[i + 1];
+        }
+
+        return null;
+    }
+
     private static decimal RoundToChartDisplayPrecision(decimal databaseValue, decimal chartValue)
     {
         var chartText = chartValue.ToString(CultureInfo.InvariantCulture);
         var separatorIndex = chartText.IndexOf('.');
         var decimals = separatorIndex < 0 ? 0 : chartText.Length - separatorIndex - 1;
         return Math.Round(databaseValue, decimals, MidpointRounding.AwayFromZero);
-    }
-
-    private static string? GetNextYearOptionAfterCurrent(IReadOnlyList<string> yearOptions)
-    {
-        var currentYear = DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture);
-        var currentIndex = -1;
-        for (var i = 0; i < yearOptions.Count; i++)
-        {
-            if (!yearOptions[i].Equals(currentYear, StringComparison.Ordinal))
-                continue;
-
-            currentIndex = i;
-            break;
-        }
-
-        if (currentIndex < 0 || currentIndex >= yearOptions.Count - 1)
-            return null;
-
-        return yearOptions[currentIndex + 1];
     }
 
     private static (string Month, string EquipmentTag, string EquipmentType, string Location, string OperatingHours, string FuelType, string ImportDate, string Source) ToTelemetryGridRow(

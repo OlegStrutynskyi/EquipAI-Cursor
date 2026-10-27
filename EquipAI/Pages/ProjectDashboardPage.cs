@@ -9,8 +9,10 @@ public class ProjectDashboardPage : BasePage
     public ProjectDashboardPage(IPage page) : base(page) { }
 
     private ILocator ProjectDashboardTitle => Page.Locator("#project-dashboard-title");
-    private ILocator ReportingBadge => Page.Locator("//span[contains(@class,'pill pill--sm')]");
+    private ILocator ReportingBadge => Page.Locator(
+        "//span[contains(@class,'pill') and contains(translate(normalize-space(.), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'REPORTING')]");
     private ILocator SynchedProcore => Page.Locator("//p[@class='page-meta__item']");
+    private ILocator YearDropdown => Page.Locator("//button[@id='project-dashboard-year']");
     private ILocator TotalEmissionsCard => Page.Locator("//article[@class='card card--subtle stat-card']");
     private ILocator TotalEmissionsIcon => TotalEmissionsCard.Locator("xpath=.//span[@class='icon-badge']");
     private ILocator TotalEmissionsTitle => TotalEmissionsCard.Locator("xpath=.//*[normalize-space()='Total Carbon Emissions']");
@@ -21,12 +23,12 @@ public class ProjectDashboardPage : BasePage
     private ILocator ScopeTotalValue => Page.Locator("//span[@class='breakdown__total-value']");
     private ILocator ScopeEmptyMessage => Page.Locator("//p[@class='project-dashboard__breakdown-empty']");
     private ILocator ChartCard => Page.Locator("//div[@class='card card--subtle project-dashboard__chart-card']");
+    private ILocator ChartSubtitle => ChartCard.Locator("xpath=.//p[@class='section-header__lead']");
     private ILocator Chart => ChartCard.Locator("div.chart__plot");
-    private ILocator YearDropdown => ChartCard.Locator("app-searchable-select");
     private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
     private ILocator DataGrid => Page.Locator("//section[@class='project-dashboard__data']");
     private ILocator FuelTab => Page.Locator("//button[normalize-space()='Fuel']");
-    private ILocator OfficeTab => Page.Locator("//button[normalize-space()='Office']");
+    private ILocator OfficeTab => Page.Locator("//button[normalize-space()='Office' and not(contains(@class,'table__sort'))]");
     private ILocator TelemetryTab => Page.Locator("//button[normalize-space()='Telemetry']");
     private ILocator FuelGrid => DataGrid.Locator("table");
     private ILocator FuelPagination => Page.Locator("nav[aria-label='Project data pagination']");
@@ -192,6 +194,12 @@ public class ProjectDashboardPage : BasePage
 
     public Task<bool> IsScopeTotalTextVisibleAsync() => ScopeTotalText.First.IsVisibleAsync();
     public Task<bool> IsChartCardVisibleAsync() => ChartCard.First.IsVisibleAsync();
+
+    public async Task<string> GetChartSubtitleAsync()
+    {
+        await ChartSubtitle.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return NormalizeText(await ChartSubtitle.First.InnerTextAsync());
+    }
     public Task<bool> IsDataGridVisibleAsync() => DataGrid.First.IsVisibleAsync();
 
     public async Task<bool> IsFuelTabVisibleAsync()
@@ -244,26 +252,32 @@ public class ProjectDashboardPage : BasePage
 
     public async Task ClickOfficeTabAsync()
     {
-        await OfficeTab.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var pressed = await OfficeTab.First.GetAttributeAsync("aria-pressed");
-        if (!string.Equals(pressed, "true", StringComparison.OrdinalIgnoreCase))
+        var tab = OfficeTab.First;
+        await tab.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        if (await IsDataTabSelectedAsync(tab))
         {
-            var before = await GetFirstDataRowFingerprintAsync();
-            await OfficeTab.First.ClickAsync();
-            await Assertions.Expect(OfficeTab.First).ToHaveAttributeAsync(
-                "aria-pressed",
-                "true",
-                new LocatorAssertionsToHaveAttributeOptions { Timeout = 5_000 });
+            await WaitForFuelGridAsync();
+            return;
+        }
 
-            var deadline = DateTime.UtcNow.AddSeconds(10);
-            while (DateTime.UtcNow < deadline)
-            {
-                var after = await GetFirstDataRowFingerprintAsync();
-                if (!string.IsNullOrEmpty(after) && !string.Equals(after, before, StringComparison.Ordinal))
-                    break;
+        var before = await GetFirstDataRowFingerprintAsync();
+        await tab.ClickAsync();
 
-                await Task.Delay(150);
-            }
+        var selectedDeadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < selectedDeadline && !await IsDataTabSelectedAsync(tab))
+            await Task.Delay(100);
+
+        if (!await IsDataTabSelectedAsync(tab))
+            throw new TimeoutException("Office tab did not become selected.");
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var after = await GetFirstDataRowFingerprintAsync();
+            if (!string.IsNullOrEmpty(after) && !string.Equals(after, before, StringComparison.Ordinal))
+                break;
+
+            await Task.Delay(150);
         }
 
         await WaitForFuelGridAsync();
@@ -435,14 +449,12 @@ public class ProjectDashboardPage : BasePage
     public async Task SelectYearAsync(string year)
     {
         var selectedValue = YearDropdown.Locator(".select__value");
-        if (await selectedValue.CountAsync() > 0)
-        {
-            var currentSelected = (await selectedValue.First.InnerTextAsync())
-                .Replace('\u00A0', ' ')
-                .Trim();
-            if (currentSelected.Equals(year, StringComparison.OrdinalIgnoreCase))
-                return;
-        }
+        var selection = await selectedValue.CountAsync() > 0 ? selectedValue.First : YearDropdown;
+        var currentSelected = (await selection.InnerTextAsync())
+            .Replace('\u00A0', ' ')
+            .Trim();
+        if (currentSelected.Equals(year, StringComparison.OrdinalIgnoreCase))
+            return;
 
         var chartLine = Chart.Locator("path.chart__line");
         var previousPath = await chartLine.CountAsync() > 0
@@ -472,7 +484,7 @@ public class ProjectDashboardPage : BasePage
             {
             }
 
-            await selectedValue
+            await selection
                 .Filter(new LocatorFilterOptions { HasTextString = text })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = 5_000 });
 
@@ -560,7 +572,7 @@ public class ProjectDashboardPage : BasePage
         await Chart.Locator("path.chart__line")
             .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
 
-        var tooltipValues = await TryGetChartMonthlyTonnesFromTooltipsAsync();
+        var tooltipValues = await TryGetChartTonnesFromTooltipsAsync(yearly: false);
         if (tooltipValues.Count > 0)
             return tooltipValues;
 
@@ -580,6 +592,15 @@ public class ProjectDashboardPage : BasePage
         }
 
         return result;
+    }
+
+    public async Task<IReadOnlyDictionary<int, decimal>> GetChartYearlyTonnesAsync()
+    {
+        await Chart.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Chart.Locator("path.chart__line")
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+
+        return await TryGetChartTonnesFromTooltipsAsync(yearly: true);
     }
 
     private async Task OpenSearchableSelectAsync(ILocator dropdown)
@@ -614,11 +635,11 @@ public class ProjectDashboardPage : BasePage
         await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
     }
 
-    private async Task<IReadOnlyDictionary<int, decimal>> TryGetChartMonthlyTonnesFromTooltipsAsync()
+    private async Task<IReadOnlyDictionary<int, decimal>> TryGetChartTonnesFromTooltipsAsync(bool yearly)
     {
         var result = new Dictionary<int, decimal>();
-        var monthLabels = Chart.Locator("g.chart__x-axis text.chart__axis-label");
-        var count = await monthLabels.CountAsync();
+        var axisLabels = Chart.Locator("g.chart__x-axis text.chart__axis-label");
+        var count = await axisLabels.CountAsync();
         if (count == 0)
             return result;
 
@@ -627,8 +648,23 @@ public class ProjectDashboardPage : BasePage
 
         for (var i = 0; i < count; i++)
         {
-            var label = monthLabels.Nth(i);
-            await label.HoverAsync();
+            var label = axisLabels.Nth(i);
+            if (!await label.IsVisibleAsync())
+                continue;
+
+            var labelText = NormalizeText(await label.TextContentAsync());
+            int year = 0;
+            if (yearly && !int.TryParse(labelText, NumberStyles.None, CultureInfo.InvariantCulture, out year))
+                continue;
+
+            try
+            {
+                await label.HoverAsync(new LocatorHoverOptions { Timeout = 1_500 });
+            }
+            catch (TimeoutException)
+            {
+                continue;
+            }
             try
             {
                 await tooltip.First.WaitForAsync(new LocatorWaitForOptions
@@ -643,15 +679,17 @@ public class ProjectDashboardPage : BasePage
             }
 
             var tooltipText = (await tooltip.First.InnerTextAsync())?.Replace('\u00A0', ' ').Trim() ?? string.Empty;
-            if (TryParseChartTooltipTonnes(tooltipText, out var tonnes))
-                result[i + 1] = tonnes;
+            if (!TryParseChartTooltipTonnes(tooltipText, yearly ? labelText : null, out var tonnes))
+                continue;
+
+            result[yearly ? year : i + 1] = tonnes;
         }
 
         await Chart.HoverAsync(new LocatorHoverOptions { Position = new Position { X = 1, Y = 1 } });
         return result;
     }
 
-    private static bool TryParseChartTooltipTonnes(string tooltipText, out decimal tonnes)
+    private static bool TryParseChartTooltipTonnes(string tooltipText, string? axisLabel, out decimal tonnes)
     {
         tonnes = 0m;
         if (string.IsNullOrWhiteSpace(tooltipText))
@@ -663,7 +701,13 @@ public class ProjectDashboardPage : BasePage
             if (line.StartsWith("Scope", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var normalized = line.Replace(",", string.Empty, StringComparison.Ordinal).Trim();
+            var normalized = line.Replace(",", string.Empty, StringComparison.Ordinal)
+                .Replace("tCO2e", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Trim();
+            if (axisLabel is not null
+                && normalized.Equals(axisLabel, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             if (decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out tonnes))
                 return true;
         }
