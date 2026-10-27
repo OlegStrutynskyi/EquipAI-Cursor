@@ -3362,6 +3362,241 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task<bool> GetProjectHasOfficesAsync(string projectName)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT HasOffices
+            FROM [projects].[Project]
+            WHERE Name = @ProjectName
+            """,
+            connection);
+        command.Parameters.AddWithValue("@ProjectName", projectName);
+        var value = await command.ExecuteScalarAsync();
+        return value switch
+        {
+            null or DBNull => false,
+            bool bit => bit,
+            _ => Convert.ToInt32(value) == 1,
+        };
+    }
+
+    public static async Task<IReadOnlyList<ProjectOfficesDashboardDbRow>> GetProjectOfficesDashboardAsync(
+        string projectName,
+        DateTime? periodStart,
+        DateTime? periodEnd)
+    {
+        var rows = new List<ProjectOfficesDashboardDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            DECLARE @ProjectId bigint = (
+                SELECT Id
+                FROM projects.Project
+                WHERE Name = @ProjectName
+                  AND IsDeleted = 0
+            );
+
+            SELECT
+                o.Id AS OfficeId,
+                o.Name,
+                ad.City,
+                ad.StateProvince,
+                o.AreaSquareFeet,
+                CASE
+                    WHEN o.AreaEmissionTypeId IS NULL THEN 'Bills'
+                    ELSE 'SQ FT'
+                END AS AreaEmissionType,
+                o.StartDate,
+                o.EndDate,
+                (
+                    SELECT STRING_AGG(names.DisplayName, ', ')
+                        WITHIN GROUP (ORDER BY names.DisplayName)
+                    FROM (
+                        SELECT DISTINCT t2.DisplayName
+                        FROM emissions.Activity AS a2
+                        INNER JOIN emissions.EmissionType AS t2
+                            ON t2.Id = a2.TypeId
+                           AND t2.IsDeleted = 0
+                        WHERE a2.OfficeId = o.Id
+                          AND a2.IsDeleted = 0
+                          AND (@PeriodStart IS NULL OR a2.ActivityDate >= @PeriodStart)
+                          AND (@PeriodEnd IS NULL OR a2.ActivityDate <= @PeriodEnd)
+                    ) AS names
+                ) AS EmissionTypes,
+                COALESCE(SUM(x.Co2eTonnes), CAST(0 AS decimal(38, 15))) AS TotalCo2eTonnes,
+                COALESCE(SUM(x.Co2eTonnes), CAST(0 AS decimal(38, 15)))
+                    / NULLIF(CAST(o.AreaSquareFeet AS decimal(38, 15)), 0) AS TotalPerSQFT
+            FROM projects.Project AS p
+            INNER JOIN projects.Office AS o
+                ON o.ProjectId = p.Id
+               AND o.IsDeleted = 0
+            LEFT JOIN projects.Address AS ad
+                ON ad.Id = o.AddressId
+            LEFT JOIN emissions.Activity AS a
+                ON a.OfficeId = o.Id
+               AND a.IsDeleted = 0
+               AND (@PeriodStart IS NULL OR a.ActivityDate >= @PeriodStart)
+               AND (@PeriodEnd IS NULL OR a.ActivityDate <= @PeriodEnd)
+            LEFT JOIN emissions.EmissionCategory AS ec
+                ON ec.Id = a.CategoryId
+               AND ec.IsDeleted = 0
+            LEFT JOIN emissions.EmissionType AS t
+                ON t.Id = a.TypeId
+               AND t.IsDeleted = 0
+            LEFT JOIN emissions.UnitOfMeasure AS sqftUnit
+                ON sqftUnit.Code = 'SQFT'
+               AND sqftUnit.IsDeleted = 0
+            OUTER APPLY (
+                SELECT TOP (1)
+                    efPick.Id,
+                    efPick.UnitOfMeasureId,
+                    efPick.Co2eTonnesPerActivityUnit,
+                    flvPick.Year
+                FROM factors.EmissionFactor AS efPick
+                INNER JOIN factors.FactorLibraryVersion AS flvPick
+                    ON flvPick.Id = efPick.FactorLibraryVersionId
+                   AND flvPick.IsDeleted = 0
+                WHERE efPick.TypeId = t.Id
+                  AND efPick.IsDeleted = 0
+                  AND (
+                        efPick.UnitOfMeasureId = t.DefaultUnitOfMeasureId
+                        OR EXISTS (
+                            SELECT 1
+                            FROM emissions.UnitOfMeasure AS du
+                            INNER JOIN emissions.UnitOfMeasure AS u
+                                ON u.IsDeleted = 0
+                               AND u.Dimension = du.Dimension
+                               AND u.Code = CASE du.Dimension
+                                   WHEN 0 THEN 'US_GAL'
+                                   WHEN 1 THEN 'T'
+                                   WHEN 2 THEN 'KWH'
+                                   WHEN 4 THEN 'SQFT'
+                                   ELSE du.Code
+                               END
+                            WHERE du.Id = t.DefaultUnitOfMeasureId
+                        )
+                  )
+                  AND (
+                        flvPick.Year <= YEAR(a.ActivityDate)
+                        OR NOT EXISTS (
+                            SELECT 1
+                            FROM factors.EmissionFactor AS efActYear
+                            INNER JOIN factors.FactorLibraryVersion AS flvActYear
+                                ON flvActYear.Id = efActYear.FactorLibraryVersionId
+                               AND flvActYear.IsDeleted = 0
+                            WHERE flvActYear.Year = YEAR(a.ActivityDate)
+                              AND efActYear.IsDeleted = 0
+                        )
+                  )
+                  AND (
+                        flvPick.Year = YEAR(a.ActivityDate)
+                        OR t.DefaultUnitOfMeasureId <> ISNULL(sqftUnit.Id, -1)
+                  )
+                ORDER BY
+                    CASE WHEN flvPick.Year <= YEAR(a.ActivityDate) THEN 0 ELSE 1 END,
+                    flvPick.Year DESC,
+                    CASE WHEN efPick.UnitOfMeasureId = t.DefaultUnitOfMeasureId THEN 0 ELSE 1 END
+            ) AS ef
+            OUTER APPLY (
+                SELECT TOP (1) du.Id, du.ScaleToCanonical
+                FROM emissions.UnitOfMeasure AS du
+                WHERE du.Id = t.DefaultUnitOfMeasureId
+                  AND du.IsDeleted = 0
+            ) AS defaultUom
+            OUTER APPLY (
+                SELECT TOP (1) u.Id, u.ScaleToCanonical
+                FROM emissions.UnitOfMeasure AS du
+                INNER JOIN emissions.UnitOfMeasure AS u
+                    ON u.IsDeleted = 0
+                   AND u.Dimension = du.Dimension
+                   AND u.Code = CASE du.Dimension
+                       WHEN 0 THEN 'US_GAL'
+                       WHEN 1 THEN 'T'
+                       WHEN 2 THEN 'KWH'
+                       WHEN 4 THEN 'SQFT'
+                       ELSE du.Code
+                   END
+                WHERE du.Id = t.DefaultUnitOfMeasureId
+                  AND du.IsDeleted = 0
+            ) AS factorUom
+            CROSS APPLY (
+                SELECT CAST(
+                    CASE
+                        WHEN ef.Id IS NULL THEN NULL
+                        WHEN factorUom.Id IS NOT NULL
+                            AND ef.UnitOfMeasureId = factorUom.Id
+                            AND defaultUom.Id IS NOT NULL
+                            AND ef.UnitOfMeasureId <> defaultUom.Id
+                            AND defaultUom.ScaleToCanonical IS NOT NULL
+                            AND defaultUom.ScaleToCanonical <> 0
+                        THEN
+                            CAST(a.Quantity AS decimal(38, 15))
+                            * CAST(ef.Co2eTonnesPerActivityUnit AS decimal(38, 15))
+                            * CAST(factorUom.ScaleToCanonical / defaultUom.ScaleToCanonical AS decimal(38, 15))
+                        ELSE
+                            CAST(a.Quantity AS decimal(38, 15))
+                            * CAST(ef.Co2eTonnesPerActivityUnit AS decimal(38, 15))
+                    END
+                    AS decimal(38, 15)
+                ) AS Co2eTonnes
+            ) AS x
+            WHERE p.IsDeleted = 0
+              AND p.Id = @ProjectId
+              AND (@PeriodEnd IS NULL OR o.StartDate <= @PeriodEnd)
+              AND (
+                    @PeriodStart IS NULL
+                    OR o.EndDate IS NULL
+                    OR o.EndDate >= @PeriodStart
+              )
+            GROUP BY
+                o.Id,
+                o.Name,
+                ad.City,
+                ad.StateProvince,
+                o.AreaSquareFeet,
+                o.AreaEmissionTypeId,
+                o.StartDate,
+                o.EndDate
+            ORDER BY TotalCo2eTonnes DESC, o.Name;
+            """,
+            connection);
+        command.Parameters.AddWithValue("@ProjectName", projectName);
+        command.Parameters.Add(new SqlParameter("@PeriodStart", System.Data.SqlDbType.Date)
+        {
+            Value = periodStart.HasValue ? periodStart.Value.Date : DBNull.Value,
+        });
+        command.Parameters.Add(new SqlParameter("@PeriodEnd", System.Data.SqlDbType.Date)
+        {
+            Value = periodEnd.HasValue ? periodEnd.Value.Date : DBNull.Value,
+        });
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new ProjectOfficesDashboardDbRow(
+                Convert.ToInt64(reader.GetValue(0)),
+                reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim(),
+                reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim(),
+                reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim(),
+                reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4)),
+                reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim(),
+                reader.IsDBNull(6) ? null : ReadLocalDateTime(reader.GetValue(6)),
+                reader.IsDBNull(7) ? null : ReadLocalDateTime(reader.GetValue(7)),
+                reader.IsDBNull(8) ? string.Empty : reader.GetString(8).Trim(),
+                reader.IsDBNull(9) ? 0m : Convert.ToDecimal(reader.GetValue(9)),
+                reader.IsDBNull(10) ? null : Convert.ToDecimal(reader.GetValue(10))));
+        }
+
+        return rows;
+    }
+
     public static async Task<IReadOnlyList<ProjectOfficeBillDbRow>> GetProjectOfficeBillsAsync(string projectName)
     {
         var rows = new List<ProjectOfficeBillDbRow>();
@@ -3778,6 +4013,19 @@ public sealed record TelemetryGridDbRow(
     DateTime? CreatedAt,
     string SourceType,
     long Id);
+
+public sealed record ProjectOfficesDashboardDbRow(
+    long OfficeId,
+    string Name,
+    string City,
+    string StateProvince,
+    decimal? AreaSquareFeet,
+    string Method,
+    DateTime? StartDate,
+    DateTime? EndDate,
+    string EmissionTypes,
+    decimal TotalCo2eTonnes,
+    decimal? TotalPerSqFt);
 
 public sealed record ProjectOfficeBillDbRow(
     string Company,

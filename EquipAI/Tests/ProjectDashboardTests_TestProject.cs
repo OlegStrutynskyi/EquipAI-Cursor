@@ -19,6 +19,16 @@ public class ProjectDashboardTests_TestProject : BaseTest
         (await projectDashboardPage.IsTotalEmissionsCardVisibleAsync()).Should().BeTrue();
         (await projectDashboardPage.IsChartCardVisibleAsync()).Should().BeTrue();
         (await projectDashboardPage.IsDataGridVisibleAsync()).Should().BeTrue();
+
+        var officesCardVisible = await SqlHelper.GetProjectHasOfficesAsync(Config.SetupProjectName1);
+        if (officesCardVisible)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < deadline && !await projectDashboardPage.IsOfficesCardVisibleAsync())
+                await Task.Delay(200);
+        }
+
+        (await projectDashboardPage.IsOfficesCardVisibleAsync()).Should().Be(officesCardVisible);
     }
 
     [Test]
@@ -132,7 +142,35 @@ public class ProjectDashboardTests_TestProject : BaseTest
         AssertChartAllThenYearAfterAllAsync(scope: 3);
 
     [Test]
-    public async Task T11_TestProject_Data_Fuel()
+    public async Task T11_TestProject_OfficesGrid()
+    {
+        const string officesNote =
+            "One row per office for the selected year. The Method column shows whether the figure comes from bills or from floor area.";
+
+        var projectName = Config.SetupProjectName1;
+        if (!await SqlHelper.GetProjectHasOfficesAsync(projectName))
+            Assert.Pass("Project does not have any Offices.");
+
+        var projectDashboardPage = await OpenProjectDashboardAsync();
+        await projectDashboardPage.SelectYearAsync("All");
+        (await projectDashboardPage.GetOfficesNoteAsync()).Should().Be(officesNote);
+        await AssertOfficesGridMatchesDbAsync(projectDashboardPage, projectName, null, null);
+
+        var selectedYear = GetYearAfterAll(await projectDashboardPage.GetYearDropdownOptionsAsync());
+        if (selectedYear is null)
+            return;
+
+        await projectDashboardPage.SelectYearAsync(selectedYear);
+        var year = int.Parse(selectedYear, CultureInfo.InvariantCulture);
+        await AssertOfficesGridMatchesDbAsync(
+            projectDashboardPage,
+            projectName,
+            new DateTime(year, 1, 1),
+            new DateTime(year, 12, 31));
+    }
+
+    [Test]
+    public async Task T12_TestProject_Data_Fuel()
     {
         var expectedColumns = new[]
         {
@@ -187,7 +225,7 @@ public class ProjectDashboardTests_TestProject : BaseTest
     }
 
     [Test]
-    public async Task T12_TestProject_Data_Office()
+    public async Task T13_TestProject_Data_Office()
     {
         var expectedColumns = new[]
         {
@@ -251,7 +289,7 @@ public class ProjectDashboardTests_TestProject : BaseTest
     }
 
     [Test]
-    public async Task T13_TestProject_Data_Telemetry()
+    public async Task T14_TestProject_Data_Telemetry()
     {
         var expectedColumns = new[]
         {
@@ -527,6 +565,82 @@ public class ProjectDashboardTests_TestProject : BaseTest
         }
 
         actual.Should().Be(expected);
+    }
+
+    private static async Task AssertOfficesGridMatchesDbAsync(
+        ProjectDashboardPage projectDashboardPage,
+        string projectName,
+        DateTime? periodStart,
+        DateTime? periodEnd)
+    {
+        var dbRows = await SqlHelper.GetProjectOfficesDashboardAsync(projectName, periodStart, periodEnd);
+        if (dbRows.Count == 0)
+        {
+            var expectedMessage = periodStart.HasValue && await SqlHelper.GetProjectHasOfficesAsync(projectName)
+                ? $"No office was occupied in {periodStart.Value.Year}."
+                : "No offices recorded yet.";
+
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            var message = string.Empty;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await projectDashboardPage.IsOfficesEmptyMessageVisibleAsync())
+                {
+                    message = await projectDashboardPage.GetOfficesEmptyMessageAsync();
+                    if (message == expectedMessage)
+                        break;
+                }
+
+                await Task.Delay(200);
+            }
+
+            message.Should().Be(expectedMessage);
+            return;
+        }
+
+        var expected = dbRows.Select(ToOfficesCardRow).ToList();
+        var rowsDeadline = DateTime.UtcNow.AddSeconds(15);
+        IReadOnlyList<ProjectOfficesCardGridRow> actual = [];
+        while (DateTime.UtcNow < rowsDeadline)
+        {
+            actual = await projectDashboardPage.GetOfficesCardRowsAsync();
+            if (actual.SequenceEqual(expected))
+                break;
+
+            await Task.Delay(200);
+        }
+
+        actual.Should().Equal(expected);
+    }
+
+    private static ProjectOfficesCardGridRow ToOfficesCardRow(ProjectOfficesDashboardDbRow row)
+    {
+        var location = string.Join(", ", new[] { row.City, row.StateProvince }.Where(part => !string.IsNullOrWhiteSpace(part)));
+        var office = string.IsNullOrWhiteSpace(location) ? row.Name : $"{row.Name} {location}";
+
+        return new ProjectOfficesCardGridRow(
+            office,
+            FormatOfficeArea(row.AreaSquareFeet),
+            row.Method.ToUpperInvariant(),
+            FormatEmpty(row.EmissionTypes),
+            FormatOfficeTonnes(row.TotalCo2eTonnes),
+            FormatOfficeTonnesPerSqFt(row.TotalPerSqFt));
+    }
+
+    private static string FormatOfficeArea(decimal? area) =>
+        area?.ToString("#,##0.00", CultureInfo.InvariantCulture) ?? "—";
+
+    private static string FormatOfficeTonnes(decimal tonnes) =>
+        Math.Round(tonnes, 1, MidpointRounding.AwayFromZero)
+            .ToString("#,##0.0", CultureInfo.InvariantCulture);
+
+    private static string FormatOfficeTonnesPerSqFt(decimal? tonnesPerSqFt)
+    {
+        if (tonnesPerSqFt is null)
+            return "—";
+
+        var rounded = Math.Round(tonnesPerSqFt.Value, 6, MidpointRounding.AwayFromZero);
+        return rounded.ToString("#,##0.######", CultureInfo.InvariantCulture);
     }
 
     private static string? GetYearAfterAll(IReadOnlyList<string> yearOptions)

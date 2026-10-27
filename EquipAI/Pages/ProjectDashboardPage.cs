@@ -27,6 +27,10 @@ public class ProjectDashboardPage : BasePage
     private ILocator Chart => ChartCard.Locator("div.chart__plot");
     private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
     private ILocator DataGrid => Page.Locator("//section[@class='project-dashboard__data']");
+    private ILocator OfficesCard => Page.Locator("//*[@class='project-dashboard__offices']");
+    private ILocator OfficesNote => Page.Locator("//p[@class='project-offices__note']");
+    private ILocator OfficesEmptyMessage => Page.Locator("//p[@class='project-offices__empty']");
+    private ILocator OfficesTable => Page.Locator("//table[contains(@class,'project-offices__table')]");
     private ILocator FuelTab => Page.Locator("//button[normalize-space()='Fuel']");
     private ILocator OfficeTab => Page.Locator("//button[normalize-space()='Office' and not(contains(@class,'table__sort'))]");
     private ILocator TelemetryTab => Page.Locator("//button[normalize-space()='Telemetry']");
@@ -201,6 +205,106 @@ public class ProjectDashboardPage : BasePage
         return NormalizeText(await ChartSubtitle.First.InnerTextAsync());
     }
     public Task<bool> IsDataGridVisibleAsync() => DataGrid.First.IsVisibleAsync();
+
+    public async Task<bool> IsOfficesCardVisibleAsync()
+    {
+        if (await OfficesCard.CountAsync() == 0)
+            return false;
+
+        return await OfficesCard.First.IsVisibleAsync();
+    }
+
+    public async Task<string> GetOfficesNoteAsync()
+    {
+        await OfficesNote.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return NormalizeText(await OfficesNote.First.InnerTextAsync());
+    }
+
+    public async Task<bool> IsOfficesEmptyMessageVisibleAsync()
+    {
+        if (await OfficesEmptyMessage.CountAsync() == 0)
+            return false;
+
+        return await OfficesEmptyMessage.First.IsVisibleAsync();
+    }
+
+    public async Task<string> GetOfficesEmptyMessageAsync()
+    {
+        await OfficesEmptyMessage.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return NormalizeText(await OfficesEmptyMessage.First.InnerTextAsync());
+    }
+
+    public async Task<IReadOnlyList<ProjectOfficesCardGridRow>> GetOfficesCardRowsAsync()
+    {
+        if (await OfficesTable.CountAsync() == 0 || !await OfficesTable.First.IsVisibleAsync())
+            return [];
+
+        var rawRows = await OfficesTable.First.EvaluateAsync<string[][]>(
+            """
+            table => [...table.querySelectorAll('tbody tr')]
+              .filter(tr => !tr.querySelector('.table__skeleton-bar'))
+              .map(tr => [...tr.querySelectorAll(':scope > td')]
+                .map(td => (td.innerText || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()))
+              .filter(cells => cells.some(cell => cell.length > 0))
+            """);
+
+        var headers = (await OfficesTable.First.Locator("thead th").AllInnerTextsAsync())
+            .Select(NormalizeOfficesHeader)
+            .ToList();
+
+        var result = new List<ProjectOfficesCardGridRow>();
+        foreach (var cells in rawRows)
+        {
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < cells.Length && i < headers.Count; i++)
+            {
+                if (headers[i].Length == 0)
+                    continue;
+
+                values[headers[i]] = cells[i];
+            }
+
+            var office = OfficesCell(values, "OFFICE");
+            if (string.IsNullOrWhiteSpace(office))
+                continue;
+
+            result.Add(new ProjectOfficesCardGridRow(
+                office,
+                OfficesCell(values, "AREA"),
+                OfficesCell(values, "METHOD"),
+                OfficesCell(values, "EMISSION"),
+                OfficesCell(values, "TONNES"),
+                OfficesCell(values, "PER")));
+        }
+
+        return result;
+    }
+
+    private static string NormalizeOfficesHeader(string header)
+    {
+        var text = NormalizeText(header)
+            .Replace("₂", "2", StringComparison.Ordinal)
+            .Replace("²", "2", StringComparison.Ordinal)
+            .ToUpperInvariant();
+
+        if (text.Contains("PER", StringComparison.Ordinal))
+            return "PER";
+        if (text.Contains("TCO2", StringComparison.Ordinal) || text.Contains("CO2", StringComparison.Ordinal))
+            return "TONNES";
+        if (text.Contains("EMISSION", StringComparison.Ordinal))
+            return "EMISSION";
+        if (text.Contains("METHOD", StringComparison.Ordinal))
+            return "METHOD";
+        if (text.Contains("AREA", StringComparison.Ordinal))
+            return "AREA";
+        if (text.Contains("OFFICE", StringComparison.Ordinal))
+            return "OFFICE";
+
+        return text;
+    }
+
+    private static string OfficesCell(IReadOnlyDictionary<string, string> values, string name) =>
+        values.TryGetValue(name, out var value) ? value : string.Empty;
 
     public async Task<bool> IsFuelTabVisibleAsync()
     {
@@ -1239,3 +1343,11 @@ public sealed record ProjectFuelGridRow(
     string Total,
     string Source,
     string Category);
+
+public sealed record ProjectOfficesCardGridRow(
+    string Office,
+    string Area,
+    string Method,
+    string EmissionType,
+    string Tonnes,
+    string TonnesPerSquareFoot);
