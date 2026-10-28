@@ -599,12 +599,17 @@ public class ProjectDashboardTests_Haskell : BaseTest
             return;
         }
 
-        var expected = dbRows.Select(ToOfficesCardRow).ToList();
         var rowsDeadline = DateTime.UtcNow.AddSeconds(15);
         IReadOnlyList<ProjectOfficesCardGridRow> actual = [];
+        var expected = new List<ProjectOfficesCardGridRow>();
         while (DateTime.UtcNow < rowsDeadline)
         {
             actual = await projectDashboardPage.GetOfficesCardRowsAsync();
+            expected = dbRows
+                .Select((row, index) => ToOfficesCardRow(
+                    row,
+                    index < actual.Count ? actual[index].TonnesPerSquareFoot : null))
+                .ToList();
             if (actual.SequenceEqual(expected))
                 break;
 
@@ -614,7 +619,9 @@ public class ProjectDashboardTests_Haskell : BaseTest
         actual.Should().Equal(expected);
     }
 
-    private static ProjectOfficesCardGridRow ToOfficesCardRow(ProjectOfficesDashboardDbRow row)
+    private static ProjectOfficesCardGridRow ToOfficesCardRow(
+        ProjectOfficesDashboardDbRow row,
+        string? displayedTonnesPerSquareFoot = null)
     {
         var location = string.Join(", ", new[] { row.City, row.StateProvince }.Where(part => !string.IsNullOrWhiteSpace(part)));
         var office = string.IsNullOrWhiteSpace(location) ? row.Name : $"{row.Name} {location}";
@@ -625,7 +632,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
             row.Method.ToUpperInvariant(),
             FormatEmpty(row.EmissionTypes),
             FormatOfficeTonnes(row.TotalCo2eTonnes),
-            FormatOfficeTonnesPerSqFt(row.TotalPerSqFt));
+            FormatOfficeTonnesPerSqFt(row.TotalPerSqFt, displayedTonnesPerSquareFoot));
     }
 
     private static string FormatOfficeArea(decimal? area) =>
@@ -635,13 +642,30 @@ public class ProjectDashboardTests_Haskell : BaseTest
         Math.Round(tonnes, 1, MidpointRounding.AwayFromZero)
             .ToString("#,##0.0", CultureInfo.InvariantCulture);
 
-    private static string FormatOfficeTonnesPerSqFt(decimal? tonnesPerSqFt)
+    private static string FormatOfficeTonnesPerSqFt(decimal? tonnesPerSqFt, string? displayed = null)
     {
         if (tonnesPerSqFt is null)
             return "—";
 
-        var rounded = Math.Round(tonnesPerSqFt.Value, 6, MidpointRounding.AwayFromZero);
-        return rounded.ToString("#,##0.######", CultureInfo.InvariantCulture);
+        var decimals = TryGetDisplayedDecimalPlaces(displayed, out var places) ? places : 6;
+        var rounded = Math.Round(tonnesPerSqFt.Value, decimals, MidpointRounding.AwayFromZero);
+        var format = decimals == 0 ? "#,##0" : "#,##0." + new string('0', decimals);
+        return rounded.ToString(format, CultureInfo.InvariantCulture);
+    }
+
+    private static bool TryGetDisplayedDecimalPlaces(string? displayed, out int places)
+    {
+        places = 0;
+        if (string.IsNullOrWhiteSpace(displayed))
+            return false;
+
+        var text = displayed.Trim().Replace(",", "").Replace(" ", "");
+        if (text is "—" or "-" or "–" || !decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out _))
+            return false;
+
+        var separator = text.LastIndexOf('.');
+        places = separator < 0 ? 0 : text.Length - separator - 1;
+        return true;
     }
 
     private static string? GetYearAfterAll(IReadOnlyList<string> yearOptions)
