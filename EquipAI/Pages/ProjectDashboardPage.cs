@@ -69,6 +69,7 @@ public class ProjectDashboardPage : BasePage
 
     public Task<bool> IsReportingBadgeVisibleAsync() => ReportingBadge.First.IsVisibleAsync();
     public Task<bool> IsSynchedProcoreVisibleAsync() => SynchedProcore.First.IsVisibleAsync();
+    public Task<bool> IsYearDropdownVisibleAsync() => YearDropdown.IsVisibleAsync();
     public Task<bool> IsTotalEmissionsCardVisibleAsync() => TotalEmissionsCard.First.IsVisibleAsync();
 
     public Task<bool> IsTotalEmissionsIconVisibleAsync() => TotalEmissionsIcon.First.IsVisibleAsync();
@@ -878,6 +879,9 @@ public class ProjectDashboardPage : BasePage
     private static decimal ParseChartAxisValue(string label)
     {
         var normalized = label.Replace(",", string.Empty, StringComparison.Ordinal).Trim();
+        if (normalized is "—" or "–" or "-" or "")
+            return 0m;
+
         var hasK = normalized.EndsWith("k", StringComparison.OrdinalIgnoreCase);
         if (hasK)
             normalized = normalized[..^1].Trim();

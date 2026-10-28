@@ -2545,18 +2545,16 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
-    public static async Task<decimal> GetTotalCarbonEmissionsTonnesAsync(int year)
+    public static Task<decimal> GetTotalCarbonEmissionsTonnesAsync() =>
+        GetTotalCarbonEmissionsTonnesAsync(year: null);
+
+    public static async Task<decimal> GetTotalCarbonEmissionsTonnesAsync(int? year)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
         await connection.OpenAsync();
 
         await using var command = new SqlCommand(
             """
-            DECLARE @PeriodStart date = DATEFROMPARTS(@Year, 1, 1);
-            DECLARE @PeriodEnd   date = IIF(@Year = YEAR(GETUTCDATE()),
-                                            CAST(GETUTCDATE() AS date),
-                                            DATEFROMPARTS(@Year, 12, 31));
-
             WITH ActivityTotals AS (
                 SELECT
                     a.CategoryId,
@@ -2564,33 +2562,15 @@ public static class SqlHelper
                 FROM projects.Project AS p
                 INNER JOIN emissions.Activity AS a
                     ON a.ProjectId = p.Id AND a.IsDeleted = 0
-                    AND a.ActivityDate >= @PeriodStart
-                    AND a.ActivityDate <= @PeriodEnd
+                    AND (@Year IS NULL OR a.ActivityDate >= DATEFROMPARTS(@Year, 1, 1))
+                    AND a.ActivityDate <= CASE
+                        WHEN @Year IS NULL OR @Year = YEAR(GETUTCDATE()) THEN CAST(GETUTCDATE() AS date)
+                        ELSE DATEFROMPARTS(@Year, 12, 31)
+                    END
                 LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
                 LEFT JOIN factors.FactorLibraryVersion AS flv
                     ON flv.IsDeleted = 0
-                    AND flv.Year = COALESCE(
-                        (
-                            SELECT TOP (1) flvExact.Year
-                            FROM factors.FactorLibraryVersion AS flvExact
-                            WHERE flvExact.IsDeleted = 0
-                              AND flvExact.Year = YEAR(a.ActivityDate)
-                              AND EXISTS (
-                                  SELECT 1
-                                  FROM factors.EmissionFactor AS efExact
-                                  WHERE efExact.FactorLibraryVersionId = flvExact.Id
-                                    AND efExact.IsDeleted = 0)
-                        ),
-                        (
-                            SELECT MAX(flvLatest.Year)
-                            FROM factors.FactorLibraryVersion AS flvLatest
-                            WHERE flvLatest.IsDeleted = 0
-                              AND EXISTS (
-                                  SELECT 1
-                                  FROM factors.EmissionFactor AS efLatest
-                                  WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
-                                    AND efLatest.IsDeleted = 0)
-                        ))
+                    AND flv.Year = YEAR(a.ActivityDate)
                 LEFT JOIN factors.EmissionFactor AS ef
                     ON ef.FactorLibraryVersionId = flv.Id
                     AND ef.TypeId = t.Id
@@ -2606,21 +2586,21 @@ public static class SqlHelper
             WHERE ec.IsDeleted = 0;
             """,
             connection);
-        command.Parameters.AddWithValue("@Year", year);
+        command.Parameters.AddWithValue("@Year", (object?)year ?? DBNull.Value);
 
         var result = await command.ExecuteScalarAsync();
         return result is null or DBNull ? 0m : Convert.ToDecimal(result);
     }
 
-    public static async Task<decimal> GetCarbonEmissionsTonnesByScopeAsync(int year, int ghgScope)
+    public static async Task<decimal> GetCarbonEmissionsTonnesByScopeAsync(int? year, int ghgScope)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
         await connection.OpenAsync();
 
         await using var command = new SqlCommand(
             """
-            DECLARE @PeriodStart date = DATEFROMPARTS(@Year, 1, 1);
-            DECLARE @PeriodEnd   date = IIF(@Year = YEAR(GETUTCDATE()),
+            DECLARE @PeriodStart date = IIF(@Year IS NULL, NULL, DATEFROMPARTS(@Year, 1, 1));
+            DECLARE @PeriodEnd   date = IIF(@Year IS NULL OR @Year = YEAR(GETUTCDATE()),
                                             CAST(GETUTCDATE() AS date),
                                             DATEFROMPARTS(@Year, 12, 31));
 
@@ -2631,33 +2611,12 @@ public static class SqlHelper
                 FROM projects.Project AS p
                 INNER JOIN emissions.Activity AS a
                     ON a.ProjectId = p.Id AND a.IsDeleted = 0
-                    AND a.ActivityDate >= @PeriodStart
+                    AND (@PeriodStart IS NULL OR a.ActivityDate >= @PeriodStart)
                     AND a.ActivityDate <= @PeriodEnd
                 LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
                 LEFT JOIN factors.FactorLibraryVersion AS flv
                     ON flv.IsDeleted = 0
-                    AND flv.Year = COALESCE(
-                        (
-                            SELECT TOP (1) flvExact.Year
-                            FROM factors.FactorLibraryVersion AS flvExact
-                            WHERE flvExact.IsDeleted = 0
-                              AND flvExact.Year = YEAR(a.ActivityDate)
-                              AND EXISTS (
-                                  SELECT 1
-                                  FROM factors.EmissionFactor AS efExact
-                                  WHERE efExact.FactorLibraryVersionId = flvExact.Id
-                                    AND efExact.IsDeleted = 0)
-                        ),
-                        (
-                            SELECT MAX(flvLatest.Year)
-                            FROM factors.FactorLibraryVersion AS flvLatest
-                            WHERE flvLatest.IsDeleted = 0
-                              AND EXISTS (
-                                  SELECT 1
-                                  FROM factors.EmissionFactor AS efLatest
-                                  WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
-                                    AND efLatest.IsDeleted = 0)
-                        ))
+                    AND flv.Year = YEAR(a.ActivityDate)
                 LEFT JOIN factors.EmissionFactor AS ef
                     ON ef.FactorLibraryVersionId = flv.Id
                     AND ef.TypeId = t.Id
@@ -2672,7 +2631,7 @@ public static class SqlHelper
             WHERE ec.IsDeleted = 0 AND ec.GhgScope = @GhgScope;
             """,
             connection);
-        command.Parameters.AddWithValue("@Year", year);
+        command.Parameters.AddWithValue("@Year", (object?)year ?? DBNull.Value);
         command.Parameters.AddWithValue("@GhgScope", ghgScope);
 
         var result = await command.ExecuteScalarAsync();
@@ -2786,7 +2745,7 @@ public static class SqlHelper
         await command.ExecuteNonQueryAsync();
     }
 
-    public static async Task<IReadOnlyList<ActiveProjectEmissionsRow>> GetTopActiveProjectsByEmissionsAsync(int limit = 8)
+    public static async Task<IReadOnlyList<ActiveProjectEmissionsRow>> GetTopActiveProjectsByEmissionsAsync(int limit = 9)
     {
         var rows = new List<ActiveProjectEmissionsRow>();
 
@@ -2802,35 +2761,18 @@ public static class SqlHelper
             LEFT JOIN emissions.Activity AS a
                 ON a.ProjectId = p.Id AND a.IsDeleted = 0
             LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
-            LEFT JOIN factors.FactorLibraryVersion AS flv
-                ON flv.IsDeleted = 0
-                AND flv.Year = COALESCE(
-                    (
-                        SELECT TOP (1) flvExact.Year
-                        FROM factors.FactorLibraryVersion AS flvExact
-                        WHERE flvExact.IsDeleted = 0
-                          AND flvExact.Year = YEAR(a.ActivityDate)
-                          AND EXISTS (
-                              SELECT 1
-                              FROM factors.EmissionFactor AS efExact
-                              WHERE efExact.FactorLibraryVersionId = flvExact.Id
-                                AND efExact.IsDeleted = 0)
-                    ),
-                    (
-                        SELECT MAX(flvLatest.Year)
-                        FROM factors.FactorLibraryVersion AS flvLatest
-                        WHERE flvLatest.IsDeleted = 0
-                          AND EXISTS (
-                              SELECT 1
-                              FROM factors.EmissionFactor AS efLatest
-                              WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
-                                AND efLatest.IsDeleted = 0)
-                    ))
-            LEFT JOIN factors.EmissionFactor AS ef
-                ON ef.FactorLibraryVersionId = flv.Id
-                AND ef.TypeId = t.Id
-                AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
-                AND ef.IsDeleted = 0
+            OUTER APPLY (
+                SELECT TOP (1) efMatch.Co2eTonnesPerActivityUnit
+                FROM factors.EmissionFactor AS efMatch
+                INNER JOIN factors.FactorLibraryVersion AS flv
+                    ON flv.Id = efMatch.FactorLibraryVersionId
+                    AND flv.IsDeleted = 0
+                WHERE efMatch.IsDeleted = 0
+                  AND efMatch.TypeId = t.Id
+                  AND efMatch.UnitOfMeasureId = t.DefaultUnitOfMeasureId
+                  AND flv.Year = YEAR(a.ActivityDate)
+                ORDER BY efMatch.Id
+            ) AS ef
             WHERE p.IsDeleted = 0
               AND p.IsActive = 1
             GROUP BY p.Id, p.Code, p.Name, p.ProjectType, p.StartDate, p.CompletionDate
@@ -2863,7 +2805,7 @@ public static class SqlHelper
             """
             SELECT TOP (8)
                 p.Name,
-                COALESCE(SUM(a.Quantity * COALESCE(exactFactor.Co2eTonnesPerActivityUnit, priorFactor.Co2eTonnesPerActivityUnit)), 0) AS TotalCo2eTonnes
+                COALESCE(SUM(a.Quantity * exactFactor.Co2eTonnesPerActivityUnit), 0) AS TotalCo2eTonnes
             FROM projects.Project AS p
             LEFT JOIN emissions.Activity AS a
                 ON a.ProjectId = p.Id AND a.IsDeleted = 0
@@ -2879,20 +2821,8 @@ public static class SqlHelper
                   AND ef.TypeId = t.Id
                   AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
                   AND flv.Year = YEAR(a.ActivityDate)
+                ORDER BY ef.Id
             ) AS exactFactor
-            OUTER APPLY (
-                SELECT TOP (1) ef.Co2eTonnesPerActivityUnit
-                FROM factors.EmissionFactor AS ef
-                INNER JOIN factors.FactorLibraryVersion AS flv
-                    ON flv.Id = ef.FactorLibraryVersionId
-                    AND flv.IsDeleted = 0
-                WHERE ef.IsDeleted = 0
-                  AND ef.TypeId = t.Id
-                  AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
-                  AND YEAR(a.ActivityDate) = YEAR(GETUTCDATE())
-                  AND flv.Year < YEAR(GETUTCDATE())
-                ORDER BY flv.Year DESC
-            ) AS priorFactor
             WHERE p.IsDeleted = 0
               AND p.IsActive = 1
               AND p.Name = @projectName
@@ -3061,23 +2991,8 @@ public static class SqlHelper
             WHERE efMatch.IsDeleted = 0
               AND efMatch.TypeId = t.Id
               AND efMatch.UnitOfMeasureId = t.DefaultUnitOfMeasureId
-              AND (
-                    flv.Year = YEAR(a.ActivityDate)
-                 OR (
-                        YEAR(a.ActivityDate) = YEAR(GETUTCDATE())
-                    AND flv.Year < YEAR(GETUTCDATE())
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM factors.EmissionFactor AS efSameYear
-                        INNER JOIN factors.FactorLibraryVersion AS flvSameYear
-                            ON flvSameYear.Id = efSameYear.FactorLibraryVersionId
-                            AND flvSameYear.IsDeleted = 0
-                        WHERE efSameYear.IsDeleted = 0
-                          AND efSameYear.TypeId = t.Id
-                          AND efSameYear.UnitOfMeasureId = t.DefaultUnitOfMeasureId
-                          AND flvSameYear.Year = YEAR(a.ActivityDate))
-                    ))
-            ORDER BY CASE WHEN flv.Year = YEAR(a.ActivityDate) THEN 0 ELSE 1 END, flv.Year DESC
+              AND flv.Year = YEAR(a.ActivityDate)
+            ORDER BY efMatch.Id
         ) AS ef
         """;
 
@@ -3164,28 +3079,7 @@ public static class SqlHelper
             LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
             LEFT JOIN factors.FactorLibraryVersion AS flv
                 ON flv.IsDeleted = 0
-                AND flv.Year = COALESCE(
-                    (
-                        SELECT TOP (1) flvExact.Year
-                        FROM factors.FactorLibraryVersion AS flvExact
-                        WHERE flvExact.IsDeleted = 0
-                          AND flvExact.Year = YEAR(a.ActivityDate)
-                          AND EXISTS (
-                              SELECT 1
-                              FROM factors.EmissionFactor AS efExact
-                              WHERE efExact.FactorLibraryVersionId = flvExact.Id
-                                AND efExact.IsDeleted = 0)
-                    ),
-                    (
-                        SELECT MAX(flvLatest.Year)
-                        FROM factors.FactorLibraryVersion AS flvLatest
-                        WHERE flvLatest.IsDeleted = 0
-                          AND EXISTS (
-                              SELECT 1
-                              FROM factors.EmissionFactor AS efLatest
-                              WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
-                                AND efLatest.IsDeleted = 0)
-                    ))
+                AND flv.Year = YEAR(a.ActivityDate)
             LEFT JOIN factors.EmissionFactor AS ef
                 ON ef.FactorLibraryVersionId = flv.Id
                 AND ef.TypeId = t.Id
@@ -3206,6 +3100,52 @@ public static class SqlHelper
             var month = Convert.ToInt32(reader.GetValue(0));
             var tonnes = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
             rows.Add(new ChartMonthEmissionsRow(month, tonnes));
+        }
+
+        return rows;
+    }
+
+    public static async Task<IReadOnlyList<ChartYearEmissionsRow>> GetChartScopeYearlyEmissionsAsync(int ghgScope)
+    {
+        var rows = new List<ChartYearEmissionsRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT
+                YEAR(a.ActivityDate) AS ActivityYear,
+                COALESCE(SUM(a.Quantity * ef.Co2eTonnesPerActivityUnit), 0) AS Co2eTonnes
+            FROM projects.Project AS p
+            INNER JOIN emissions.Activity AS a
+                ON a.ProjectId = p.Id AND a.IsDeleted = 0
+                AND a.ActivityDate <= CAST(GETUTCDATE() AS date)
+            INNER JOIN emissions.EmissionCategory AS ec
+                ON ec.Id = a.CategoryId AND ec.IsDeleted = 0
+            LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
+            LEFT JOIN factors.FactorLibraryVersion AS flv
+                ON flv.IsDeleted = 0
+                AND flv.Year = YEAR(a.ActivityDate)
+            LEFT JOIN factors.EmissionFactor AS ef
+                ON ef.FactorLibraryVersionId = flv.Id
+                AND ef.TypeId = t.Id
+                AND ef.UnitOfMeasureId = t.DefaultUnitOfMeasureId
+                AND ef.IsDeleted = 0
+            WHERE p.IsDeleted = 0 AND ec.GhgScope = @GhgScope
+            GROUP BY YEAR(a.ActivityDate)
+            HAVING COALESCE(SUM(a.Quantity * ef.Co2eTonnesPerActivityUnit), 0) > 0
+            ORDER BY ActivityYear;
+            """,
+            connection);
+        command.Parameters.AddWithValue("@GhgScope", ghgScope);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var year = Convert.ToInt32(reader.GetValue(0));
+            var tonnes = reader.IsDBNull(1) ? 0m : Convert.ToDecimal(reader.GetValue(1));
+            rows.Add(new ChartYearEmissionsRow(year, tonnes));
         }
 
         return rows;
@@ -3450,9 +3390,6 @@ public static class SqlHelper
             LEFT JOIN emissions.EmissionType AS t
                 ON t.Id = a.TypeId
                AND t.IsDeleted = 0
-            LEFT JOIN emissions.UnitOfMeasure AS sqftUnit
-                ON sqftUnit.Code = 'SQFT'
-               AND sqftUnit.IsDeleted = 0
             OUTER APPLY (
                 SELECT TOP (1)
                     efPick.Id,
@@ -3465,6 +3402,7 @@ public static class SqlHelper
                    AND flvPick.IsDeleted = 0
                 WHERE efPick.TypeId = t.Id
                   AND efPick.IsDeleted = 0
+                  AND flvPick.Year = YEAR(a.ActivityDate)
                   AND (
                         efPick.UnitOfMeasureId = t.DefaultUnitOfMeasureId
                         OR EXISTS (
@@ -3483,26 +3421,9 @@ public static class SqlHelper
                             WHERE du.Id = t.DefaultUnitOfMeasureId
                         )
                   )
-                  AND (
-                        flvPick.Year <= YEAR(a.ActivityDate)
-                        OR NOT EXISTS (
-                            SELECT 1
-                            FROM factors.EmissionFactor AS efActYear
-                            INNER JOIN factors.FactorLibraryVersion AS flvActYear
-                                ON flvActYear.Id = efActYear.FactorLibraryVersionId
-                               AND flvActYear.IsDeleted = 0
-                            WHERE flvActYear.Year = YEAR(a.ActivityDate)
-                              AND efActYear.IsDeleted = 0
-                        )
-                  )
-                  AND (
-                        flvPick.Year = YEAR(a.ActivityDate)
-                        OR t.DefaultUnitOfMeasureId <> ISNULL(sqftUnit.Id, -1)
-                  )
                 ORDER BY
-                    CASE WHEN flvPick.Year <= YEAR(a.ActivityDate) THEN 0 ELSE 1 END,
-                    flvPick.Year DESC,
-                    CASE WHEN efPick.UnitOfMeasureId = t.DefaultUnitOfMeasureId THEN 0 ELSE 1 END
+                    CASE WHEN efPick.UnitOfMeasureId = t.DefaultUnitOfMeasureId THEN 0 ELSE 1 END,
+                    efPick.Id
             ) AS ef
             OUTER APPLY (
                 SELECT TOP (1) du.Id, du.ScaleToCanonical
@@ -3664,7 +3585,7 @@ public static class SqlHelper
         return rows;
     }
 
-    public static async Task<IReadOnlyList<CategoryEmissionsRow>> GetEmissionsByCategoryAsync(int year, int ghgScope)
+    public static async Task<IReadOnlyList<CategoryEmissionsRow>> GetEmissionsByCategoryAsync(int? year, int ghgScope)
     {
         var rows = new List<CategoryEmissionsRow>();
 
@@ -3673,8 +3594,8 @@ public static class SqlHelper
 
         await using var command = new SqlCommand(
             """
-            DECLARE @PeriodStart date = DATEFROMPARTS(@Year, 1, 1);
-            DECLARE @PeriodEnd   date = IIF(@Year = YEAR(GETUTCDATE()),
+            DECLARE @PeriodStart date = IIF(@Year IS NULL, NULL, DATEFROMPARTS(@Year, 1, 1));
+            DECLARE @PeriodEnd   date = IIF(@Year IS NULL OR @Year = YEAR(GETUTCDATE()),
                                             CAST(GETUTCDATE() AS date),
                                             DATEFROMPARTS(@Year, 12, 31));
 
@@ -3685,33 +3606,12 @@ public static class SqlHelper
                 FROM projects.Project AS p
                 INNER JOIN emissions.Activity AS a
                     ON a.ProjectId = p.Id AND a.IsDeleted = 0
-                    AND a.ActivityDate >= @PeriodStart
+                    AND (@PeriodStart IS NULL OR a.ActivityDate >= @PeriodStart)
                     AND a.ActivityDate <= @PeriodEnd
                 LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
                 LEFT JOIN factors.FactorLibraryVersion AS flv
                     ON flv.IsDeleted = 0
-                    AND flv.Year = COALESCE(
-                        (
-                            SELECT TOP (1) flvExact.Year
-                            FROM factors.FactorLibraryVersion AS flvExact
-                            WHERE flvExact.IsDeleted = 0
-                              AND flvExact.Year = YEAR(a.ActivityDate)
-                              AND EXISTS (
-                                  SELECT 1
-                                  FROM factors.EmissionFactor AS efExact
-                                  WHERE efExact.FactorLibraryVersionId = flvExact.Id
-                                    AND efExact.IsDeleted = 0)
-                        ),
-                        (
-                            SELECT MAX(flvLatest.Year)
-                            FROM factors.FactorLibraryVersion AS flvLatest
-                            WHERE flvLatest.IsDeleted = 0
-                              AND EXISTS (
-                                  SELECT 1
-                                  FROM factors.EmissionFactor AS efLatest
-                                  WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
-                                    AND efLatest.IsDeleted = 0)
-                        ))
+                    AND flv.Year = YEAR(a.ActivityDate)
                 LEFT JOIN factors.EmissionFactor AS ef
                     ON ef.FactorLibraryVersionId = flv.Id
                     AND ef.TypeId = t.Id
@@ -3729,7 +3629,7 @@ public static class SqlHelper
             ORDER BY Co2eTonnes DESC, CategoryName ASC;
             """,
             connection);
-        command.Parameters.AddWithValue("@Year", year);
+        command.Parameters.AddWithValue("@Year", (object?)year ?? DBNull.Value);
         command.Parameters.AddWithValue("@GhgScope", ghgScope);
         await using var reader = await command.ExecuteReaderAsync();
 
@@ -3802,7 +3702,7 @@ public static class SqlHelper
     }
 
     public static async Task<IReadOnlyList<EmissionTypeEmissionsRow>> GetEmissionTypeEmissionsByCategoryCodeAsync(
-        int year,
+        int? year,
         string categoryCode)
     {
         var rows = new List<EmissionTypeEmissionsRow>();
@@ -3812,8 +3712,8 @@ public static class SqlHelper
 
         await using var command = new SqlCommand(
             """
-            DECLARE @PeriodStart date = DATEFROMPARTS(@Year, 1, 1);
-            DECLARE @PeriodEnd   date = IIF(@Year = YEAR(GETUTCDATE()),
+            DECLARE @PeriodStart date = IIF(@Year IS NULL, NULL, DATEFROMPARTS(@Year, 1, 1));
+            DECLARE @PeriodEnd   date = IIF(@Year IS NULL OR @Year = YEAR(GETUTCDATE()),
                                             CAST(GETUTCDATE() AS date),
                                             DATEFROMPARTS(@Year, 12, 31));
 
@@ -3824,7 +3724,7 @@ public static class SqlHelper
                 FROM projects.Project AS p
                 INNER JOIN emissions.Activity AS a
                     ON a.ProjectId = p.Id AND a.IsDeleted = 0
-                    AND a.ActivityDate >= @PeriodStart
+                    AND (@PeriodStart IS NULL OR a.ActivityDate >= @PeriodStart)
                     AND a.ActivityDate <= @PeriodEnd
                     AND a.CategoryId = (
                         SELECT Id
@@ -3833,28 +3733,7 @@ public static class SqlHelper
                 LEFT JOIN emissions.EmissionType AS t ON t.Id = a.TypeId AND t.IsDeleted = 0
                 LEFT JOIN factors.FactorLibraryVersion AS flv
                     ON flv.IsDeleted = 0
-                    AND flv.Year = COALESCE(
-                        (
-                            SELECT TOP (1) flvExact.Year
-                            FROM factors.FactorLibraryVersion AS flvExact
-                            WHERE flvExact.IsDeleted = 0
-                              AND flvExact.Year = YEAR(a.ActivityDate)
-                              AND EXISTS (
-                                  SELECT 1
-                                  FROM factors.EmissionFactor AS efExact
-                                  WHERE efExact.FactorLibraryVersionId = flvExact.Id
-                                    AND efExact.IsDeleted = 0)
-                        ),
-                        (
-                            SELECT MAX(flvLatest.Year)
-                            FROM factors.FactorLibraryVersion AS flvLatest
-                            WHERE flvLatest.IsDeleted = 0
-                              AND EXISTS (
-                                  SELECT 1
-                                  FROM factors.EmissionFactor AS efLatest
-                                  WHERE efLatest.FactorLibraryVersionId = flvLatest.Id
-                                    AND efLatest.IsDeleted = 0)
-                        ))
+                    AND flv.Year = YEAR(a.ActivityDate)
                 LEFT JOIN factors.EmissionFactor AS ef
                     ON ef.FactorLibraryVersionId = flv.Id
                     AND ef.TypeId = t.Id
@@ -3876,7 +3755,7 @@ public static class SqlHelper
             ORDER BY et.DisplayName;
             """,
             connection);
-        command.Parameters.AddWithValue("@Year", year);
+        command.Parameters.AddWithValue("@Year", (object?)year ?? DBNull.Value);
         command.Parameters.AddWithValue("@Code", categoryCode);
         await using var reader = await command.ExecuteReaderAsync();
 

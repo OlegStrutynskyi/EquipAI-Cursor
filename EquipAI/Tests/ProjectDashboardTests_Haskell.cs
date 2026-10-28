@@ -16,6 +16,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
         (await projectDashboardPage.GetPageTitleAsync()).Should().Be($"{Config.DefaultEnterpriseProjectName} Overview");
         (await projectDashboardPage.IsReportingBadgeVisibleAsync()).Should().BeTrue();
         (await projectDashboardPage.IsSynchedProcoreVisibleAsync()).Should().BeTrue();
+        (await projectDashboardPage.IsYearDropdownVisibleAsync()).Should().BeTrue();
         (await projectDashboardPage.IsTotalEmissionsCardVisibleAsync()).Should().BeTrue();
         (await projectDashboardPage.IsChartCardVisibleAsync()).Should().BeTrue();
         (await projectDashboardPage.IsDataGridVisibleAsync()).Should().BeTrue();

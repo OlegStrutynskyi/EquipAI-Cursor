@@ -30,21 +30,21 @@ public class DashboardPage : BasePage
     private ILocator TotalProjectsReportingValue => Page.Locator("//dd[@class='stat__value stat__value--primary']");
     private ILocator TotalProjectsNonReportingLabel => Page.Locator("//span[normalize-space()='Non Reporting']");
     private ILocator TotalProjectsNonReportingValue => Page.Locator("//dd[@class='stat__value stat__value--danger']");
-    private ILocator TotalCarbonEmissionsByScopeCard => Page.Locator("//section[@class='dashboard__chart']");
+    private ILocator TotalCarbonEmissionsByScopeCard => Page.Locator("//article[contains(@class,'dashboard__chart-card')]");
     private ILocator TotalEmissionsByScopeLabel => Page.Locator("#dashboard-chart-title");
-    private ILocator TotalEmissionsByScopeMessage => Page.Locator("//header[@class='section-header']//p[@class='section-header__lead']");
+    private ILocator TotalEmissionsByScopeMessage => Page.Locator("//article[contains(@class,'dashboard__chart-card')]//p[@class='section-header__lead']");
     private ILocator YearLabel => Page.Locator("//label[normalize-space()='Year']");
-    private ILocator YearDropdown => Page.Locator("//app-searchable-select[@controlid='dashboard-chart-year']");
+    private ILocator YearDropdown => Page.Locator("//app-searchable-select[@controlid='dashboard-year']");
     private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
     private ILocator Scope1Btn => Page.Locator("//button[normalize-space()='Scope 1']");
     private ILocator Scope2Btn => Page.Locator("//button[normalize-space()='Scope 2']");
     private ILocator Scope3Btn => Page.Locator("//button[normalize-space()='Scope 3']");
     private ILocator Chart => Page.Locator("//div[@class='chart__plot']");
-    private ILocator ActiveProjectsCard => Page.Locator("//section[@class='dashboard__panel']");
+    private ILocator ActiveProjectsCard => Page.Locator("//section[contains(@class,'dashboard__projects')]");
     private ILocator ActiveProjectsLabel => Page.Locator("//h2[@id='dashboard-projects-heading']");
-    private ILocator ActiveProjectsMessage => Page.Locator("//section[@class='dashboard__panel']//p[@class='section-header__lead']");
+    private ILocator ActiveProjectsMessage => Page.Locator("//section[contains(@class,'dashboard__projects')]//p[@class='section-header__lead']");
     private ILocator ProjectsList => Page.Locator("//div[@class='card card--subtle dashboard__panel-card']");
-    private ILocator ProjectsUl => Page.Locator("//ul[@class='projects']");
+    private ILocator ProjectsUl => Page.Locator("//section[contains(@class,'dashboard__projects')]//ul[contains(@class,'projects')]");
     private ILocator ProjectNameLinks => Page.Locator("//p[@class='projects__name']/a");
     private ILocator ProjectTonnesValues => Page.Locator("//span[@class='projects__tonnes']");
     private ILocator ViewAllProjectsLink => Page.Locator("//a[normalize-space()='View all projects']");
@@ -622,6 +622,62 @@ public class DashboardPage : BasePage
         return result;
     }
 
+    public async Task<IReadOnlyDictionary<int, decimal>> GetChartYearlyTonnesAsync()
+    {
+        await Chart.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Chart.Locator("path.chart__line")
+            .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+
+        var result = new Dictionary<int, decimal>();
+        var axisLabels = Chart.Locator("g.chart__x-axis text.chart__axis-label");
+        var count = await axisLabels.CountAsync();
+        if (count == 0)
+            return result;
+
+        var tooltip = Page.Locator(
+            "//div[contains(@class,'chart__tooltip') or contains(@class,'tooltip') or @role='tooltip']");
+
+        for (var i = 0; i < count; i++)
+        {
+            var label = axisLabels.Nth(i);
+            if (!await label.IsVisibleAsync())
+                continue;
+
+            var labelText = (await label.TextContentAsync())?.Replace('\u00A0', ' ').Trim() ?? string.Empty;
+            if (!int.TryParse(labelText, NumberStyles.None, CultureInfo.InvariantCulture, out var year))
+                continue;
+
+            try
+            {
+                await label.HoverAsync(new LocatorHoverOptions { Timeout = 1_500 });
+            }
+            catch (TimeoutException)
+            {
+                continue;
+            }
+
+            try
+            {
+                await tooltip.First.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = 1_500,
+                });
+            }
+            catch (TimeoutException)
+            {
+                continue;
+            }
+
+            var tooltipText = (await tooltip.First.InnerTextAsync())?.Replace('\u00A0', ' ').Trim() ?? string.Empty;
+            if (TryParseChartTooltipTonnes(tooltipText, labelText, out var tonnes))
+                result[year] = tonnes;
+        }
+
+        await Chart.HoverAsync(new LocatorHoverOptions { Position = new Position { X = 1, Y = 1 } });
+        return result;
+    }
+
     private async Task<IReadOnlyDictionary<int, decimal>> TryGetChartMonthlyTonnesFromTooltipsAsync()
     {
         var result = new Dictionary<int, decimal>();
@@ -659,7 +715,10 @@ public class DashboardPage : BasePage
         return result;
     }
 
-    private static bool TryParseChartTooltipTonnes(string tooltipText, out decimal tonnes)
+    private static bool TryParseChartTooltipTonnes(string tooltipText, out decimal tonnes) =>
+        TryParseChartTooltipTonnes(tooltipText, axisLabel: null, out tonnes);
+
+    private static bool TryParseChartTooltipTonnes(string tooltipText, string? axisLabel, out decimal tonnes)
     {
         tonnes = 0m;
         if (string.IsNullOrWhiteSpace(tooltipText))
@@ -671,7 +730,13 @@ public class DashboardPage : BasePage
             if (line.StartsWith("Scope", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var normalized = line.Replace(",", string.Empty, StringComparison.Ordinal).Trim();
+            var normalized = line.Replace(",", string.Empty, StringComparison.Ordinal)
+                .Replace("tCO2e", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Trim();
+            if (axisLabel is not null
+                && normalized.Equals(axisLabel, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             if (decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out tonnes))
                 return true;
         }
@@ -744,6 +809,9 @@ public class DashboardPage : BasePage
     private static decimal ParseChartAxisValue(string label)
     {
         var normalized = label.Replace(",", string.Empty, StringComparison.Ordinal).Trim();
+        if (normalized is "—" or "–" or "-" or "")
+            return 0m;
+
         var hasK = normalized.EndsWith("k", StringComparison.OrdinalIgnoreCase);
         if (hasK)
             normalized = normalized[..^1].Trim();
