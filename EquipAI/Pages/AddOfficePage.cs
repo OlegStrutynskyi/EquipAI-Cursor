@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Playwright;
 
 namespace EquipAI.Pages;
@@ -36,6 +37,8 @@ public class AddOfficePage : BasePage
     private ILocator AreaError => FieldError("Area (sq ft)");
     private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
     private ILocator CalculateByFootageToggle => Page.Locator("//span[@class='form-toggle__control']/input");
+    private ILocator EmissionTypeDropdown => Page.Locator(
+        "//label[contains(normalize-space(),'Emission')]/following-sibling::app-searchable-select");
     private ILocator EmissionsMessage => Page.Locator("//p[@id='office-method-hint']");
 
     public async Task WaitForLoadedAsync()
@@ -84,7 +87,148 @@ public class AddOfficePage : BasePage
     public async Task FillCityAsync(string value) => await CityInput.FillAsync(value);
     public async Task FillStateAsync(string value) => await StateInput.FillAsync(value);
     public async Task FillPostalCodeAsync(string value) => await PostalCodeInput.FillAsync(value);
+    public Task FillStartDateAsync(DateTime value) => FillMaskedDateAsync(StartDateInput, value);
+    public Task FillEndDateAsync(DateTime value) => FillMaskedDateAsync(EndDateInput, value);
     public async Task FillAreaAsync(string value) => await AreaInput.FillAsync(value);
+
+    public async Task<string> SelectProjectAsync(string projectName)
+    {
+        await ProjectDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var current = await GetSelectedProjectAsync();
+        if (IsProjectOption(current, projectName))
+            return current;
+
+        await OpenSearchableSelectAsync(ProjectDropdown);
+
+        var search = VisibleDropdownList().Locator("input");
+        if (await search.CountAsync() == 0)
+            search = ProjectDropdown.Locator("input");
+
+        if (await search.CountAsync() > 0 && await search.First.IsVisibleAsync())
+            await search.First.FillAsync(projectName);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var options = VisibleDropdownList().Locator("[role='option']");
+            var count = await options.CountAsync();
+            for (var i = 0; i < count; i++)
+            {
+                var candidate = options.Nth(i);
+                var text = NormalizeOption(await candidate.InnerTextAsync());
+                if (!IsProjectOption(text, projectName))
+                    continue;
+
+                await candidate.ClickAsync();
+                try
+                {
+                    await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+                    {
+                        State = WaitForSelectorState.Hidden,
+                        Timeout = 5_000
+                    });
+                }
+                catch (TimeoutException)
+                {
+                }
+
+                return await GetSelectedProjectAsync();
+            }
+
+            if (count > 0)
+                await options.Last.ScrollIntoViewIfNeededAsync();
+
+            await Task.Delay(150);
+        }
+
+        throw new InvalidOperationException($"Project '{projectName}' was not found.");
+    }
+
+    public async Task SelectCountryAsync(string country)
+    {
+        await CountryDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var current = NormalizeOption(await GetSelectedCountryAsync());
+        if (current.Equals(country, StringComparison.Ordinal))
+            return;
+
+        await OpenSearchableSelectAsync(CountryDropdown);
+
+        var search = VisibleDropdownList().Locator("input");
+        if (await search.CountAsync() == 0)
+            search = CountryDropdown.Locator("input");
+
+        if (await search.CountAsync() > 0 && await search.First.IsVisibleAsync())
+            await search.First.FillAsync(country);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var options = VisibleDropdownList().Locator("[role='option']");
+            var count = await options.CountAsync();
+            for (var i = 0; i < count; i++)
+            {
+                var candidate = options.Nth(i);
+                var text = NormalizeOption(await candidate.InnerTextAsync());
+                if (!text.Equals(country, StringComparison.Ordinal))
+                    continue;
+
+                await candidate.ClickAsync();
+                try
+                {
+                    await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+                    {
+                        State = WaitForSelectorState.Hidden,
+                        Timeout = 5_000
+                    });
+                }
+                catch (TimeoutException)
+                {
+                }
+
+                return;
+            }
+
+            if (count > 0)
+                await options.Last.ScrollIntoViewIfNeededAsync();
+
+            await Task.Delay(150);
+        }
+
+        throw new InvalidOperationException($"Country '{country}' was not found.");
+    }
+
+    public async Task<OfficesPage> CreateOfficeAsync()
+    {
+        var responseTask = Page.WaitForResponseAsync(
+            response => response.Request.Method is "POST" or "PUT",
+            new PageWaitForResponseOptions { Timeout = 30_000 });
+        await CreateOfficeBtn.ClickAsync();
+        var response = await responseTask;
+        if (!response.Ok)
+        {
+            var body = await response.TextAsync();
+            throw new InvalidOperationException(
+                $"Create office failed with status {(int)response.Status} {response.Url}: {body}");
+        }
+
+        try
+        {
+            await Page.WaitForURLAsync(
+                url => url.Contains("/admin/offices", StringComparison.OrdinalIgnoreCase)
+                       && !url.Contains("/new", StringComparison.OrdinalIgnoreCase),
+                new PageWaitForURLOptions { Timeout = 30_000 });
+        }
+        catch (TimeoutException)
+        {
+            var errors = await Page.Locator(".error, .alert, [role='alert']").AllInnerTextsAsync();
+            throw new TimeoutException(
+                $"Create office stayed on {Page.Url} after {(int)response.Status} {response.Url}. {string.Join(" | ", errors.Select(error => error.Trim()))}");
+        }
+
+        var officesPage = new OfficesPage(Page);
+        await officesPage.WaitForLoadedAsync();
+        return officesPage;
+    }
 
     public Task<string> GetProjectErrorAsync() => GetFieldErrorAsync(ProjectError);
     public Task<string> GetNameErrorAsync() => GetFieldErrorAsync(NameError);
@@ -132,6 +276,80 @@ public class AddOfficePage : BasePage
     {
         await CalculateByFootageToggle.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached });
         return await CalculateByFootageToggle.IsCheckedAsync();
+    }
+
+    public async Task TurnCalculateByFootageOnAsync()
+    {
+        await CalculateByFootageToggle.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached });
+        if (await CalculateByFootageToggle.IsCheckedAsync())
+            return;
+
+        await CalculateByFootageToggle
+            .Locator("xpath=ancestor::span[@class='form-toggle__control']")
+            .ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await CalculateByFootageToggle.IsCheckedAsync())
+            {
+                await EmissionTypeDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new InvalidOperationException("Calculate by footage toggle did not turn on.");
+    }
+
+    public async Task SelectEmissionTypeAsync(string code, string displayName)
+    {
+        await EmissionTypeDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await OpenSearchableSelectAsync(EmissionTypeDropdown);
+
+        var search = VisibleDropdownList().Locator("input");
+        if (await search.CountAsync() == 0)
+            search = EmissionTypeDropdown.Locator("input");
+
+        if (await search.CountAsync() > 0 && await search.First.IsVisibleAsync())
+            await search.First.FillAsync(displayName);
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var options = VisibleDropdownList().Locator("[role='option']");
+            var count = await options.CountAsync();
+            for (var i = 0; i < count; i++)
+            {
+                var candidate = options.Nth(i);
+                var text = NormalizeOption(await candidate.InnerTextAsync());
+                if (!IsEmissionTypeOption(text, code, displayName))
+                    continue;
+
+                await candidate.ClickAsync();
+                try
+                {
+                    await SearchableSelectList.WaitForAsync(new LocatorWaitForOptions
+                    {
+                        State = WaitForSelectorState.Hidden,
+                        Timeout = 5_000
+                    });
+                }
+                catch (TimeoutException)
+                {
+                }
+
+                return;
+            }
+
+            if (count > 0)
+                await options.Last.ScrollIntoViewIfNeededAsync();
+
+            await Task.Delay(150);
+        }
+
+        throw new InvalidOperationException($"Emission type '{displayName}' was not found.");
     }
 
     public async Task<string> GetEmissionsMessageAsync()
@@ -245,6 +463,40 @@ public class AddOfficePage : BasePage
         }
 
         return seen;
+    }
+
+    private async Task FillMaskedDateAsync(ILocator input, DateTime value)
+    {
+        var digits = value.ToString("MMddyyyy", CultureInfo.InvariantCulture);
+        var expected = value.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+        await input.ClickAsync();
+        await input.FillAsync(string.Empty);
+        await input.PressSequentiallyAsync(digits, new LocatorPressSequentiallyOptions { Delay = 40 });
+        var actual = (await input.InputValueAsync()).Trim();
+        if (!string.Equals(actual, expected, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Date is '{actual}', expected '{expected}'.");
+    }
+
+    private static string NormalizeOption(string value) =>
+        System.Text.RegularExpressions.Regex.Replace(value.Replace('\u00A0', ' '), @"\s+", " ").Trim();
+
+    private static bool IsEmissionTypeOption(string option, string code, string displayName)
+    {
+        var text = NormalizeOption(option);
+        return text.Equals(code, StringComparison.Ordinal)
+            || text.StartsWith(code + " —", StringComparison.Ordinal)
+            || text.StartsWith(code + " -", StringComparison.Ordinal)
+            || text.Equals(displayName, StringComparison.Ordinal)
+            || text.EndsWith("— " + displayName, StringComparison.Ordinal)
+            || text.EndsWith("- " + displayName, StringComparison.Ordinal);
+    }
+
+    private static bool IsProjectOption(string option, string projectName)
+    {
+        var text = NormalizeOption(option);
+        return text.Equals(projectName, StringComparison.Ordinal)
+            || text.EndsWith("— " + projectName, StringComparison.Ordinal)
+            || text.EndsWith("- " + projectName, StringComparison.Ordinal);
     }
 
     private static async Task<bool> IsVisibleAsync(ILocator locator)

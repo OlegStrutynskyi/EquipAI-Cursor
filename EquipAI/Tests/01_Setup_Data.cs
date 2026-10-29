@@ -189,7 +189,30 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T09_Setup_CreateEmissionTypePropane()
+    public async Task T09_Setup_CreateEmissionType4()
+    {
+        const string code = Config.SetupCode4;
+        const string displayName = Config.SetupEmissionTypeName4;
+
+        var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
+        await emissionTypesPage.OpenAsync();
+
+        if (await emissionTypesPage.IsCodeInGridAsync(code))
+            Assert.Pass("Emission type 4 already exists.");
+
+        var addEmissionTypePage = await emissionTypesPage.ClickAddEmissionTypeBtnAsync();
+        await addEmissionTypePage.FillCodeAsync(code);
+        await addEmissionTypePage.FillDisplayNameAsync(displayName);
+        await addEmissionTypePage.SelectDefaultUnitByCodeAsync(Config.SetupDefaultUnitCode4);
+        await addEmissionTypePage.SelectDefaultEmissionCategoryAsync(Config.SetupDefaultEmissionCategory3);
+        emissionTypesPage = await addEmissionTypePage.CreateEmissionTypeAsync();
+
+        (await emissionTypesPage.IsCodeInGridAsync(code)).Should().BeTrue();
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T10_Setup_CreateEmissionTypePropane()
     {
         const string code = Config.SetupCodePropane;
         const string displayName = Config.SetupEmissionNamePropane;
@@ -212,7 +235,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T10_Setup_CreateAliasUnit()
+    public async Task T11_Setup_CreateAliasUnit()
     {
         const string aliasText = Config.SetupAliasUnit;
 
@@ -236,7 +259,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T11_Setup_CreateAliasEmissionType()
+    public async Task T12_Setup_CreateAliasEmissionType()
     {
         const string aliasText = Config.SetupAliasEmissionType;
 
@@ -261,7 +284,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T12_Setup_CreateAliasFactor1()
+    public async Task T13_Setup_CreateAliasFactor1()
     {
         const string aliasText = Config.SetupAliasFactor1;
 
@@ -287,7 +310,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T13_Setup_CreateAliasFactorPropane()
+    public async Task T14_Setup_CreateAliasFactorPropane()
     {
         const string aliasText = Config.SetupAliasFactorPropane;
 
@@ -313,7 +336,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T14_Setup_CreateAliasProject1()
+    public async Task T15_Setup_CreateAliasProject1()
     {
         const string aliasText = Config.SetupAliasProject1;
 
@@ -337,7 +360,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T15_Setup_CreateManualInvoice()
+    public async Task T16_Setup_CreateManualInvoice()
     {
         const string invoiceNumber = Config.SetupInvoiceNumber1;
         const string companyName = Config.SetupCompanyName1;
@@ -406,7 +429,7 @@ public class _01_Setup_Data : BaseTest
     [Explicit("Manual setup test. Run before the test suite.")]
     [CancelAfter(660_000)]
     [Test]
-    public async Task T16_Setup_UploadUtilityBill()
+    public async Task T17_Setup_UploadUtilityBill()
     {
         const string fileName = "Test_Utility_Bill_01_2022.pdf";
         const string billDate = "Jan 1, 2022";
@@ -464,7 +487,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T17_Setup_ImportTelemetry()
+    public async Task T18_Setup_ImportTelemetry()
     {
         const string fileName = "Custom_06_22.xlsx";
         const string monthValue = "2022-06";
@@ -497,7 +520,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T18_Setup_CreateTestUser2()
+    public async Task T19_Setup_CreateTestUser2()
     {
         var email = Config.TestUserEmail2;
         var expectedRoles = new[]
@@ -532,7 +555,7 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T19_Setup_CreateTestUser3()
+    public async Task T20_Setup_CreateTestUser3()
     {
         var email = Config.TestUserEmail3;
         var expected = new UserGridRecord(email, "—", "None");
@@ -547,6 +570,91 @@ public class _01_Setup_Data : BaseTest
         await addUserPage.FillEmailAsync(email);
         usersPage = await addUserPage.CreateUserAsync();
         (await usersPage.GetGridRecordByEmailAsync(email)).Should().Be(expected);        
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T21_Setup_CreateTestOfficeBills()
+    {
+        const string name = Config.SetupOfficeName1;
+        var startDate = DateTime.ParseExact(Config.SetupOfficeStartDate1, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+        var endDate = DateTime.ParseExact(Config.SetupOfficeEndDate1, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+        var area = decimal.Parse(Config.SetupOfficeArea1, CultureInfo.InvariantCulture);
+
+        var officesPage = new OfficesPage(Fixture.Page);
+        await officesPage.OpenAsync();
+
+        if (await officesPage.IsNameInGridAsync(name))
+            Assert.Pass("TestOfficeBills already exists.");
+
+        var addOfficePage = await officesPage.ClickAddOfficeBtnAsync();
+        var project = await addOfficePage.SelectProjectAsync(Config.SetupProjectName1);
+        await addOfficePage.FillNameAsync(name);
+        await addOfficePage.FillAddressLine1Async(Config.SetupAddressLine1);
+        await addOfficePage.FillAddressLine2Async(Config.SetupAddressLine2);
+        await addOfficePage.FillCityAsync(Config.SetupCity);
+        await addOfficePage.FillStateAsync(Config.SetupState);
+        await addOfficePage.FillPostalCodeAsync(Config.SetupPostalCode);
+        await addOfficePage.SelectCountryAsync(Config.SetupCountry);
+        await addOfficePage.FillStartDateAsync(startDate);
+        await addOfficePage.FillEndDateAsync(endDate);
+        await addOfficePage.FillAreaAsync(Config.SetupOfficeArea1);
+        officesPage = await addOfficePage.CreateOfficeAsync();
+
+        await officesPage.SearchAsync(name);
+        var actual = await officesPage.GetAllGridRecordsAsync();
+        actual.Should().ContainSingle();
+        actual[0].Should().Be(new OfficeGridRecord(
+            project,
+            name,
+            $"{Config.SetupAddressLine1}, {Config.SetupAddressLine2}, {Config.SetupCity}, {Config.SetupState} {Config.SetupPostalCode}, {Config.SetupCountry}",
+            startDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            endDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            decimal.Round(area, 2, MidpointRounding.AwayFromZero).ToString("#,##0.##", CultureInfo.GetCultureInfo("en-US"))));
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T22_Setup_CreateTestOfficeSQFT()
+    {
+        const string name = Config.SetupOfficeName2;
+        var startDate = DateTime.ParseExact(Config.SetupOfficeStartDate2, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+        var endDate = DateTime.ParseExact(Config.SetupOfficeEndDate2, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+        var area = decimal.Parse(Config.SetupOfficeArea2, CultureInfo.InvariantCulture);
+
+        var officesPage = new OfficesPage(Fixture.Page);
+        await officesPage.OpenAsync();
+
+        if (await officesPage.IsNameInGridAsync(name))
+            Assert.Pass("TestOfficeSQFT already exists.");
+
+        var addOfficePage = await officesPage.ClickAddOfficeBtnAsync();
+        var project = await addOfficePage.SelectProjectAsync(Config.SetupProjectName1);
+        await addOfficePage.FillNameAsync(name);
+        await addOfficePage.FillAddressLine1Async(Config.SetupAddressLine1);
+        await addOfficePage.FillAddressLine2Async(Config.SetupAddressLine2);
+        await addOfficePage.FillCityAsync(Config.SetupCity);
+        await addOfficePage.FillStateAsync(Config.SetupState);
+        await addOfficePage.FillPostalCodeAsync(Config.SetupPostalCode);
+        await addOfficePage.SelectCountryAsync(Config.SetupCountry);
+        await addOfficePage.FillStartDateAsync(startDate);
+        await addOfficePage.FillEndDateAsync(endDate);
+        await addOfficePage.FillAreaAsync(Config.SetupOfficeArea2);
+        await addOfficePage.ClickEmissionsTabAsync();
+        await addOfficePage.TurnCalculateByFootageOnAsync();
+        await addOfficePage.SelectEmissionTypeAsync(Config.SetupCode4, Config.SetupEmissionTypeName4);
+        officesPage = await addOfficePage.CreateOfficeAsync();
+
+        await officesPage.SearchAsync(name);
+        var actual = await officesPage.GetAllGridRecordsAsync();
+        actual.Should().ContainSingle();
+        actual[0].Should().Be(new OfficeGridRecord(
+            project,
+            name,
+            $"{Config.SetupAddressLine1}, {Config.SetupAddressLine2}, {Config.SetupCity}, {Config.SetupState} {Config.SetupPostalCode}, {Config.SetupCountry}",
+            startDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            endDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            decimal.Round(area, 2, MidpointRounding.AwayFromZero).ToString("#,##0.##", CultureInfo.GetCultureInfo("en-US"))));
     }
 
     private static bool HasAutotestTelemetry(

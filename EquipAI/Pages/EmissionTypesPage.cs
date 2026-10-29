@@ -246,23 +246,41 @@ public class EmissionTypesPage : BasePage
     public async Task<bool> IsCodeInGridAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await SearchInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
 
+        var previousSearch = await SearchInput.InputValueAsync();
         try
         {
-            await Grid.Locator("tbody tr td:nth-child(1)")
-                .Filter(new LocatorFilterOptions { HasTextString = code })
-                .First
-                .WaitForAsync(new LocatorWaitForOptions
+            if (!previousSearch.Equals(code, StringComparison.Ordinal))
+            {
+                var response = Page.WaitForResponseAsync(
+                    response => IsEmissionTypesSearchResponse(response, code),
+                    new PageWaitForResponseOptions { Timeout = 15_000 });
+                await SearchInput.FillAsync(code);
+                await response;
+            }
+
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await IsGridLoadingAsync())
                 {
-                    State = WaitForSelectorState.Visible,
-                    Timeout = 15_000,
-                });
-            return true;
+                    await Task.Delay(100);
+                    continue;
+                }
+
+                await GoToFirstGridPageAsync();
+                if (await FindCodeAcrossPagesAsync(code))
+                    return true;
+
+                await Task.Delay(200);
+            }
+
+            return false;
         }
-        catch (TimeoutException)
+        finally
         {
-            await GoToFirstGridPageAsync();
-            return await FindCodeAcrossPagesAsync(code);
+            await RestoreSearchAsync(previousSearch);
         }
     }
 
@@ -615,6 +633,38 @@ public class EmissionTypesPage : BasePage
             ?? throw new InvalidOperationException($"Code '{code}' was not found in the emission types grid.");
         await row.GetByRole(AriaRole.Button, new() { Name = "Deactivate" }).ClickAsync();
         await DeactivateDialog.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
+
+    private async Task RestoreSearchAsync(string previousSearch)
+    {
+        var current = await SearchInput.InputValueAsync();
+        if (current.Equals(previousSearch, StringComparison.Ordinal))
+            return;
+
+        if (string.IsNullOrEmpty(previousSearch))
+        {
+            var response = Page.WaitForResponseAsync(
+                response => response.Ok
+                    && response.Url.Contains("/api/admin/reference-data/emission-types", StringComparison.OrdinalIgnoreCase)
+                    && !IsEmissionTypesSearchResponse(response, current),
+                new PageWaitForResponseOptions { Timeout = 15_000 });
+            await SearchInput.FillAsync(string.Empty);
+            try
+            {
+                await response;
+            }
+            catch (TimeoutException)
+            {
+            }
+
+            return;
+        }
+
+        var restore = Page.WaitForResponseAsync(
+            response => IsEmissionTypesSearchResponse(response, previousSearch),
+            new PageWaitForResponseOptions { Timeout = 15_000 });
+        await SearchInput.FillAsync(previousSearch);
+        await restore;
     }
 
     private async Task SearchEmissionTypesAsync(string code)

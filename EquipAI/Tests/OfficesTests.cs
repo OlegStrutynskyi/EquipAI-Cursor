@@ -303,6 +303,100 @@ public class OfficesTests : BaseTest
         (await addOfficePage.GetAreaErrorAsync()).Should().Be(expectedAreaError);
     }
 
+    [Test]
+    public async Task T19_Offices_Add_OfficeBills_Success()
+    {
+        var createdAt = DateTime.Now;
+        var stamp = createdAt.ToString("yyyyMMddHHmmss");
+        var name = $"Office{stamp}";
+        var addressLine1 = $"Address1{stamp}";
+        var addressLine2 = $"Address2{stamp}";
+        var city = $"City{stamp}";
+        var state = $"State{stamp}";
+        var postalCode = $"Code{stamp}";
+        var startDate = createdAt.Date;
+
+        try
+        {
+            var addOfficePage = await OpenAddOfficePageAsync();
+            var project = await addOfficePage.SelectProjectAsync(Config.SetupProjectName1);
+            await addOfficePage.FillNameAsync(name);
+            await addOfficePage.FillAddressLine1Async(addressLine1);
+            await addOfficePage.FillAddressLine2Async(addressLine2);
+            await addOfficePage.FillCityAsync(city);
+            await addOfficePage.FillStateAsync(state);
+            await addOfficePage.FillPostalCodeAsync(postalCode);
+            await addOfficePage.FillStartDateAsync(startDate);
+            await addOfficePage.FillAreaAsync("1000");
+            var officesPage = await addOfficePage.CreateOfficeAsync();
+
+            await officesPage.SearchAsync(name);
+            var actual = await officesPage.GetAllGridRecordsAsync();
+            actual.Should().ContainSingle();
+            actual[0].Should().Be(new OfficeGridRecord(
+                project,
+                name,
+                FormatAddress($"{addressLine1}, {addressLine2}, {city}, {state} {postalCode}", "US"),
+                FormatDate(startDate),
+                "—",
+                FormatArea(1000m)));
+        }
+        finally
+        {
+            await SqlHelper.DeleteOfficeByNameAsync(name);
+        }
+    }
+
+    [Test]
+    public async Task T20_Offices_Add_OfficeSQFT_Success()
+    {
+        var createdAt = DateTime.Now;
+        var stamp = createdAt.ToString("yyyyMMddHHmmss");
+        var name = $"Office{stamp}";
+        var addressLine1 = $"Address1{stamp}";
+        var addressLine2 = $"Address2{stamp}";
+        var city = $"City{stamp}";
+        var state = $"State{stamp}";
+        var postalCode = $"Code{stamp}";
+        var startDate = createdAt.Date;
+        var endDate = startDate.AddYears(2);
+
+        try
+        {
+            await SqlHelper.DeleteGeneratedTestOfficesAsync();
+            var addOfficePage = await OpenAddOfficePageAsync();
+            var project = await addOfficePage.SelectProjectAsync(Config.SetupProjectName1);
+            await addOfficePage.FillNameAsync(name);
+            await addOfficePage.FillAddressLine1Async(addressLine1);
+            await addOfficePage.FillAddressLine2Async(addressLine2);
+            await addOfficePage.FillCityAsync(city);
+            await addOfficePage.FillStateAsync(state);
+            await addOfficePage.FillPostalCodeAsync(postalCode);
+            await addOfficePage.FillStartDateAsync(startDate);
+            await addOfficePage.FillEndDateAsync(endDate);
+            await addOfficePage.FillAreaAsync("1000");
+            await addOfficePage.ClickEmissionsTabAsync();
+            await addOfficePage.TurnCalculateByFootageOnAsync();
+            await addOfficePage.SelectEmissionTypeAsync(Config.SetupCode4, Config.SetupEmissionTypeName4);
+            var officesPage = await addOfficePage.CreateOfficeAsync();
+
+            await officesPage.SearchAsync(name);
+            var actual = await officesPage.GetAllGridRecordsAsync();
+            actual.Should().ContainSingle();
+            actual[0].Should().Be(new OfficeGridRecord(
+                project,
+                name,
+                FormatAddress($"{addressLine1}, {addressLine2}, {city}, {state} {postalCode}", "US"),
+                FormatDate(startDate),
+                FormatDate(endDate),
+                FormatArea(1000m)));
+        }
+        finally
+        {
+            await SqlHelper.DeleteOfficeByNameAsync(name);
+        }
+    }
+
     private async Task<AddOfficePage> OpenAddOfficePageAsync()
     {
         var officesPage = new OfficesPage(Fixture.Page);

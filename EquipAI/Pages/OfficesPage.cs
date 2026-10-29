@@ -119,6 +119,12 @@ public class OfficesPage : BasePage
         throw new TimeoutException($"Offices search for '{text}' did not finish.");
     }
 
+    public async Task<bool> IsNameInGridAsync(string name)
+    {
+        await SearchAsync(name);
+        return (await GetAllGridRecordsAsync()).Any(row => row.Name.Equals(name, StringComparison.Ordinal));
+    }
+
     public async Task<string> GetGridEmptyMessageAsync()
     {
         var message = Grid.Locator("tbody").GetByText(

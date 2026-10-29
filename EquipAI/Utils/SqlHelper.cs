@@ -327,6 +327,57 @@ public static class SqlHelper
         return rows;
     }
 
+    public static async Task DeleteOfficeByNameAsync(string name)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var deleteActivitiesCommand = new SqlCommand(
+            """
+            DELETE FROM [emissions].[Activity]
+            WHERE [OfficeId] IN (
+                SELECT [Id] FROM [projects].[Office] WHERE [Name] = @name
+            )
+            """,
+            connection))
+        {
+            deleteActivitiesCommand.Parameters.AddWithValue("@name", name);
+            await deleteActivitiesCommand.ExecuteNonQueryAsync();
+        }
+
+        await using var command = new SqlCommand(
+            "DELETE FROM [projects].[Office] WHERE Name = @name",
+            connection);
+        command.Parameters.AddWithValue("@name", name);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public static async Task DeleteGeneratedTestOfficesAsync()
+    {
+        var names = new List<string>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var command = new SqlCommand(
+            """
+            SELECT o.Name
+            FROM [projects].[Office] AS o
+            INNER JOIN [projects].[Address] AS a ON a.Id = o.AddressId
+            WHERE o.Name LIKE 'Office[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+              AND a.AddressLine1 LIKE 'Address1[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+            """,
+            connection))
+        {
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                names.Add(reader.GetString(0));
+        }
+
+        foreach (var name in names)
+            await DeleteOfficeByNameAsync(name);
+    }
+
     public static async Task<bool?> TryGetProjectIsDeletedByNameAsync(string name)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -374,7 +425,6 @@ public static class SqlHelper
     public static async Task CreateSetupTestProjectAsync()
     {
         const string createdByUserId = "367DA46B-C6A9-4FE0-8854-D5CFBCF545AA";
-        const string addressLine1 = "Test str";
         var timestamp = "2026-06-25 08:02:27.3477977 +00:00";
 
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -388,12 +438,12 @@ public static class SqlHelper
                 (@addressLine1, @addressLine2, @city, @stateProvince, @postalCode, @countryCode, @createdAt, @updatedAt, 0, @createdByUserId)
             """,
             connection);
-        insertAddressCommand.Parameters.AddWithValue("@addressLine1", addressLine1);
-        insertAddressCommand.Parameters.AddWithValue("@addressLine2", "Test flat");
-        insertAddressCommand.Parameters.AddWithValue("@city", "Test city");
-        insertAddressCommand.Parameters.AddWithValue("@stateProvince", "Test state");
-        insertAddressCommand.Parameters.AddWithValue("@postalCode", "123456");
-        insertAddressCommand.Parameters.AddWithValue("@countryCode", "US");
+        insertAddressCommand.Parameters.AddWithValue("@addressLine1", Config.SetupAddressLine1);
+        insertAddressCommand.Parameters.AddWithValue("@addressLine2", Config.SetupAddressLine2);
+        insertAddressCommand.Parameters.AddWithValue("@city", Config.SetupCity);
+        insertAddressCommand.Parameters.AddWithValue("@stateProvince", Config.SetupState);
+        insertAddressCommand.Parameters.AddWithValue("@postalCode", Config.SetupPostalCode);
+        insertAddressCommand.Parameters.AddWithValue("@countryCode", Config.SetupCountry);
         insertAddressCommand.Parameters.AddWithValue("@createdAt", timestamp);
         insertAddressCommand.Parameters.AddWithValue("@updatedAt", timestamp);
         insertAddressCommand.Parameters.AddWithValue("@createdByUserId", Guid.Parse(createdByUserId));
@@ -402,13 +452,13 @@ public static class SqlHelper
         await using var insertProjectCommand = new SqlCommand(
             """
             INSERT INTO [projects].[Project]
-                (Code, Name, AddressId, CreatedAt, UpdatedAt, IsDeleted, CreatedByUserId)
+                (Code, Name, AddressId, CreatedAt, UpdatedAt, IsDeleted, CreatedByUserId, IsActive, HasOffices)
             VALUES
-                ('TEST-1', @projectName, (SELECT Id FROM [projects].[Address] WHERE AddressLine1 = @addressLine1), @createdAt, @updatedAt, 0, @createdByUserId)
+                ('TEST-1', @projectName, (SELECT Id FROM [projects].[Address] WHERE AddressLine1 = @addressLine1), @createdAt, @updatedAt, 0, @createdByUserId, 1, 1)
             """,
             connection);
         insertProjectCommand.Parameters.AddWithValue("@projectName", Config.SetupProjectName1);
-        insertProjectCommand.Parameters.AddWithValue("@addressLine1", addressLine1);
+        insertProjectCommand.Parameters.AddWithValue("@addressLine1", Config.SetupAddressLine1);
         insertProjectCommand.Parameters.AddWithValue("@createdAt", timestamp);
         insertProjectCommand.Parameters.AddWithValue("@updatedAt", timestamp);
         insertProjectCommand.Parameters.AddWithValue("@createdByUserId", Guid.Parse(createdByUserId));
