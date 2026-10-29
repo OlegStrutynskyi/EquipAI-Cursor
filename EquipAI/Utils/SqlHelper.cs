@@ -281,6 +281,35 @@ public static class SqlHelper
         return options;
     }
 
+    public static async Task<IReadOnlyList<string>> GetSqftEmissionTypeDisplayNamesAsync()
+    {
+        var names = new List<string>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT DisplayName
+            FROM [emissions].[EmissionType]
+            WHERE DefaultUnitOfMeasureId = (
+                SELECT Id FROM [emissions].[UnitOfMeasure] WHERE Code = 'SQFT'
+            )
+            ORDER BY DisplayName
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var name = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            if (!string.IsNullOrEmpty(name))
+                names.Add(name);
+        }
+
+        return names;
+    }
+
     public static async Task<IReadOnlyList<OfficeGridDbRow>> GetOfficeGridRowsAsync()
     {
         var rows = new List<OfficeGridDbRow>();

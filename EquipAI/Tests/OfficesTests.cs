@@ -337,7 +337,20 @@ public class OfficesTests : BaseTest
     }
 
     [Test]
-    public async Task T20_Offices_Add_ClickCancel()
+    public async Task T20_Offices_Add_EmissionTypeOptions()
+    {
+        var expected = await SqlHelper.GetSqftEmissionTypeDisplayNamesAsync();
+
+        var addOfficePage = await OpenAddOfficePageAsync();
+        await addOfficePage.ClickEmissionsTabAsync();
+        await addOfficePage.TurnCalculateByFootageOnAsync();
+
+        var actual = await addOfficePage.GetEmissionTypeDropdownOptionsAsync();
+        actual.Should().Equal(expected);
+    }
+
+    [Test]
+    public async Task T21_Offices_Add_ClickCancel()
     {
         const string expectedPageTitle = "Offices";
         var createdAt = DateTime.Now;
@@ -373,7 +386,7 @@ public class OfficesTests : BaseTest
     }
 
     [Test]
-    public async Task T21_Offices_Add_OfficeBills_Success()
+    public async Task T22_Offices_Add_OfficeBills_Success()
     {
         var createdAt = DateTime.Now;
         var stamp = createdAt.ToString("yyyyMMddHHmmss");
@@ -417,7 +430,7 @@ public class OfficesTests : BaseTest
     }
 
     [Test]
-    public async Task T22_Offices_Add_OfficeSQFT_Success()
+    public async Task T23_Offices_Add_OfficeSQFT_Success()
     {
         var createdAt = DateTime.Now;
         var stamp = createdAt.ToString("yyyyMMddHHmmss");

@@ -393,6 +393,13 @@ public class AddOfficePage : BasePage
         return await ReadVisibleDropdownOptionsAsync();
     }
 
+    public async Task<IReadOnlyList<string>> GetEmissionTypeDropdownOptionsAsync()
+    {
+        await EmissionTypeDropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await OpenSearchableSelectAsync(EmissionTypeDropdown);
+        return await ReadVisibleDropdownOptionsAsync();
+    }
+
     private async Task<string> GetSelectedOptionAsync(ILocator dropdown)
     {
         await dropdown.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
