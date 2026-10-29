@@ -3518,9 +3518,9 @@ public static class SqlHelper
         return rows;
     }
 
-    public static async Task<IReadOnlyList<ProjectOfficeBillDbRow>> GetProjectOfficeBillsAsync(string projectName)
+    public static async Task<IReadOnlyList<ProjectUtilityBillDbRow>> GetProjectUtilityBillsAsync(string projectName)
     {
-        var rows = new List<ProjectOfficeBillDbRow>();
+        var rows = new List<ProjectUtilityBillDbRow>();
 
         await using var connection = new SqlConnection(Config.SqlConnectionString);
         await connection.OpenAsync();
@@ -3570,7 +3570,7 @@ public static class SqlHelper
             var source = reader.IsDBNull(6) ? string.Empty : reader.GetValue(6).ToString()?.Trim() ?? string.Empty;
             var category = reader.IsDBNull(7) ? string.Empty : reader.GetString(7).Trim();
             var id = reader.IsDBNull(8) ? 0L : Convert.ToInt64(reader.GetValue(8));
-            rows.Add(new ProjectOfficeBillDbRow(
+            rows.Add(new ProjectUtilityBillDbRow(
                 company,
                 billDate,
                 status,
@@ -3906,7 +3906,7 @@ public sealed record ProjectOfficesDashboardDbRow(
     decimal TotalCo2eTonnes,
     decimal? TotalPerSqFt);
 
-public sealed record ProjectOfficeBillDbRow(
+public sealed record ProjectUtilityBillDbRow(
     string Company,
     DateTime? BillDate,
     string Status,

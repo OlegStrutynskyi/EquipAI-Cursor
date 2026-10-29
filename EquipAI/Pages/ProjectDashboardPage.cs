@@ -32,7 +32,7 @@ public class ProjectDashboardPage : BasePage
     private ILocator OfficesEmptyMessage => Page.Locator("//p[@class='project-offices__empty']");
     private ILocator OfficesTable => Page.Locator("//table[contains(@class,'project-offices__table')]");
     private ILocator FuelTab => Page.Locator("//button[normalize-space()='Fuel']");
-    private ILocator OfficeTab => Page.Locator("//button[normalize-space()='Office' and not(contains(@class,'table__sort'))]");
+    private ILocator UtilityTab => Page.Locator("//button[normalize-space()='Utility' and not(contains(@class,'table__sort'))]");
     private ILocator TelemetryTab => Page.Locator("//button[normalize-space()='Telemetry']");
     private ILocator FuelGrid => DataGrid.Locator("table");
     private ILocator FuelPagination => Page.Locator("nav[aria-label='Project data pagination']");
@@ -341,23 +341,23 @@ public class ProjectDashboardPage : BasePage
             .ToList();
     }
 
-    public async Task<bool> IsOfficeTabVisibleAsync()
+    public async Task<bool> IsUtilityTabVisibleAsync()
     {
-        if (await OfficeTab.CountAsync() == 0)
+        if (await UtilityTab.CountAsync() == 0)
             return false;
 
-        return await OfficeTab.First.IsVisibleAsync();
+        return await UtilityTab.First.IsVisibleAsync();
     }
 
-    public async Task<bool> IsOfficeTabSelectedAsync()
+    public async Task<bool> IsUtilityTabSelectedAsync()
     {
-        await OfficeTab.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        return await IsDataTabSelectedAsync(OfficeTab.First);
+        await UtilityTab.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return await IsDataTabSelectedAsync(UtilityTab.First);
     }
 
-    public async Task ClickOfficeTabAsync()
+    public async Task ClickUtilityTabAsync()
     {
-        var tab = OfficeTab.First;
+        var tab = UtilityTab.First;
         await tab.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         if (await IsDataTabSelectedAsync(tab))
         {
@@ -373,7 +373,7 @@ public class ProjectDashboardPage : BasePage
             await Task.Delay(100);
 
         if (!await IsDataTabSelectedAsync(tab))
-            throw new TimeoutException("Office tab did not become selected.");
+            throw new TimeoutException("Utility tab did not become selected.");
 
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (DateTime.UtcNow < deadline)
@@ -388,7 +388,7 @@ public class ProjectDashboardPage : BasePage
         await WaitForFuelGridAsync();
     }
 
-    public async Task<IReadOnlyList<ProjectOfficeGridRow>> GetOfficeGridRowsAsync()
+    public async Task<IReadOnlyList<ProjectUtilityGridRow>> GetUtilityGridRowsAsync()
     {
         await WaitForFuelGridAsync();
         try
@@ -405,11 +405,11 @@ public class ProjectDashboardPage : BasePage
 
         await GoToFirstFuelGridPageAsync();
 
-        var result = new List<ProjectOfficeGridRow>();
+        var result = new List<ProjectUtilityGridRow>();
         while (true)
         {
             await WaitForDisplayedFuelPageAsync();
-            result.AddRange(await ReadOfficeGridRowsOnCurrentPageAsync());
+            result.AddRange(await ReadUtilityGridRowsOnCurrentPageAsync());
             if (!await TryGoToNextFuelGridPageAsync())
                 break;
         }
@@ -959,10 +959,10 @@ public class ProjectDashboardPage : BasePage
         return result;
     }
 
-    private async Task<IReadOnlyList<ProjectOfficeGridRow>> ReadOfficeGridRowsOnCurrentPageAsync()
+    private async Task<IReadOnlyList<ProjectUtilityGridRow>> ReadUtilityGridRowsOnCurrentPageAsync()
     {
         var pages = await ReadDataGridPagesAsync();
-        var result = new List<ProjectOfficeGridRow>();
+        var result = new List<ProjectUtilityGridRow>();
         foreach (var values in pages)
         {
             var company = Cell(values, "COMPANY");
@@ -970,7 +970,7 @@ public class ProjectDashboardPage : BasePage
             if (string.IsNullOrWhiteSpace(company) && string.IsNullOrWhiteSpace(billDate))
                 continue;
 
-            result.Add(new ProjectOfficeGridRow(
+            result.Add(new ProjectUtilityGridRow(
                 company,
                 billDate,
                 Cell(values, "STATUS"),
@@ -1329,7 +1329,7 @@ public class ProjectDashboardPage : BasePage
         System.Text.RegularExpressions.Regex.Replace(value ?? string.Empty, @"\s+", " ").Trim();
 }
 
-public sealed record ProjectOfficeGridRow(
+public sealed record ProjectUtilityGridRow(
     string Company,
     string BillDate,
     string Status,

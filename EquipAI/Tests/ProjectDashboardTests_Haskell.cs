@@ -226,7 +226,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
     }
 
     [Test]
-    public async Task T13_HaskellDashboard_Data_Office()
+    public async Task T13_HaskellDashboard_Data_Utility()
     {
         var expectedColumns = new[]
         {
@@ -239,27 +239,27 @@ public class ProjectDashboardTests_Haskell : BaseTest
             "CATEGORY",
         };
 
-        var dbRows = await SqlHelper.GetProjectOfficeBillsAsync(Config.DefaultEnterpriseProjectName);
+        var dbRows = await SqlHelper.GetProjectUtilityBillsAsync(Config.DefaultEnterpriseProjectName);
         var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
         await projectDashboardPage.WaitForDefaultViewAsync();
 
         if (dbRows.Count == 0)
         {
             var deadline = DateTime.UtcNow.AddSeconds(10);
-            while (DateTime.UtcNow < deadline && !await projectDashboardPage.IsOfficeTabVisibleAsync())
+            while (DateTime.UtcNow < deadline && !await projectDashboardPage.IsUtilityTabVisibleAsync())
                 await Task.Delay(250);
 
-            (await projectDashboardPage.IsOfficeTabVisibleAsync()).Should().BeFalse();
+            (await projectDashboardPage.IsUtilityTabVisibleAsync()).Should().BeFalse();
             return;
         }
 
-        var officeDeadline = DateTime.UtcNow.AddSeconds(15);
-        while (DateTime.UtcNow < officeDeadline && !await projectDashboardPage.IsOfficeTabVisibleAsync())
+        var utilityDeadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < utilityDeadline && !await projectDashboardPage.IsUtilityTabVisibleAsync())
             await Task.Delay(250);
 
-        (await projectDashboardPage.IsOfficeTabVisibleAsync()).Should().BeTrue();
-        await projectDashboardPage.ClickOfficeTabAsync();
-        (await projectDashboardPage.IsOfficeTabSelectedAsync()).Should().BeTrue();
+        (await projectDashboardPage.IsUtilityTabVisibleAsync()).Should().BeTrue();
+        await projectDashboardPage.ClickUtilityTabAsync();
+        (await projectDashboardPage.IsUtilityTabSelectedAsync()).Should().BeTrue();
         (await projectDashboardPage.GetFuelGridColumnHeadersAsync()).Should().Equal(expectedColumns);
 
         var expected = dbRows
@@ -267,10 +267,10 @@ public class ProjectDashboardTests_Haskell : BaseTest
             .ThenBy(row => row.Company, StringComparer.OrdinalIgnoreCase)
             .ThenBy(row => row.BillDate ?? DateTime.MinValue)
             .ThenBy(row => row.Id)
-            .Select(ToOfficeGridRow)
+            .Select(ToUtilityGridRow)
             .ToList();
-        var actual = (await projectDashboardPage.GetOfficeGridRowsAsync())
-            .Select(ToActualOfficeRow)
+        var actual = (await projectDashboardPage.GetUtilityGridRowsAsync())
+            .Select(ToActualUtilityRow)
             .ToList();
 
         if (actual.Count != expected.Count)
@@ -716,8 +716,8 @@ public class ProjectDashboardTests_Haskell : BaseTest
     private static string FormatHours(decimal? value) =>
         value?.ToString("#,##0.################", CultureInfo.GetCultureInfo("en-US")) ?? "—";
 
-    private static (string Company, string BillDate, string Status, string ImportDate, string Total, string Source, string Category) ToOfficeGridRow(
-        ProjectOfficeBillDbRow row) =>
+    private static (string Company, string BillDate, string Status, string ImportDate, string Total, string Source, string Category) ToUtilityGridRow(
+        ProjectUtilityBillDbRow row) =>
         (
             FormatEmpty(row.Company),
             FormatDate(row.BillDate),
@@ -728,8 +728,8 @@ public class ProjectDashboardTests_Haskell : BaseTest
             FormatEmpty(row.Category)
         );
 
-    private static (string Company, string BillDate, string Status, string ImportDate, string Total, string Source, string Category) ToActualOfficeRow(
-        ProjectOfficeGridRow row) =>
+    private static (string Company, string BillDate, string Status, string ImportDate, string Total, string Source, string Category) ToActualUtilityRow(
+        ProjectUtilityGridRow row) =>
         (
             row.Company,
             row.BillDate,

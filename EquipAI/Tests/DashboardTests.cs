@@ -120,8 +120,11 @@ public class DashboardTests : BaseTest
 
         var dashboardPage = new DashboardPage(Fixture.Page);
         await dashboardPage.OpenAsync();
+        await dashboardPage.SelectYearAsync("All");
 
-        var actualValue = await dashboardPage.GetTotalEmissionsScope1ValueAsync();
+        var actualValue = await WaitForScopeEmissionsValueAsync(
+            dashboardPage.GetTotalEmissionsScope1ValueAsync,
+            expectedValue);
         actualValue.Should().Be(expectedValue);
 
         var yearOptions = await dashboardPage.GetYearDropdownOptionsAsync();
@@ -146,17 +149,9 @@ public class DashboardTests : BaseTest
 
         await dashboardPage.SelectYearAsync(selectedYear);
 
-        var actualYearValue = string.Empty;
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (DateTime.UtcNow < deadline)
-        {
-            actualYearValue = await dashboardPage.GetTotalEmissionsScope1ValueAsync();
-            if (actualYearValue == expectedYearValue)
-                break;
-
-            await Task.Delay(200);
-        }
-
+        var actualYearValue = await WaitForScopeEmissionsValueAsync(
+            dashboardPage.GetTotalEmissionsScope1ValueAsync,
+            expectedYearValue);
         actualYearValue.Should().Be(expectedYearValue);
     }
 
@@ -168,8 +163,11 @@ public class DashboardTests : BaseTest
 
         var dashboardPage = new DashboardPage(Fixture.Page);
         await dashboardPage.OpenAsync();
+        await dashboardPage.SelectYearAsync("All");
 
-        var actualValue = await dashboardPage.GetTotalEmissionsScope2ValueAsync();
+        var actualValue = await WaitForScopeEmissionsValueAsync(
+            dashboardPage.GetTotalEmissionsScope2ValueAsync,
+            expectedValue);
         actualValue.Should().Be(expectedValue);
 
         var yearOptions = await dashboardPage.GetYearDropdownOptionsAsync();
@@ -194,17 +192,9 @@ public class DashboardTests : BaseTest
 
         await dashboardPage.SelectYearAsync(selectedYear);
 
-        var actualYearValue = string.Empty;
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (DateTime.UtcNow < deadline)
-        {
-            actualYearValue = await dashboardPage.GetTotalEmissionsScope2ValueAsync();
-            if (actualYearValue == expectedYearValue)
-                break;
-
-            await Task.Delay(200);
-        }
-
+        var actualYearValue = await WaitForScopeEmissionsValueAsync(
+            dashboardPage.GetTotalEmissionsScope2ValueAsync,
+            expectedYearValue);
         actualYearValue.Should().Be(expectedYearValue);
     }
 
@@ -216,8 +206,11 @@ public class DashboardTests : BaseTest
 
         var dashboardPage = new DashboardPage(Fixture.Page);
         await dashboardPage.OpenAsync();
+        await dashboardPage.SelectYearAsync("All");
 
-        var actualValue = await dashboardPage.GetTotalEmissionsScope3ValueAsync();
+        var actualValue = await WaitForScopeEmissionsValueAsync(
+            dashboardPage.GetTotalEmissionsScope3ValueAsync,
+            expectedValue);
         actualValue.Should().Be(expectedValue);
 
         var yearOptions = await dashboardPage.GetYearDropdownOptionsAsync();
@@ -242,17 +235,9 @@ public class DashboardTests : BaseTest
 
         await dashboardPage.SelectYearAsync(selectedYear);
 
-        var actualYearValue = string.Empty;
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (DateTime.UtcNow < deadline)
-        {
-            actualYearValue = await dashboardPage.GetTotalEmissionsScope3ValueAsync();
-            if (actualYearValue == expectedYearValue)
-                break;
-
-            await Task.Delay(200);
-        }
-
+        var actualYearValue = await WaitForScopeEmissionsValueAsync(
+            dashboardPage.GetTotalEmissionsScope3ValueAsync,
+            expectedYearValue);
         actualYearValue.Should().Be(expectedYearValue);
     }
 
@@ -948,6 +933,37 @@ public class DashboardTests : BaseTest
 
         var parsed = decimal.Parse(normalized, CultureInfo.InvariantCulture);
         return Math.Round(parsed, 1, MidpointRounding.AwayFromZero);
+    }
+
+    private static async Task<string> WaitForScopeEmissionsValueAsync(
+        Func<Task<string>> readValue,
+        string expectedValue)
+    {
+        var actualValue = string.Empty;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var current = await readValue();
+            if (IsDashPlaceholder(current))
+            {
+                await Task.Delay(200);
+                continue;
+            }
+
+            actualValue = current;
+            if (actualValue == expectedValue)
+                break;
+
+            await Task.Delay(200);
+        }
+
+        return actualValue;
+    }
+
+    private static bool IsDashPlaceholder(string value)
+    {
+        var text = value.Trim();
+        return text.Length == 0 || text is "-" or "—" or "–";
     }
 
     private static string FormatScopeEmissionsValue(decimal tonnes)
