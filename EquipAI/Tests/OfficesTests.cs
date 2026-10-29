@@ -200,7 +200,10 @@ public class OfficesTests : BaseTest
         var expectedProjects = await SqlHelper.GetOfficeProjectDropdownOptionsAsync();
 
         var addOfficePage = await OpenAddOfficePageAsync();
+        await addOfficePage.ClickEmissionsTabAsync();
+        await addOfficePage.TurnCalculateByFootageOnAsync();
         await addOfficePage.ClickCreateOfficeBtnAsync();
+        await addOfficePage.ClickDetailsTabAsync();
 
         (await addOfficePage.GetNameErrorAsync()).Should().Be("Name is required.");
 
@@ -217,6 +220,9 @@ public class OfficesTests : BaseTest
         (await addOfficePage.GetStartDateErrorAsync()).Should().Be("Start date is required.");
         (await addOfficePage.IsEndDateErrorVisibleAsync()).Should().BeFalse();
         (await addOfficePage.GetAreaErrorAsync()).Should().Be("Area is required.");
+
+        await addOfficePage.ClickEmissionsTabAsync();
+        (await addOfficePage.GetEmissionTypeErrorAsync()).Should().Be("Emission type is required.");
     }
 
     [Test]
@@ -304,7 +310,70 @@ public class OfficesTests : BaseTest
     }
 
     [Test]
-    public async Task T19_Offices_Add_OfficeBills_Success()
+    public async Task T19_Offices_Add_ExistingName()
+    {
+        const string expectedAlertMessage = "An office with this name already exists in the project.";
+        var createdAt = DateTime.Now;
+        var stamp = createdAt.ToString("yyyyMMddHHmmss");
+        var addressLine1 = $"Address1{stamp}";
+        var addressLine2 = $"Address2{stamp}";
+        var city = $"City{stamp}";
+        var state = $"State{stamp}";
+        var postalCode = $"Code{stamp}";
+
+        var addOfficePage = await OpenAddOfficePageAsync();
+        await addOfficePage.SelectProjectAsync(Config.SetupProjectName1);
+        await addOfficePage.FillNameAsync(Config.SetupOfficeName1);
+        await addOfficePage.FillAddressLine1Async(addressLine1);
+        await addOfficePage.FillAddressLine2Async(addressLine2);
+        await addOfficePage.FillCityAsync(city);
+        await addOfficePage.FillStateAsync(state);
+        await addOfficePage.FillPostalCodeAsync(postalCode);
+        await addOfficePage.FillStartDateAsync(createdAt.Date);
+        await addOfficePage.FillAreaAsync("1000");
+        await addOfficePage.ClickCreateOfficeBtnAsync();
+
+        (await addOfficePage.GetAlertMessageAsync()).Should().Be(expectedAlertMessage);
+    }
+
+    [Test]
+    public async Task T20_Offices_Add_ClickCancel()
+    {
+        const string expectedPageTitle = "Offices";
+        var createdAt = DateTime.Now;
+        var stamp = createdAt.ToString("yyyyMMddHHmmss");
+        var name = $"Office{stamp}";
+        var addressLine1 = $"Address1{stamp}";
+        var addressLine2 = $"Address2{stamp}";
+        var city = $"City{stamp}";
+        var state = $"State{stamp}";
+        var postalCode = $"Code{stamp}";
+
+        try
+        {
+            var addOfficePage = await OpenAddOfficePageAsync();
+            await addOfficePage.SelectProjectAsync(Config.SetupProjectName1);
+            await addOfficePage.FillNameAsync(name);
+            await addOfficePage.FillAddressLine1Async(addressLine1);
+            await addOfficePage.FillAddressLine2Async(addressLine2);
+            await addOfficePage.FillCityAsync(city);
+            await addOfficePage.FillStateAsync(state);
+            await addOfficePage.FillPostalCodeAsync(postalCode);
+            await addOfficePage.FillStartDateAsync(createdAt.Date);
+            await addOfficePage.FillAreaAsync("1000");
+            var officesPage = await addOfficePage.ClickCancelBtnAsync();
+
+            (await officesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
+            (await officesPage.IsNameInGridAsync(name)).Should().BeFalse();
+        }
+        finally
+        {
+            await SqlHelper.DeleteOfficeByNameAsync(name);
+        }
+    }
+
+    [Test]
+    public async Task T21_Offices_Add_OfficeBills_Success()
     {
         var createdAt = DateTime.Now;
         var stamp = createdAt.ToString("yyyyMMddHHmmss");
@@ -348,7 +417,7 @@ public class OfficesTests : BaseTest
     }
 
     [Test]
-    public async Task T20_Offices_Add_OfficeSQFT_Success()
+    public async Task T22_Offices_Add_OfficeSQFT_Success()
     {
         var createdAt = DateTime.Now;
         var stamp = createdAt.ToString("yyyyMMddHHmmss");

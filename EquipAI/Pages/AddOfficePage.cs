@@ -13,6 +13,7 @@ public class AddOfficePage : BasePage
     private ILocator EmissionsTab => Page.Locator("//button[contains(text(),'Emissions · ')]");
     private ILocator CreateOfficeBtn => Page.Locator("//button[normalize-space()='Create office']");
     private ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
+    private ILocator AlertMessage => Page.Locator("//div[@class='alert__body']");
     private ILocator ProjectDropdown => Page.Locator("//label[normalize-space()='Project']/following-sibling::app-searchable-select");
     private ILocator NameInput => Page.Locator("//input[@id='office-name']");
     private ILocator AddressLine1Input => Page.Locator("//input[@id='office-address-line-1']");
@@ -35,6 +36,8 @@ public class AddOfficePage : BasePage
     private ILocator StartDateError => FieldError("Start Date");
     private ILocator EndDateError => FieldError("End Date");
     private ILocator AreaError => FieldError("Area (sq ft)");
+    private ILocator EmissionTypeError => Page.Locator(
+        "//label[normalize-space()='Emission type']/following::span[contains(@class,'form-hint--error')][1]");
     private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
     private ILocator CalculateByFootageToggle => Page.Locator("//span[@class='form-toggle__control']/input");
     private ILocator EmissionTypeDropdown => Page.Locator(
@@ -80,6 +83,24 @@ public class AddOfficePage : BasePage
     }
 
     public async Task ClickCreateOfficeBtnAsync() => await CreateOfficeBtn.ClickAsync();
+
+    public async Task<string> GetAlertMessageAsync()
+    {
+        await AlertMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return (await AlertMessage.InnerTextAsync()).Trim();
+    }
+
+    public async Task<OfficesPage> ClickCancelBtnAsync()
+    {
+        await CancelBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url => url.Contains("/admin/offices", StringComparison.OrdinalIgnoreCase)
+                   && !url.Contains("/new", StringComparison.OrdinalIgnoreCase),
+            new PageWaitForURLOptions { Timeout = 30_000 });
+        var officesPage = new OfficesPage(Page);
+        await officesPage.WaitForLoadedAsync();
+        return officesPage;
+    }
 
     public async Task FillNameAsync(string value) => await NameInput.FillAsync(value);
     public async Task FillAddressLine1Async(string value) => await AddressLine1Input.FillAsync(value);
@@ -239,6 +260,7 @@ public class AddOfficePage : BasePage
     public Task<string> GetPostalCodeErrorAsync() => GetFieldErrorAsync(PostalCodeError);
     public Task<string> GetStartDateErrorAsync() => GetFieldErrorAsync(StartDateError);
     public Task<string> GetAreaErrorAsync() => GetFieldErrorAsync(AreaError);
+    public Task<string> GetEmissionTypeErrorAsync() => GetFieldErrorAsync(EmissionTypeError);
 
     public Task<bool> IsProjectErrorVisibleAsync() => IsFieldErrorVisibleAsync(ProjectError);
     public Task<bool> IsAddressLine2ErrorVisibleAsync() => IsFieldErrorVisibleAsync(AddressLine2Error);
@@ -246,6 +268,12 @@ public class AddOfficePage : BasePage
 
     public Task<bool> IsDetailsTabSelectedAsync() => IsTabSelectedAsync(DetailsTab);
     public Task<bool> IsEmissionsTabSelectedAsync() => IsTabSelectedAsync(EmissionsTab);
+
+    public async Task ClickDetailsTabAsync()
+    {
+        await DetailsTab.ClickAsync();
+        await NameInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+    }
 
     public async Task ClickEmissionsTabAsync()
     {
