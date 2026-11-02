@@ -310,6 +310,85 @@ public static class SqlHelper
         return names;
     }
 
+    public static async Task<(long OfficeId, long AddressId, string CountryCode)> GetOfficeIdAndAddressIdByNameAsync(string name)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT o.Id, o.AddressId, a.CountryCode
+            FROM [projects].[Office] AS o
+            LEFT JOIN [projects].[Address] AS a ON a.Id = o.AddressId
+            WHERE o.Name = @name
+            """,
+            connection);
+        command.Parameters.AddWithValue("@name", name);
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync() || reader.IsDBNull(0) || reader.IsDBNull(1))
+            throw new InvalidOperationException($"Office '{name}' was not found.");
+
+        var officeId = Convert.ToInt64(reader.GetValue(0));
+        var addressId = Convert.ToInt64(reader.GetValue(1));
+        var countryCode = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+        return (officeId, addressId, countryCode);
+    }
+
+    public static async Task RestoreSetupOffice1Async(long officeId, long addressId, string countryCode)
+    {
+        var startDate = DateTime.ParseExact(Config.SetupOfficeStartDate1, "MM/dd/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var endDate = DateTime.ParseExact(Config.SetupOfficeEndDate1, "MM/dd/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var area = decimal.Parse(Config.SetupOfficeArea1, System.Globalization.CultureInfo.InvariantCulture);
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var updateOffice = new SqlCommand(
+            """
+            UPDATE [projects].[Office]
+            SET ProjectId = (SELECT Id FROM [projects].[Project] WHERE Name = @projectName),
+                Name = @officeName,
+                AddressId = @addressId,
+                StartDate = @startDate,
+                EndDate = @endDate,
+                AreaSquareFeet = @area,
+                AreaEmissionTypeId = NULL
+            WHERE Id = @officeId
+            """,
+            connection))
+        {
+            updateOffice.Parameters.AddWithValue("@projectName", Config.SetupProjectName1);
+            updateOffice.Parameters.AddWithValue("@officeName", Config.SetupOfficeName1);
+            updateOffice.Parameters.AddWithValue("@addressId", addressId);
+            updateOffice.Parameters.AddWithValue("@startDate", startDate);
+            updateOffice.Parameters.AddWithValue("@endDate", endDate);
+            updateOffice.Parameters.AddWithValue("@area", area);
+            updateOffice.Parameters.AddWithValue("@officeId", officeId);
+            await updateOffice.ExecuteNonQueryAsync();
+        }
+
+        await using var updateAddress = new SqlCommand(
+            """
+            UPDATE [projects].[Address]
+            SET AddressLine1 = @addressLine1,
+                AddressLine2 = @addressLine2,
+                City = @city,
+                StateProvince = @state,
+                PostalCode = @postalCode,
+                CountryCode = @countryCode
+            WHERE Id = @addressId
+            """,
+            connection);
+        updateAddress.Parameters.AddWithValue("@addressLine1", Config.SetupAddressLine1);
+        updateAddress.Parameters.AddWithValue("@addressLine2", Config.SetupAddressLine2);
+        updateAddress.Parameters.AddWithValue("@city", Config.SetupCity);
+        updateAddress.Parameters.AddWithValue("@state", Config.SetupState);
+        updateAddress.Parameters.AddWithValue("@postalCode", Config.SetupPostalCode);
+        updateAddress.Parameters.AddWithValue("@countryCode", countryCode);
+        updateAddress.Parameters.AddWithValue("@addressId", addressId);
+        await updateAddress.ExecuteNonQueryAsync();
+    }
+
     public static async Task<IReadOnlyList<OfficeGridDbRow>> GetOfficeGridRowsAsync()
     {
         var rows = new List<OfficeGridDbRow>();

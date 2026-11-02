@@ -125,6 +125,22 @@ public class OfficesPage : BasePage
         return (await GetAllGridRecordsAsync()).Any(row => row.Name.Equals(name, StringComparison.Ordinal));
     }
 
+    public async Task<EditOfficePage> ClickEditBtnAsync(string officeName)
+    {
+        await SearchAsync(officeName);
+        var row = Grid.Locator("tbody tr").Filter(new LocatorFilterOptions
+        {
+            Has = Page.Locator("td:nth-child(2)").GetByText(officeName, new LocatorGetByTextOptions { Exact = true })
+        });
+        if (await row.CountAsync() == 0)
+            throw new InvalidOperationException($"Office '{officeName}' was not found.");
+
+        await row.First.Locator("a, button").Filter(new LocatorFilterOptions { HasText = "Edit" }).First.ClickAsync();
+        var editOfficePage = new EditOfficePage(Page);
+        await editOfficePage.WaitForLoadedAsync();
+        return editOfficePage;
+    }
+
     public async Task<string> GetGridEmptyMessageAsync()
     {
         var message = Grid.Locator("tbody").GetByText(

@@ -57,6 +57,18 @@ public class AddOfficePage : BasePage
     }
 
     public Task<bool> IsBackBtnVisibleAsync() => IsVisibleAsync(BackBtn);
+
+    public async Task<OfficesPage> ClickBackBtnAsync()
+    {
+        await BackBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url => Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                   && uri.AbsolutePath.TrimEnd('/').Equals("/admin/offices", StringComparison.OrdinalIgnoreCase),
+            new PageWaitForURLOptions { Timeout = 30_000 });
+        var officesPage = new OfficesPage(Page);
+        await officesPage.WaitForLoadedAsync();
+        return officesPage;
+    }
     public Task<bool> IsDetailsTabVisibleAsync() => IsVisibleAsync(DetailsTab);
     public Task<bool> IsEmissionsTabVisibleAsync() => IsVisibleAsync(EmissionsTab);
     public Task<bool> IsCreateOfficeBtnVisibleAsync() => IsVisibleAsync(CreateOfficeBtn);
