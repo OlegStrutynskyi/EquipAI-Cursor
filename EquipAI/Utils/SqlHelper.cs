@@ -1160,6 +1160,49 @@ public static class SqlHelper
         }
     }
 
+    public static async Task DeleteWasteReportByExternalReferenceAsync(string externalReferenceId)
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var deleteReadingsCommand = new SqlCommand(
+            """
+            DELETE FROM [waste].[WasteReportReading]
+            WHERE SourceId = (
+                SELECT Id FROM [sources].[ActivitySource]
+                WHERE ExternalReferenceId = @externalReferenceId
+            )
+            """,
+            connection))
+        {
+            deleteReadingsCommand.Parameters.AddWithValue("@externalReferenceId", externalReferenceId);
+            await deleteReadingsCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var deleteActivitiesCommand = new SqlCommand(
+            """
+            DELETE FROM [emissions].[Activity]
+            WHERE SourceId = (
+                SELECT Id FROM [sources].[ActivitySource]
+                WHERE ExternalReferenceId = @externalReferenceId
+            )
+            """,
+            connection))
+        {
+            deleteActivitiesCommand.Parameters.AddWithValue("@externalReferenceId", externalReferenceId);
+            await deleteActivitiesCommand.ExecuteNonQueryAsync();
+        }
+
+        await using var deleteSourceCommand = new SqlCommand(
+            """
+            DELETE FROM [sources].[ActivitySource]
+            WHERE ExternalReferenceId = @externalReferenceId
+            """,
+            connection);
+        deleteSourceCommand.Parameters.AddWithValue("@externalReferenceId", externalReferenceId);
+        await deleteSourceCommand.ExecuteNonQueryAsync();
+    }
+
     public static async Task DeleteTelemetryByExternalReferenceAsync(string externalReferenceId)
     {
         await using var connection = new SqlConnection(Config.SqlConnectionString);
@@ -1268,6 +1311,69 @@ public static class SqlHelper
             var id = reader.IsDBNull(8) ? 0L : Convert.ToInt64(reader.GetValue(8));
             rows.Add(new TelemetryGridDbRow(
                 month, equipmentTag, equipmentType, location, operatingHours, fuelType, createdAt, sourceType, id));
+        }
+
+        return rows;
+    }
+
+    public static async Task<DateTime?> GetLatestWasteReportMonthAsync()
+    {
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT MAX(ReportingMonth)
+            FROM [waste].[WasteReportReading]
+            WHERE IsDeleted = 0
+            """,
+            connection);
+        var result = await command.ExecuteScalarAsync();
+        if (result is null or DBNull)
+            return null;
+
+        return ReadLocalDateTime(result).Date;
+    }
+
+    public static async Task<IReadOnlyList<WasteReportGridDbRow>> GetWasteReportGridRowsAsync(DateTime reportingMonth)
+    {
+        var rows = new List<WasteReportGridDbRow>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT r.Id, r.TicketNumber, r.ContainerId, r.SiteName, r.SiteAddress,
+                   p.Code, p.Name, r.HaulDate, r.Tonnage, e.DisplayName, r.VendorName
+            FROM [waste].[WasteReportReading] AS r
+            LEFT JOIN [projects].[Project] AS p
+                ON r.ProjectId = p.Id
+            LEFT JOIN [emissions].[EmissionType] AS e
+                ON r.EmissionTypeId = e.Id
+            WHERE r.IsDeleted = 0
+              AND r.ReportingMonth = @reportingMonth
+            """,
+            connection);
+        command.Parameters.AddWithValue("@reportingMonth", reportingMonth.Date);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var id = Convert.ToInt64(reader.GetValue(0));
+            var ticketNumber = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
+            var containerId = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            var siteName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            var siteAddress = reader.IsDBNull(4) ? string.Empty : reader.GetString(4).Trim();
+            var projectCode = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
+            var projectName = reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim();
+            DateTime? haulDate = reader.IsDBNull(7) ? null : ReadLocalDateTime(reader.GetValue(7));
+            decimal? tonnage = reader.IsDBNull(8) ? null : Convert.ToDecimal(reader.GetValue(8));
+            var emissionType = reader.IsDBNull(9) ? string.Empty : reader.GetString(9).Trim();
+            var company = reader.IsDBNull(10) ? string.Empty : reader.GetString(10).Trim();
+            rows.Add(new WasteReportGridDbRow(
+                id, ticketNumber, containerId, siteName, siteAddress,
+                projectCode, projectName, haulDate, tonnage, emissionType, company));
         }
 
         return rows;
@@ -4050,6 +4156,19 @@ public sealed record TelemetryGridDbRow(
     DateTime? CreatedAt,
     string SourceType,
     long Id);
+
+public sealed record WasteReportGridDbRow(
+    long Id,
+    string TicketNumber,
+    string ContainerId,
+    string SiteName,
+    string SiteAddress,
+    string ProjectCode,
+    string ProjectName,
+    DateTime? HaulDate,
+    decimal? Tonnage,
+    string EmissionType,
+    string Company);
 
 public sealed record ProjectOfficesDashboardDbRow(
     long OfficeId,

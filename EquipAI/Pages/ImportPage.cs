@@ -10,7 +10,7 @@ public class ImportPage : BasePage
     private ILocator ImportTitle => Page.Locator(
         "//h1[@id='invoice-import-title'] | //h1[contains(@class,'page-title')] | //h1[contains(@id,'title')]");
     private ILocator ImportMessage => Page.Locator(
-        "//p[@class='invoice-import__lead'] | //p[@class='telemetry-import__lead'] | //p[contains(@class,'page-header__lead')]");
+        "//p[@class='invoice-import__lead'] | //p[@class='telemetry-import__lead'] | //p[contains(@class,'waste-report-import__lead')] | //p[contains(@class,'page-header__lead')]");
     private ILocator BackBtn => Page.Locator("//a[contains(text(),'Back')]");
     private ILocator CsvFileLabel => Page.Locator("//span[@id='invoice-csv-file-label']");
     private ILocator PdfFileLabel => Page.Locator("//span[@id='invoice-pdf-file-label']");
@@ -36,6 +36,17 @@ public class ImportPage : BasePage
     private ILocator UnrecognizedRowsAlert => Page.Locator("//app-alert[@aria-label='Unrecognized row validation messages']");
     private ILocator ValidationLead => Page.Locator("//p[@class='telemetry-import__validation-lead']");
     private ILocator ValidationList => Page.Locator("//ul[@class='telemetry-import__validation-list']");
+    private ILocator WasteCompanyInput => Page.Locator("#waste-company-name");
+    private ILocator WasteCompanyError => Page.Locator("//input[@id='waste-company-name']/following-sibling::span");
+    private ILocator WasteValidationLead => Page.Locator("//p[contains(@class,'waste-report-import__validation-lead')]");
+    private ILocator WasteValidationList => Page.Locator("//ul[contains(@class,'waste-report-import__validation-list')]");
+    private ILocator WasteValidationNext => Page
+        .Locator("nav[aria-label='Validation messages pagination'] button")
+        .Filter(new LocatorFilterOptions { HasText = "Next" });
+    private ILocator WasteEmissionTypeNotice => Page.Locator("app-alert")
+        .Filter(new LocatorFilterOptions { HasText = "still need an emission type" });
+    private ILocator WasteEmissionTypeRowError =>
+        Page.Locator(".waste-report-import__emission-type-cell--error span[role='alert']");
     private ILocator SearchableSelectList => Page.Locator("//div[@role='listbox' and contains(@class,'select__list')]");
     private ILocator ReviewLead => Page.Locator("//p[@class='invoice-pdf-review-page__lead']");
     private ILocator ReviewApproveBtn => Page.Locator("//button[normalize-space()='Approve']");
@@ -84,6 +95,14 @@ public class ImportPage : BasePage
         var telemetryPage = new TelemetryPage(Page);
         await telemetryPage.OpenAsync();
         await telemetryPage.ClickImportBtnAsync();
+        await WaitForLoadedAsync();
+    }
+
+    public async Task OpenWasteAsync()
+    {
+        var wastePage = new WasteReportPage(Page);
+        await wastePage.OpenAsync();
+        await wastePage.ClickImportBtnAsync();
         await WaitForLoadedAsync();
     }
 
@@ -193,6 +212,27 @@ public class ImportPage : BasePage
         var telemetryPage = new TelemetryPage(Page);
         await telemetryPage.WaitForLoadedAsync();
         return telemetryPage;
+    }
+
+    public async Task<WasteReportPage> ClickSaveWasteBtnAsync()
+    {
+        await SaveBtn.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await Assertions.Expect(SaveBtn).ToBeEnabledAsync(new LocatorAssertionsToBeEnabledOptions
+        {
+            Timeout = 30_000,
+        });
+        await SaveBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url =>
+            {
+                var path = new Uri(url).AbsolutePath.TrimEnd('/');
+                return path.Equals("/waste-reports", StringComparison.OrdinalIgnoreCase);
+            },
+            new PageWaitForURLOptions { Timeout = 60_000 });
+
+        var wastePage = new WasteReportPage(Page);
+        await wastePage.WaitForLoadedAsync();
+        return wastePage;
     }
 
     public async Task ClickSaveExpectingValidationAsync()
@@ -309,6 +349,62 @@ public class ImportPage : BasePage
     {
         await ValidationList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         return NormalizeMultiline(await ValidationList.InnerTextAsync());
+    }
+
+    public async Task<string> GetWasteValidationLeadAsync()
+    {
+        await WasteValidationLead.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return NormalizeMultiline(await WasteValidationLead.InnerTextAsync());
+    }
+
+    public async Task<string> GetWasteValidationListTextAsync()
+    {
+        await WasteValidationList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var pages = new List<string>();
+        while (true)
+        {
+            pages.Add(NormalizeMultiline(await WasteValidationList.InnerTextAsync()));
+            if (await WasteValidationNext.CountAsync() == 0 || !await WasteValidationNext.IsEnabledAsync())
+                break;
+
+            var before = await WasteValidationList.InnerTextAsync();
+            await WasteValidationNext.ClickAsync();
+            await Assertions.Expect(WasteValidationList).Not.ToHaveTextAsync(
+                before,
+                new LocatorAssertionsToHaveTextOptions { Timeout = 10_000 });
+        }
+
+        return string.Join("\n", pages);
+    }
+
+    public async Task TouchWasteCompanyAsync()
+    {
+        await WasteCompanyInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WasteCompanyInput.ClickAsync();
+        await WasteCompanyInput.BlurAsync();
+    }
+
+    public async Task<string> GetWasteCompanyErrorAsync()
+    {
+        await WasteCompanyError.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return (await WasteCompanyError.InnerTextAsync()).Trim();
+    }
+
+    public async Task<string> GetWasteEmissionTypeNoticeAsync()
+    {
+        await WasteEmissionTypeNotice.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var title = NormalizeCell(await WasteEmissionTypeNotice.Locator(".alert__title").InnerTextAsync());
+        var body = NormalizeCell(await WasteEmissionTypeNotice.Locator(".alert__body").InnerTextAsync());
+        return title + "\n" + body;
+    }
+
+    public async Task<string> GetWasteEmissionTypeRowErrorAsync()
+    {
+        await WasteEmissionTypeRowError.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+        });
+        return (await WasteEmissionTypeRowError.First.InnerTextAsync()).Trim();
     }
 
     public async Task<InvoicesPage> ImportCsvAsync(string fileName)
@@ -512,6 +608,79 @@ public class ImportPage : BasePage
                 LocationText = await ResolveLocationTextAsync(row, values),
                 OperatingHours = GetCell(values, "OPERATING HOURS"),
                 FuelType = GetCell(values, "FUEL TYPE"),
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<string> GetWasteCompanyValueAsync()
+    {
+        await WasteCompanyInput.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 60_000,
+        });
+        return (await WasteCompanyInput.InputValueAsync()).Trim();
+    }
+
+    public async Task ClearWasteCompanyAsync()
+    {
+        await WasteCompanyInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await WasteCompanyInput.FillAsync(string.Empty);
+        await WasteCompanyInput.BlurAsync();
+        await Assertions.Expect(SaveBtn).ToBeDisabledAsync(new LocatorAssertionsToBeDisabledOptions
+        {
+            Timeout = 10_000,
+        });
+    }
+
+    public async Task<IReadOnlyList<WasteImportPreviewRow>> GetWastePreviewRowsAsync()
+    {
+        await PreviewTable.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 60_000,
+        });
+
+        var headers = (await PreviewTable.Locator("thead th").AllInnerTextsAsync())
+            .Select(NormalizeHeader)
+            .ToList();
+        var rows = PreviewTable.Locator("tbody tr");
+        var count = await rows.CountAsync();
+        var result = new List<WasteImportPreviewRow>();
+
+        for (var i = 0; i < count; i++)
+        {
+            var row = rows.Nth(i);
+            var cells = row.Locator("td");
+            var cellCount = await cells.CountAsync();
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (var c = 0; c < cellCount && c < headers.Count; c++)
+            {
+                var cell = cells.Nth(c);
+                var selectValue = cell.Locator(".select__value");
+                values[headers[c]] = await selectValue.CountAsync() > 0
+                    ? NormalizeCell(await selectValue.First.InnerTextAsync())
+                    : NormalizeCell(await cell.InnerTextAsync());
+            }
+
+            var ticketNumber = GetCell(values, "TICKET NUMBER");
+            if (string.IsNullOrWhiteSpace(ticketNumber))
+                continue;
+
+            result.Add(new WasteImportPreviewRow
+            {
+                TicketNumber = ticketNumber,
+                ContainerId = GetCell(values, "CONTAINER ID"),
+                SiteName = GetCell(values, "SITE NAME"),
+                SiteAddress = GetCell(values, "SITE ADDRESS"),
+                Project = GetCell(values, "PROJECT"),
+                HaulDate = GetCell(values, "HAUL DATE"),
+                Tonnage = GetCell(values, "TONNAGE"),
+                AssignedWasteType = GetCell(values, "ASSIGNED WASTE TYPE"),
+                EmissionType = GetCell(values, "EMISSION TYPE"),
+                Company = GetCell(values, "COMPANY"),
             });
         }
 
@@ -818,6 +987,21 @@ public class ImportPage : BasePage
         return utilityBillUploadPage;
     }
 
+    public async Task<WasteReportPage> ClickBackToWasteReportsAsync()
+    {
+        await BackBtn.ClickAsync();
+        await Page.WaitForURLAsync(
+            url =>
+            {
+                var path = new Uri(url).AbsolutePath.TrimEnd('/');
+                return path.Equals("/waste-reports", StringComparison.OrdinalIgnoreCase);
+            });
+
+        var wastePage = new WasteReportPage(Page);
+        await wastePage.WaitForLoadedAsync();
+        return wastePage;
+    }
+
     public async Task<TelemetryPage> ClickBackToTelemetryAsync()
     {
         await BackBtn.ClickAsync();
@@ -1015,4 +1199,18 @@ public sealed class TelemetryImportPreviewRow
     public required string LocationText { get; init; }
     public required string OperatingHours { get; init; }
     public required string FuelType { get; init; }
+}
+
+public sealed class WasteImportPreviewRow
+{
+    public required string TicketNumber { get; init; }
+    public required string ContainerId { get; init; }
+    public required string SiteName { get; init; }
+    public required string SiteAddress { get; init; }
+    public required string Project { get; init; }
+    public required string HaulDate { get; init; }
+    public required string Tonnage { get; init; }
+    public required string AssignedWasteType { get; init; }
+    public required string EmissionType { get; init; }
+    public required string Company { get; init; }
 }

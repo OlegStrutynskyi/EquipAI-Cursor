@@ -34,6 +34,7 @@ public class SideMenuTests : BaseTest
             "Invoice Upload",
             "Telemetry Upload",
             "Utility Bill Upload",
+            "Waste Report Upload",
         };
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
@@ -83,6 +84,7 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Invoice Upload")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Telemetry Upload")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Utility Bill Upload")).Should().BeTrue();
+            (await sideMenuPage.IsLinkVisibleAsync("Waste Report Upload")).Should().BeTrue();
             (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
@@ -118,6 +120,7 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Invoice Upload")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Telemetry Upload")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Utility Bill Upload")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Waste Report Upload")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
@@ -153,6 +156,7 @@ public class SideMenuTests : BaseTest
             (await sideMenuPage.IsLinkVisibleAsync("Invoice Upload")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Telemetry Upload")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Utility Bill Upload")).Should().BeFalse();
+            (await sideMenuPage.IsLinkVisibleAsync("Waste Report Upload")).Should().BeFalse();
             (await sideMenuPage.IsLinkVisibleAsync("Factor Import")).Should().BeFalse();
         }
         finally
@@ -198,25 +202,25 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T08_SideMenu_ClickUsers()
+    public async Task T08_SideMenu_ClickEmissionCategories()
     {
-        const string expectedTitle = "Users";
+        const string expectedTitle = "Emission Categories";
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();
-        await sideMenuPage.ClickUsersAsync();
+        await sideMenuPage.ClickEmissionCategoriesAsync();
 
         (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
     }
 
     [Test]
-    public async Task T09_SideMenu_ClickUnits()
+    public async Task T09_SideMenu_ClickFactorImport()
     {
-        const string expectedTitle = "Units";
+        const string expectedTitle = "Factor Import";
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();
-        await sideMenuPage.ClickUnitsAsync();
+        await sideMenuPage.ClickFactorImportAsync();
 
         (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
     }
@@ -234,19 +238,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T11_SideMenu_ClickEmissionCategories()
-    {
-        const string expectedTitle = "Emission Categories";
-
-        var sideMenuPage = new SideMenuPage(Fixture.Page);
-        await sideMenuPage.OpenAsync();
-        await sideMenuPage.ClickEmissionCategoriesAsync();
-
-        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
-    }
-
-    [Test]
-    public async Task T12_SideMenu_ClickAliases()
+    public async Task T11_SideMenu_ClickAliases()
     {
         const string expectedTitle = "Aliases";
 
@@ -258,7 +250,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T13_SideMenu_ClickInvoiceUpload()
+    public async Task T12_SideMenu_ClickInvoiceUpload()
     {
         const string expectedTitle = "Invoice Upload";
 
@@ -270,7 +262,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T14_SideMenu_ClickTelemetryUpload()
+    public async Task T13_SideMenu_ClickTelemetryUpload()
     {
         const string expectedTitle = "Telemetry Upload";
 
@@ -282,7 +274,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T15_SideMenu_ClickUtilityBillUpload()
+    public async Task T14_SideMenu_ClickUtilityBillUpload()
     {
         const string expectedTitle = "Utility Bill Upload";
 
@@ -294,19 +286,43 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T16_SideMenu_ClickFactorImport()
+    public async Task T15_SideMenu_ClickWasteReportUpload()
     {
-        const string expectedTitle = "Factor Import";
+        const string expectedTitle = "Waste Report Upload";
 
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();
-        await sideMenuPage.ClickFactorImportAsync();
+        await sideMenuPage.ClickWasteReportUploadAsync();
 
         (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
     }
 
     [Test]
-    public async Task T17_SideMenu_ClickDarkMode()
+    public async Task T16_SideMenu_ClickUnits()
+    {
+        const string expectedTitle = "Units";
+
+        var sideMenuPage = new SideMenuPage(Fixture.Page);
+        await sideMenuPage.OpenAsync();
+        await sideMenuPage.ClickUnitsAsync();
+
+        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
+    }
+
+    [Test]
+    public async Task T17_SideMenu_ClickUsers()
+    {
+        const string expectedTitle = "Users";
+
+        var sideMenuPage = new SideMenuPage(Fixture.Page);
+        await sideMenuPage.OpenAsync();
+        await sideMenuPage.ClickUsersAsync();
+
+        (await sideMenuPage.GetPageTitleAsync()).Should().Be(expectedTitle);
+    }
+
+    [Test]
+    public async Task T18_SideMenu_ClickDarkMode()
     {
         const string expectedDarkBackground = "rgb(0, 0, 0)";
         const string expectedLightBackground = "rgb(255, 255, 255)";
@@ -325,7 +341,7 @@ public class SideMenuTests : BaseTest
     }
 
     [Test]
-    public async Task T18_SideMenu_ClickLogout()
+    public async Task T19_SideMenu_ClickLogout()
     {
         var sideMenuPage = new SideMenuPage(Fixture.Page);
         await sideMenuPage.OpenAsync();

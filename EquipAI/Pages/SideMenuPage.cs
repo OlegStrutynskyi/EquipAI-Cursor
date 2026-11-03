@@ -23,6 +23,7 @@ public class SideMenuPage : BasePage
     private ILocator InvoiceUploadLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Invoice Upload" });
     private ILocator TelemetryUploadLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Telemetry Upload" });
     private ILocator UtilityBillUploadLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Utility Bill Upload" });
+    private ILocator WasteReportUploadLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Waste Report Upload" });
     private ILocator UnitsLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Units" });
     private ILocator UsersLink => PrimaryNav.Locator("a.nav-item").Filter(new LocatorFilterOptions { HasTextString = "Users" });
     private ILocator DarkModeLink => Page.Locator("label.nav-item--theme, label.nav-item")
@@ -113,6 +114,12 @@ public class SideMenuPage : BasePage
     {
         await EnsureDataHubExpandedForAsync(UtilityBillUploadLink);
         await ClickLinkAsync(UtilityBillUploadLink);
+    }
+
+    public async Task ClickWasteReportUploadAsync()
+    {
+        await EnsureDataHubExpandedForAsync(WasteReportUploadLink);
+        await ClickLinkAsync(WasteReportUploadLink);
     }
 
     public Task ClickEmissionHubAsync() => ClickNavGroupAsync(EmissionHubLink);
