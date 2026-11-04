@@ -40,8 +40,10 @@ public class ImportPage : BasePage
     private ILocator WasteCompanyError => Page.Locator("//input[@id='waste-company-name']/following-sibling::span");
     private ILocator WasteValidationLead => Page.Locator("//p[contains(@class,'waste-report-import__validation-lead')]");
     private ILocator WasteValidationList => Page.Locator("//ul[contains(@class,'waste-report-import__validation-list')]");
-    private ILocator WasteValidationNext => Page
-        .Locator("nav[aria-label='Validation messages pagination'] button")
+    private ILocator WasteValidationPagination =>
+        Page.Locator("nav[aria-label='Validation messages pagination']");
+    private ILocator WasteValidationNext => WasteValidationPagination
+        .Locator("button")
         .Filter(new LocatorFilterOptions { HasText = "Next" });
     private ILocator WasteEmissionTypeNotice => Page.Locator("app-alert")
         .Filter(new LocatorFilterOptions { HasText = "still need an emission type" });
@@ -361,20 +363,60 @@ public class ImportPage : BasePage
     {
         await WasteValidationList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         var pages = new List<string>();
+        var text = NormalizeMultiline(await WasteValidationList.InnerTextAsync());
         while (true)
         {
-            pages.Add(NormalizeMultiline(await WasteValidationList.InnerTextAsync()));
-            if (await WasteValidationNext.CountAsync() == 0 || !await WasteValidationNext.IsEnabledAsync())
+            pages.Add(text);
+            var (page, total) = await ReadValidationPagerAsync();
+            if (page >= total)
                 break;
 
-            var before = await WasteValidationList.InnerTextAsync();
+            await Assertions.Expect(WasteValidationNext).ToBeEnabledAsync(
+                new LocatorAssertionsToBeEnabledOptions { Timeout = 10_000 });
             await WasteValidationNext.ClickAsync();
-            await Assertions.Expect(WasteValidationList).Not.ToHaveTextAsync(
-                before,
-                new LocatorAssertionsToHaveTextOptions { Timeout = 10_000 });
+            await Assertions.Expect(WasteValidationPagination).ToContainTextAsync(
+                $"Page {page + 1} of",
+                new LocatorAssertionsToContainTextOptions { Timeout = 10_000 });
+            text = await WaitForDifferentValidationListAsync(text);
         }
 
         return string.Join("\n", pages);
+    }
+
+    private async Task<(int Page, int Total)> ReadValidationPagerAsync()
+    {
+        if (await WasteValidationPagination.CountAsync() == 0 || !await WasteValidationPagination.IsVisibleAsync())
+            return (1, 1);
+
+        var text = System.Text.RegularExpressions.Regex.Replace(
+            (await WasteValidationPagination.InnerTextAsync()).Replace('\u00A0', ' '),
+            @"\s+",
+            " ");
+        var match = System.Text.RegularExpressions.Regex.Match(
+            text,
+            @"Page\s+(\d+)\s+of\s+(\d+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!match.Success)
+            return (1, 1);
+
+        return (int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value));
+    }
+
+    private async Task<string> WaitForDifferentValidationListAsync(string previous)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        string? stable = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            var text = NormalizeMultiline(await WasteValidationList.InnerTextAsync());
+            if (text != previous && text == stable)
+                return text;
+
+            stable = text;
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("Validation messages did not change after opening the next page.");
     }
 
     public async Task TouchWasteCompanyAsync()
@@ -675,9 +717,10 @@ public class ImportPage : BasePage
                 ContainerId = GetCell(values, "CONTAINER ID"),
                 SiteName = GetCell(values, "SITE NAME"),
                 SiteAddress = GetCell(values, "SITE ADDRESS"),
+                Location = GetCell(values, "LOCATION"),
                 Project = GetCell(values, "PROJECT"),
                 HaulDate = GetCell(values, "HAUL DATE"),
-                Tonnage = GetCell(values, "TONNAGE"),
+                Tonnage = GetCellByPrefix(values, "TONNAGE"),
                 AssignedWasteType = GetCell(values, "ASSIGNED WASTE TYPE"),
                 EmissionType = GetCell(values, "EMISSION TYPE"),
                 Company = GetCell(values, "COMPANY"),
@@ -1173,6 +1216,19 @@ public class ImportPage : BasePage
         return string.Empty;
     }
 
+    private static string GetCellByPrefix(IReadOnlyDictionary<string, string> values, string prefix)
+    {
+        foreach (var pair in values)
+        {
+            if (pair.Key.Equals(prefix, StringComparison.OrdinalIgnoreCase)
+                || pair.Key.StartsWith(prefix + " ", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.StartsWith(prefix + "(", StringComparison.OrdinalIgnoreCase))
+                return pair.Value;
+        }
+
+        return string.Empty;
+    }
+
     private static string ResolveTestDataPath(string fileName)
     {
         var candidates = new[]
@@ -1207,6 +1263,7 @@ public sealed class WasteImportPreviewRow
     public required string ContainerId { get; init; }
     public required string SiteName { get; init; }
     public required string SiteAddress { get; init; }
+    public required string Location { get; init; }
     public required string Project { get; init; }
     public required string HaulDate { get; init; }
     public required string Tonnage { get; init; }

@@ -335,7 +335,7 @@ public class WasteReportPage : BasePage
                 Location = GetCell(values, "LOCATION"),
                 Project = GetCell(values, "PROJECT"),
                 HaulDate = GetCell(values, "HAUL DATE"),
-                Tonnage = GetCell(values, "TONNAGE"),
+                Tonnage = GetCellByPrefix(values, "TONNAGE"),
                 EmissionType = GetCell(values, "EMISSION TYPE"),
                 Company = GetCell(values, "COMPANY"),
             });
@@ -494,6 +494,19 @@ public class WasteReportPage : BasePage
         {
             if (values.TryGetValue(key, out var value))
                 return value;
+        }
+
+        return string.Empty;
+    }
+
+    private static string GetCellByPrefix(IReadOnlyDictionary<string, string> values, string prefix)
+    {
+        foreach (var pair in values)
+        {
+            if (pair.Key.Equals(prefix, StringComparison.OrdinalIgnoreCase)
+                || pair.Key.StartsWith(prefix + " ", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.StartsWith(prefix + "(", StringComparison.OrdinalIgnoreCase))
+                return pair.Value;
         }
 
         return string.Empty;
