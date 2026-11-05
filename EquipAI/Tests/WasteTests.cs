@@ -51,7 +51,7 @@ public class WasteTests : BaseTest
             "LOCATION",
             "PROJECT",
             "HAUL DATE",
-            "TONNAGE",
+            "TONNAGE (SHORT TON)",
             "EMISSION TYPE",
             "COMPANY",
         };

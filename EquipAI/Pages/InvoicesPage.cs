@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EquipAI.Utils;
 using Microsoft.Playwright;
 
@@ -189,49 +190,46 @@ public class InvoicesPage : BasePage
     {
         var header = InvoicesGrid.Locator("thead th").Filter(new LocatorFilterOptions { HasTextString = columnName }).First;
         await header.ScrollIntoViewIfNeededAsync();
-        var ariaBefore = await header.GetAttributeAsync("aria-sort");
-        var fingerprintBefore = await GetPageFingerprintAsync();
-        var showingBefore = await TryGetShowingRangeAsync();
-        await header.Locator("button.table__sort").ClickAsync();
+        var firstBefore = await GetFirstInvoiceNumberAsync();
 
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (DateTime.UtcNow < deadline)
+        var requestTask = new TaskCompletionSource<IRequest>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnRequest(object? sender, IRequest request)
         {
-            var ariaAfter = await header.GetAttributeAsync("aria-sort");
-            if (string.Equals(ariaAfter, ariaBefore, StringComparison.Ordinal))
+            if (request.Method == "GET"
+                && request.Url.Contains("/api/invoices", StringComparison.OrdinalIgnoreCase))
+                requestTask.TrySetResult(request);
+        }
+
+        Page.Request += OnRequest;
+        string? expectedFirst = null;
+        try
+        {
+            await header.Locator("button.table__sort").ClickAsync();
+            var sortRequest = await requestTask.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            var response = await sortRequest.ResponseAsync();
+            if (response is { Ok: true })
+                expectedFirst = ReadFirstInvoiceNumber(await response.TextAsync());
+        }
+        catch (TimeoutException)
+        {
+            expectedFirst = null;
+        }
+        finally
+        {
+            Page.Request -= OnRequest;
+        }
+
+        if (!string.IsNullOrEmpty(expectedFirst)
+            && !string.Equals(expectedFirst, firstBefore, StringComparison.Ordinal))
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline)
             {
+                if (string.Equals(await GetFirstInvoiceNumberAsync(), expectedFirst, StringComparison.Ordinal))
+                    break;
+
                 await Task.Delay(100);
-                continue;
             }
-
-            var refreshDeadline = DateTime.UtcNow.AddSeconds(10);
-            while (DateTime.UtcNow < refreshDeadline)
-            {
-                var showingAfter = await TryGetShowingRangeAsync();
-                var onFirstPage = showingAfter is null || showingAfter.Value.Start == 1;
-                var fingerprintAfter = await GetPageFingerprintAsync();
-                if (onFirstPage
-                    && fingerprintAfter.Length > 0
-                    && !string.Equals(fingerprintAfter, fingerprintBefore, StringComparison.Ordinal))
-                {
-                    await WaitForInvoiceGridSettledAsync();
-                    var settled = await GetPageFingerprintAsync();
-                    if (!string.Equals(settled, fingerprintBefore, StringComparison.Ordinal))
-                        return;
-                }
-
-                await Task.Delay(100);
-            }
-
-            if (showingBefore is null || showingBefore.Value.Start == 1)
-            {
-                await WaitForInvoiceGridSettledAsync();
-                var settled = await GetPageFingerprintAsync();
-                if (!string.Equals(settled, fingerprintBefore, StringComparison.Ordinal))
-                    return;
-            }
-
-            break;
         }
 
         await WaitForInvoiceGridSettledAsync();
@@ -852,6 +850,31 @@ public class InvoicesPage : BasePage
         var finalFingerprint = await GetPageFingerprintAsync();
         return !string.IsNullOrEmpty(fingerprintBefore)
                && !fingerprintBefore.Equals(finalFingerprint, StringComparison.Ordinal);
+    }
+
+    private async Task<string> GetFirstInvoiceNumberAsync()
+    {
+        var cell = InvoicesGrid.Locator("tbody tr td:nth-child(2)").First;
+        if (await cell.CountAsync() == 0)
+            return string.Empty;
+
+        return ((await cell.InnerTextAsync()) ?? string.Empty).Replace('\u00A0', ' ').Trim();
+    }
+
+    private static string? ReadFirstInvoiceNumber(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("items", out var items) || items.GetArrayLength() == 0)
+                return null;
+
+            return items[0].TryGetProperty("invoiceNumber", out var number) ? number.GetString() : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private async Task<string> GetPageFingerprintAsync()

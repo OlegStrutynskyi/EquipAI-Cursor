@@ -76,16 +76,9 @@ public class ProjectsTests : BaseTest
             Assert.Pass("No Projects");
 
         var actualRecords = await projectsPage.GetAllGridRecordsAsync();
-        var expectedRecords = projects
-            .Select(project => new ProjectGridRecord(
-                project.Code,
-                project.Name,
-                project.Address,
-                project.StartDate is null ? "—" : FormatProjectStartDate(project.StartDate.Value),
-                project.IsActive ? "ACTIVE" : "INACTIVE"))
-            .ToList();
+        var expectedRecords = projects.Select(ToGridRecord).ToList();
 
-        actualRecords.Should().BeEquivalentTo(expectedRecords);
+        actualRecords.Should().BeEquivalentTo(expectedRecords, options => options.WithoutStrictOrdering());
     }
 
     [Test]
@@ -200,12 +193,7 @@ public class ProjectsTests : BaseTest
 
         var expected = (await SqlHelper.GetProjectGridRowsAsync())
             .Where(row => ProjectMatchesSearch(row, term))
-            .Select(project => new ProjectGridRecord(
-                project.Code,
-                project.Name,
-                project.Address,
-                project.StartDate is null ? "—" : FormatProjectStartDate(project.StartDate.Value),
-                project.IsActive ? "ACTIVE" : "INACTIVE"))
+            .Select(ToGridRecord)
             .ToList();
 
         if (expected.Count == 0)
@@ -215,7 +203,7 @@ public class ProjectsTests : BaseTest
         }
 
         var actual = await projectsPage.GetAllGridRecordsAsync();
-        actual.Should().BeEquivalentTo(expected);
+        actual.Should().BeEquivalentTo(expected, options => options.WithoutStrictOrdering());
         actual.Should().OnlyContain(row => RowContains(row, term));
     }
 
@@ -224,7 +212,7 @@ public class ProjectsTests : BaseTest
             .Contains(term, StringComparison.OrdinalIgnoreCase);
 
     private static bool ProjectMatchesSearch(ProjectGridRow row, string term) =>
-        string.Join(' ', row.Code, row.Name, row.Address)
+        string.Join(' ', row.Code, row.Name, FormatAddress(row))
             .Contains(term, StringComparison.OrdinalIgnoreCase);
 
     private static List<ProjectGridRecord> ExpectedSortedRecords(
@@ -236,7 +224,7 @@ public class ProjectsTests : BaseTest
         {
             "CODE" => OrderByText(projects, project => project.Code, ascending, StringComparer.OrdinalIgnoreCase),
             "NAME" => OrderByText(projects, project => project.Name, ascending, HyphenInsensitiveComparer.Instance),
-            "ADDRESS" => OrderByText(projects, project => project.Address, ascending, HyphenInsensitiveComparer.Instance),
+            "ADDRESS" => OrderByText(projects, project => FormatAddress(project), ascending, HyphenInsensitiveComparer.Instance),
             "STATUS" => OrderByText(projects, project => project.IsActive ? "ACTIVE" : "INACTIVE", ascending, StringComparer.OrdinalIgnoreCase),
             "START DATE" => ascending
                 ? projects
@@ -248,14 +236,41 @@ public class ProjectsTests : BaseTest
             _ => throw new ArgumentOutOfRangeException(nameof(column), column, "Unknown projects grid column."),
         };
 
-        return ordered
-            .Select(project => new ProjectGridRecord(
-                project.Code,
-                project.Name,
-                project.Address,
-                project.StartDate is null ? "—" : FormatProjectStartDate(project.StartDate.Value),
-                project.IsActive ? "ACTIVE" : "INACTIVE"))
-            .ToList();
+        return ordered.Select(ToGridRecord).ToList();
+    }
+
+    private static ProjectGridRecord ToGridRecord(ProjectGridRow project) =>
+        new(
+            project.Code,
+            project.Name,
+            FormatAddress(project),
+            project.StartDate is null ? "—" : FormatProjectStartDate(project.StartDate.Value),
+            project.IsActive ? "ACTIVE" : "INACTIVE");
+
+    private static string FormatAddress(ProjectGridRow project)
+    {
+        var country = CountryName(project.CountryCode);
+        if (string.IsNullOrEmpty(project.Address))
+            return country;
+        if (string.IsNullOrEmpty(country))
+            return project.Address;
+
+        return $"{project.Address}, {country}";
+    }
+
+    private static string CountryName(string countryCode)
+    {
+        if (string.IsNullOrWhiteSpace(countryCode))
+            return string.Empty;
+
+        try
+        {
+            return new RegionInfo(countryCode).EnglishName;
+        }
+        catch (ArgumentException)
+        {
+            return countryCode;
+        }
     }
 
     private static IEnumerable<ProjectGridRow> OrderByText(

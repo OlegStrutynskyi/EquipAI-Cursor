@@ -233,6 +233,7 @@ public class WasteImportTests : BaseTest
         previewRows.Should().ContainSingle();
         previewRows[0].EmissionType.Should().Be("Select emission type\u2026");
         (await importPage.GetWasteEmissionTypeRowErrorAsync()).Should().Be("Select an emission type.");
+        (await importPage.IsSaveBtnEnabledAsync()).Should().BeFalse();
     }
 
     [Test]
@@ -602,6 +603,7 @@ public class WasteImportTests : BaseTest
         previewRows.Should().HaveCount(2);
         previewRows.Should().OnlyContain(row => row.EmissionType == "Select emission type\u2026");
         (await importPage.GetWasteEmissionTypeRowErrorAsync()).Should().Be("Select an emission type.");
+        (await importPage.IsSaveBtnEnabledAsync()).Should().BeFalse();
     }
 
     [Test]

@@ -12,7 +12,7 @@ public class CreateInvoicePage : InvoiceFormPage
     private ILocator CreateInvoiceBtn => Page.Locator("//button[normalize-space()='Create invoice']");
     private ILocator ProjectError => Page.Locator(
         "//*[@id='invoice-project']/ancestor::app-searchable-select/following-sibling::span[contains(@class,'form-hint--error')] | //select[@id='invoice-project']/following-sibling::span");
-    private ILocator InvoiceDateError => Page.Locator("//input[@id='invoice-date']/following-sibling::span");
+    private ILocator InvoiceDateError => Page.Locator("//div[contains(@class,'date-input')]/../following-sibling::span[contains(@class,'form-hint--error')]");
     private ILocator EmissionCategoryError => Page.Locator(
         "//*[@id='invoice-category']/ancestor::app-searchable-select/following-sibling::span[contains(@class,'form-hint--error')] | //select[@id='invoice-category']/../following-sibling::span");
     private ILocator CurrencyError => Page.Locator(
@@ -85,7 +85,7 @@ public class CreateInvoicePage : InvoiceFormPage
         await InvoiceNumberInput.FillAsync(invoiceNumber);
         await CompanyNameInput.FillAsync(companyName);
         await AddressInput.FillAsync(address);
-        await InvoiceDateInput.FillAsync(invoiceDate);
+        await FillInvoiceDateAsync(invoiceDate);
         await SelectOptionByTextAsync(EmissionCategoryDropdown, emissionCategory);
         await TotalCostInput.FillAsync(totalCost);
         await SelectOptionByTextAsync(CurrencyDropdown, currency);
@@ -100,7 +100,7 @@ public class CreateInvoicePage : InvoiceFormPage
         await InvoiceNumberInput.FillAsync(invoiceNumber);
         await CompanyNameInput.FillAsync(companyName);
         await AddressInput.FillAsync(address);
-        await InvoiceDateInput.FillAsync(invoiceDate);
+        await FillInvoiceDateAsync(invoiceDate);
         await TotalCostInput.FillAsync(totalCost);
         await Description1Input.FillAsync(description);
         await Quantity1Input.FillAsync(quantity);
@@ -165,7 +165,7 @@ public class CreateInvoicePage : InvoiceFormPage
         await InvoiceNumberInput.FillAsync(invoiceNumber);
         await CompanyNameInput.FillAsync(companyName);
         await AddressInput.FillAsync(address);
-        await InvoiceDateInput.FillAsync(invoiceDate);
+        await FillInvoiceDateAsync(invoiceDate);
         await SelectFirstNonEmptyOptionAsync(EmissionCategoryDropdown);
         await TotalCostInput.FillAsync(totalCost);
         var currency = await SelectFirstNonEmptyOptionAndGetTextAsync(CurrencyDropdown)
@@ -185,7 +185,13 @@ public class CreateInvoicePage : InvoiceFormPage
         await InvoiceNumberInput.FillAsync(invoiceNumber);
         await CompanyNameInput.FillAsync(companyName);
         await AddressInput.FillAsync(address);
+        await FillInvoiceDateAsync(invoiceDate);
+        await TotalCostInput.FillAsync(totalCost);
         await Description1Input.FillAsync(description);
+        await Quantity1Input.FillAsync("1");
+        await UnitPrice1Input.FillAsync("100");
+        if (await Cost1Input.CountAsync() > 0)
+            await Cost1Input.FillAsync("100");
 
         return new FilledInvoiceFormData
         {

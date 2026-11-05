@@ -19,7 +19,7 @@ public class EditUtilityBillTests : BaseTest
         var header = await SqlHelper.GetUtilityBillEditHeaderAsync(companyName, billDateValue);
         var lineItems = await SqlHelper.GetUtilityBillEditLineItemsAsync(companyName, billDateValue);
         var billDate = header.BillDate?.ToString("MMM d, yyyy", CultureInfo.InvariantCulture) ?? string.Empty;
-        var expectedBillDate = header.BillDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+        var expectedBillDate = header.BillDate?.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture) ?? string.Empty;
 
         var utilityBillUploadPage = new UtilityBillUploadPage(Fixture.Page);
         await utilityBillUploadPage.OpenAsync();
@@ -254,7 +254,6 @@ public class EditUtilityBillTests : BaseTest
             await editPage.FillReviewCompanyNameAsync(updatedCompany);
             await editPage.FillReviewAddressAsync(updatedAddress);
             var updatedProject = await editPage.SelectDifferentReviewProjectAsync();
-            await editPage.FillReviewBillDateAsync(updatedBillDateInput);
             await editPage.FillReviewTotalCostAsync(updatedTotalCost);
             var updatedCurrency = await editPage.SelectDifferentReviewCurrencyAsync();
             var updatedTotalDisplay = $"111.11 {updatedCurrency}";
@@ -274,6 +273,7 @@ public class EditUtilityBillTests : BaseTest
             var line1Cost = FormatViewCost(await editPage.GetReviewLineCostAsync(1));
             const string addedLineCost = "—";
 
+            await editPage.FillReviewBillDateAsync(updatedBillDateInput);
             await editPage.ClickReviewSaveAsDraftBtnAsync();
             await editPage.WaitForReviewDraftSavedMessageAsync();
             utilityBillUploadPage = await editPage.ClickBackToUtilityBillUploadAsync();

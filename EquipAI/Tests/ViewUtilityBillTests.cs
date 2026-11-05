@@ -68,6 +68,7 @@ public class ViewUtilityBillTests : BaseTest
         lineItem.EmissionType,
         lineItem.Category,
         lineItem.Unit,
+        string.IsNullOrWhiteSpace(lineItem.Office) ? "—" : lineItem.Office,
     ];
 
     [Test]

@@ -410,7 +410,7 @@ public class UsersTests : BaseTest
     [Test]
     public async Task T23_Users_EditUser_TakenEmail()
     {
-        const string expectedAlertMessage = "Request failed.";
+        const string expectedAlertMessage = $"Email '{Config.TestUserEmail}' is already taken.";
 
         var editUserPage = await OpenTestUser3Async();
         await editUserPage.FillEmailAsync(Config.TestUserEmail);

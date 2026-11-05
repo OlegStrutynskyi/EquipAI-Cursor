@@ -12,7 +12,7 @@ public class TelemetryImportTests : BaseTest
     {
         const string expectedTitle = "Import Telemetry";
         const string expectedMessage =
-            "Upload an Excel (.xlsx) file named CompanyName_Month_Year.xlsx (example: Herc_07_26.xlsx). Review the recognized rows, Month/Year, and Company before saving.";
+            "Upload an Excel (.xlsx) file. A file named CompanyName_MM_YY.xlsx (example: Herc_07_26.xlsx) fills in Month/Year and Company; otherwise enter them on the review step. Review the recognized rows, Month/Year, and Company before saving.";
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();

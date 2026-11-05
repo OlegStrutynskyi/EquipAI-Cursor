@@ -366,7 +366,7 @@ public class _01_Setup_Data : BaseTest
         const string companyName = Config.SetupCompanyName1;
         const string address = Config.SetupInvoiceAddress1;
         const string invoiceDate = "02/06/2026";
-        const string emissionCategory = "Internal Fuel (Scope 1)";
+        const string emissionCategory = "Direct Fuel Emissions (Scope 1)";
         const string totalCost = "1562.99";
         const string currency = "USD";
         const string description = Config.SetupInvoiceLineDescription1;
@@ -657,10 +657,50 @@ public class _01_Setup_Data : BaseTest
             decimal.Round(area, 2, MidpointRounding.AwayFromZero).ToString("#,##0.##", CultureInfo.GetCultureInfo("en-US"))));
     }
 
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T23_Setup_ImportWaste()
+    {
+        const string fileName = "Republic_correct_06_2022.xlsx";
+        const string monthValue = "2022-06";
+        const string monthDisplay = "June 2022";
+        const string ticketNumber1 = "test101";
+        const string ticketNumber2 = "test102";
+
+        var wastePage = new WasteReportPage(Fixture.Page);
+        await wastePage.OpenAsync();
+        await wastePage.SetMonthAsync(monthValue);
+        (await wastePage.GetMonthFieldDisplayValueAsync()).Should().Be(monthDisplay);
+
+        if (HasWasteTickets(await wastePage.GetGridRowsAsync(), ticketNumber1, ticketNumber2))
+            Assert.Pass("Waste records already exist.");
+
+        var importPage = await wastePage.ClickImportBtnAsync();
+        await importPage.UploadFileAsync(fileName);
+        await importPage.ClickImportBtnAsync();
+        (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
+        wastePage = await importPage.ClickSaveWasteBtnAsync();
+
+        await wastePage.OpenAsync();
+        await wastePage.SetMonthAsync(monthValue);
+        (await wastePage.GetMonthFieldDisplayValueAsync()).Should().Be(monthDisplay);
+
+        var ticketNumbers = (await wastePage.GetGridRowsAsync()).Select(row => row.TicketNumber).ToList();
+        ticketNumbers.Should().Contain(ticketNumber1);
+        ticketNumbers.Should().Contain(ticketNumber2);
+    }
+
     private static bool HasAutotestTelemetry(
         IReadOnlyList<TelemetryGridRow> rows,
         string equipmentType1,
         string equipmentType2) =>
         rows.Any(row => row.EquipmentType == equipmentType1)
         && rows.Any(row => row.EquipmentType == equipmentType2);
+
+    private static bool HasWasteTickets(
+        IReadOnlyList<WasteReportGridRow> rows,
+        string ticketNumber1,
+        string ticketNumber2) =>
+        rows.Any(row => row.TicketNumber == ticketNumber1)
+        && rows.Any(row => row.TicketNumber == ticketNumber2);
 }

@@ -17,7 +17,7 @@ public class EditInvoiceTests : BaseTest
 
         var header = await SqlHelper.GetInvoiceEditHeaderAsync(companyName, invoiceNumber);
         var lineItems = await SqlHelper.GetInvoiceViewLineItemsAsync(companyName, invoiceNumber);
-        var invoiceDate = header.InvoiceDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+        var invoiceDate = header.InvoiceDate?.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture) ?? string.Empty;
 
         var invoicesPage = new InvoicesPage(Fixture.Page);
         await invoicesPage.OpenAsync();

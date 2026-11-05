@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Playwright;
 
 namespace EquipAI.Pages;
@@ -77,7 +78,51 @@ public abstract class InvoiceFormPage : BasePage
 
     public async Task FillInvoiceDateAsync(string invoiceDate)
     {
-        await InvoiceDateInput.FillAsync(invoiceDate);
+        await InvoiceDateInput.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var inputType = (await InvoiceDateInput.GetAttributeAsync("type")) ?? string.Empty;
+        if (inputType.Equals("date", StringComparison.OrdinalIgnoreCase))
+        {
+            var iso = ParseInvoiceDate(invoiceDate).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            await InvoiceDateInput.EvaluateAsync(
+                """
+                (input, value) => {
+                  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+                  descriptor.set.call(input, value);
+                  input.dispatchEvent(new Event('input', { bubbles: true }));
+                  input.dispatchEvent(new Event('change', { bubbles: true }));
+                  input.blur();
+                }
+                """,
+                iso);
+            var actual = (await InvoiceDateInput.InputValueAsync()).Trim();
+            if (!string.Equals(actual, iso, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Date is '{actual}', expected '{iso}'.");
+            return;
+        }
+
+        var date = ParseInvoiceDate(invoiceDate);
+        var digits = date.ToString("MMddyyyy", CultureInfo.InvariantCulture);
+        var expected = date.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+        await InvoiceDateInput.ClickAsync();
+        await InvoiceDateInput.FillAsync(string.Empty);
+        await InvoiceDateInput.PressSequentiallyAsync(digits, new LocatorPressSequentiallyOptions { Delay = 40 });
+        await InvoiceDateInput.BlurAsync();
+        var masked = (await InvoiceDateInput.InputValueAsync()).Trim();
+        if (!string.Equals(masked, expected, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Date is '{masked}', expected '{expected}'.");
+    }
+
+    private static DateTime ParseInvoiceDate(string invoiceDate)
+    {
+        if (DateTime.TryParseExact(
+                invoiceDate,
+                ["yyyy-MM-dd", "MM/dd/yyyy", "M/d/yyyy"],
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var exact))
+            return exact;
+
+        return DateTime.Parse(invoiceDate, CultureInfo.InvariantCulture);
     }
 
     public async Task FillQuantity1Async(string quantity)

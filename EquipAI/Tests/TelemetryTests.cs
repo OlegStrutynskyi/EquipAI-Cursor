@@ -12,7 +12,7 @@ public class TelemetryTests : BaseTest
     {
         const string expectedTitle = "Telemetry Upload";
         const string expectedMessage = "Browse imported equipment telemetry readings.";
-        var expectedMonth = DateTime.Today.AddMonths(-1).ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        var expectedMonth = DateTime.Today.AddMonths(-1).ToString("MM/yyyy", CultureInfo.InvariantCulture);
 
         var telemetryPage = new TelemetryPage(Fixture.Page);
         await telemetryPage.OpenAsync();

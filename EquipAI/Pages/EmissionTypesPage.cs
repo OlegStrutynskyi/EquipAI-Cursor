@@ -596,8 +596,9 @@ public class EmissionTypesPage : BasePage
     public async Task<(string Code, string DisplayName)> GetCodeAndDisplayNameAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='table']//tr[td[1][normalize-space()='{code}']]");
-        await row.WaitForAsync();
+        await SearchEmissionTypesAsync(code);
+        var row = await FindRowByCodeAcrossPagesAsync(code)
+            ?? throw new InvalidOperationException($"Code '{code}' was not found in the emission types grid.");
         var codeText = (await row.Locator("td").Nth(0).InnerTextAsync()).Trim();
         var displayName = (await row.Locator("td").Nth(1).InnerTextAsync()).Trim();
         return (codeText, displayName);
@@ -618,7 +619,9 @@ public class EmissionTypesPage : BasePage
     public async Task<EditEmissionTypePage> ClickEditBtnAsync(string code)
     {
         await Grid.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        var row = Page.Locator($"//table[@class='table']//tr[td[1][normalize-space()='{code}']]");
+        await SearchEmissionTypesAsync(code);
+        var row = await FindRowByCodeAcrossPagesAsync(code)
+            ?? throw new InvalidOperationException($"Code '{code}' was not found in the emission types grid.");
         await row.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
         var editEmissionTypePage = new EditEmissionTypePage(Page);
         await editEmissionTypePage.WaitForLoadedAsync();

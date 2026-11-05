@@ -390,19 +390,21 @@ public class EmissionTypesTests : BaseTest
     {
         const string expectedPageTitle = "Emission Types";
         var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
-        var code = $"Code{stamp}";
-        var displayName = $"Type{stamp}";
+        var updatedCode = $"Code{stamp}";
+        var updatedDisplayName = $"Type{stamp}";
 
         var emissionTypesPage = new EmissionTypesPage(Fixture.Page);
         await emissionTypesPage.OpenAsync();
-        var editEmissionTypePage = await emissionTypesPage.ClickEditBtnAsync(Config.SetupCode1);
-        await editEmissionTypePage.FillCodeAsync(code);
-        await editEmissionTypePage.FillDisplayNameAsync(displayName);
+        var (code, displayName) = await emissionTypesPage.GetCodeAndDisplayNameAsync(Config.SetupCode1);
+        var editEmissionTypePage = await emissionTypesPage.ClickEditBtnAsync(code);
+        await editEmissionTypePage.FillCodeAsync(updatedCode);
+        await editEmissionTypePage.FillDisplayNameAsync(updatedDisplayName);
         emissionTypesPage = await editEmissionTypePage.ClickCancelBtnAsync();
 
         (await emissionTypesPage.GetPageTitleAsync()).Should().Be(expectedPageTitle);
-        (await emissionTypesPage.IsCodeInGridAsync(Config.SetupCode1)).Should().BeTrue();
-        (await emissionTypesPage.IsDisplayNameInGridAsync(Config.SetupEmissionTypeName1)).Should().BeTrue();
+        var (codeAfterCancel, displayNameAfterCancel) = await emissionTypesPage.GetCodeAndDisplayNameAsync(code);
+        codeAfterCancel.Should().Be(code);
+        displayNameAfterCancel.Should().Be(displayName);
     }
 
     [Test]

@@ -20,7 +20,7 @@ public class FactorImportPage : BasePage
     private ILocator SelectFileArea => Page.Locator("//div[@class='form-file-picker']");
     private ILocator FileInput => Page.Locator("input[type='file']");
     private ILocator UploadBtn => Page.Locator("//button[normalize-space()='Upload and import']");
-    private ILocator AlertBody => Page.Locator("//div[@class='alert__body']");
+    private ILocator AlertBody => Page.Locator("span[role='alert'], div.alert__body");
     private ILocator ImportResultLabel => Page.Locator("#admin-factor-import-result-title");
     private ILocator RecentBatchesLabel => Page.Locator("//h2[@id='admin-factor-import-recent-title']");
     private ILocator Grid => Page.Locator("//table[@class='table']");
@@ -184,8 +184,9 @@ public class FactorImportPage : BasePage
 
     public async Task<string> GetAlertBodyTextAsync()
     {
-        await AlertBody.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        return (await AlertBody.InnerTextAsync()).Replace('\u00A0', ' ').Trim();
+        var alert = AlertBody.Filter(new LocatorFilterOptions { Visible = true });
+        await alert.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return (await alert.First.InnerTextAsync()).Replace('\u00A0', ' ').Trim();
     }
 
     public Task<bool> IsImportResultLabelVisibleAsync() => ImportResultLabel.IsVisibleAsync();

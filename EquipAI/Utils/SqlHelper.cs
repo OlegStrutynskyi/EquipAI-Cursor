@@ -203,8 +203,8 @@ public static class SqlHelper
                     NULLIF(a.AddressLine1, ''),
                     NULLIF(a.AddressLine2, ''),
                     NULLIF(a.City, ''),
-                    NULLIF(CONCAT_WS(' ', a.StateProvince, a.PostalCode), ''),
-                    NULLIF(a.CountryCode, '')) AS Address,
+                    NULLIF(CONCAT_WS(' ', a.StateProvince, a.PostalCode), '')) AS Address,
+                NULLIF(a.CountryCode, '') AS CountryCode,
                 p.StartDate,
                 p.IsActive
             FROM [projects].[Project] AS p
@@ -220,9 +220,10 @@ public static class SqlHelper
             var code = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
             var name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
             var address = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
-            DateTime? startDate = reader.IsDBNull(3) ? null : Convert.ToDateTime(reader.GetValue(3));
-            var isActive = !reader.IsDBNull(4) && Convert.ToBoolean(reader.GetValue(4));
-            rows.Add(new ProjectGridRow(code, name, address, startDate, isActive));
+            var countryCode = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            DateTime? startDate = reader.IsDBNull(4) ? null : Convert.ToDateTime(reader.GetValue(4));
+            var isActive = !reader.IsDBNull(5) && Convert.ToBoolean(reader.GetValue(5));
+            rows.Add(new ProjectGridRow(code, name, address, countryCode, startDate, isActive));
         }
 
         return rows;
@@ -2263,7 +2264,8 @@ public static class SqlHelper
         await using var command = new SqlCommand(
             """
             SELECT i.LinePosition, i.LineDescription, i.Quantity, i.Cost, t.DisplayName, c.DisplayName,
-                   CONCAT(u.DisplayName, ' (', u.Code, ')') AS Unit
+                   CONCAT(u.DisplayName, ' (', u.Code, ')') AS Unit,
+                   o.Name AS Office
             FROM [invoices].[InvoiceLineItem] AS i
             LEFT JOIN [emissions].[EmissionType] AS t
                 ON i.EmissionTypeId = t.Id
@@ -2271,6 +2273,8 @@ public static class SqlHelper
                 ON i.CategoryId = c.Id
             LEFT JOIN [emissions].[UnitOfMeasure] AS u
                 ON i.UnitOfMeasureId = u.Id
+            LEFT JOIN [projects].[Office] AS o
+                ON i.OfficeId = o.Id
             WHERE i.InvoiceId = (
                 SELECT Id
                 FROM [invoices].[Invoice]
@@ -2293,7 +2297,8 @@ public static class SqlHelper
             var emissionType = reader.IsDBNull(4) ? string.Empty : reader.GetString(4).Trim();
             var category = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
             var unit = reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim();
-            rows.Add(new UtilityBillViewLineItemRow(linePosition, description, quantity, cost, emissionType, category, unit));
+            var office = reader.IsDBNull(7) ? string.Empty : reader.GetString(7).Trim();
+            rows.Add(new UtilityBillViewLineItemRow(linePosition, description, quantity, cost, emissionType, category, unit, office));
         }
 
         return rows;
@@ -4134,7 +4139,8 @@ public sealed record UtilityBillViewLineItemRow(
     decimal? Cost,
     string EmissionType,
     string Category,
-    string Unit);
+    string Unit,
+    string Office);
 
 public sealed record UtilityBillGridDbRow(
     long Id,
@@ -4226,7 +4232,7 @@ public sealed record FactorImportBatchGridDbRow(
 
 public sealed record EmissionTypeEmissionsRow(string DisplayName, decimal Co2eTonnes);
 
-public sealed record ProjectGridRow(string Code, string Name, string Address, DateTime? StartDate, bool IsActive);
+public sealed record ProjectGridRow(string Code, string Name, string Address, string CountryCode, DateTime? StartDate, bool IsActive);
 
 public sealed record OfficeGridDbRow(
     string Project,
