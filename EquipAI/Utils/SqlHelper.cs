@@ -2385,12 +2385,15 @@ public static class SqlHelper
         await using var command = new SqlCommand(
             """
             SELECT i.LinePosition, i.LineDescription, i.Quantity, i.UnitPrice, i.Cost,
-                   t.DisplayName AS EmissionType, CONCAT(u.DisplayName, ' (', u.Code, ')') AS Unit
+                   t.DisplayName AS EmissionType, CONCAT(u.DisplayName, ' (', u.Code, ')') AS Unit,
+                   o.Name AS Office
             FROM [invoices].[InvoiceLineItem] AS i
             LEFT JOIN [emissions].[EmissionType] AS t
                 ON i.EmissionTypeId = t.Id
             LEFT JOIN [emissions].[UnitOfMeasure] AS u
                 ON i.UnitOfMeasureId = u.Id
+            LEFT JOIN [projects].[Office] AS o
+                ON i.OfficeId = o.Id
             WHERE i.InvoiceId = (
                 SELECT Id
                 FROM [invoices].[Invoice]
@@ -2413,7 +2416,8 @@ public static class SqlHelper
             decimal? cost = reader.IsDBNull(4) ? null : Convert.ToDecimal(reader.GetValue(4));
             var emissionType = reader.IsDBNull(5) ? string.Empty : reader.GetString(5).Trim();
             var unit = reader.IsDBNull(6) ? string.Empty : reader.GetString(6).Trim();
-            rows.Add(new InvoiceViewLineItemRow(linePosition, description, quantity, unitPrice, cost, emissionType, unit));
+            var office = reader.IsDBNull(7) ? string.Empty : reader.GetString(7).Trim();
+            rows.Add(new InvoiceViewLineItemRow(linePosition, description, quantity, unitPrice, cost, emissionType, unit, office));
         }
 
         return rows;
@@ -4084,7 +4088,8 @@ public sealed record InvoiceViewLineItemRow(
     decimal? UnitPrice,
     decimal? Cost,
     string EmissionType,
-    string Unit);
+    string Unit,
+    string Office);
 
 public sealed record UtilityBillEditSnapshot(
     long InvoiceId,

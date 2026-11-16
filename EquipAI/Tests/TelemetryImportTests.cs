@@ -12,7 +12,7 @@ public class TelemetryImportTests : BaseTest
     {
         const string expectedTitle = "Import Telemetry";
         const string expectedMessage =
-            "Upload an Excel (.xlsx) file. A file named CompanyName_MM_YY.xlsx (example: Herc_07_26.xlsx) fills in Month/Year and Company; otherwise enter them on the review step. Review the recognized rows, Month/Year, and Company before saving.";
+            "Upload an Excel (.xlsx) file. A file named CompanyName_MM_YY.xlsx (example: Herc_07_26.xlsx) fills in Month/Year and Company. A name without a date still fills Company from the file name (United.xlsx → United). Enter Month/Year on the review step when the name has none. Review the recognized rows, Month/Year, and Company before saving.";
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
@@ -111,7 +111,7 @@ public class TelemetryImportTests : BaseTest
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
-        await importPage.UploadFileAsync("Herc_new_no_MonthYear.xlsx");
+        await importPage.UploadFileAsync("Herc.xlsx");
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
@@ -421,7 +421,7 @@ public class TelemetryImportTests : BaseTest
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
-        await importPage.UploadFileAsync("JCB_new_no_MonthYear.xlsx");
+        await importPage.UploadFileAsync("JCB.xlsx");
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
@@ -785,7 +785,7 @@ public class TelemetryImportTests : BaseTest
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
-        await importPage.UploadFileAsync("Custom_no_MonthYear.xlsx");
+        await importPage.UploadFileAsync("Custom.xlsx");
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();
@@ -1183,7 +1183,7 @@ public class TelemetryImportTests : BaseTest
 
         var importPage = new ImportPage(Fixture.Page);
         await importPage.OpenTelemetryAsync();
-        await importPage.UploadFileAsync("United_new_no_MonthYear.xlsx");
+        await importPage.UploadFileAsync("United.xlsx");
         await importPage.ClickImportBtnAsync();
 
         (await importPage.IsPreviewTableVisibleAsync()).Should().BeTrue();

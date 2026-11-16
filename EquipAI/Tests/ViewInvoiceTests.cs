@@ -69,6 +69,7 @@ public class ViewInvoiceTests : BaseTest
         FormatAmount(lineItem.Cost),
         lineItem.EmissionType,
         lineItem.Unit,
+        string.IsNullOrWhiteSpace(lineItem.Office) ? "—" : lineItem.Office,
     ];
 
     private static string FormatAmount(decimal? value) =>
