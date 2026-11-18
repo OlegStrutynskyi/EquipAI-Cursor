@@ -3691,7 +3691,8 @@ public static class SqlHelper
     public static async Task<IReadOnlyList<ProjectOfficesDashboardDbRow>> GetProjectOfficesDashboardAsync(
         string projectName,
         DateTime? periodStart,
-        DateTime? periodEnd)
+        DateTime? periodEnd,
+        int? kind = null)
     {
         var rows = new List<ProjectOfficesDashboardDbRow>();
 
@@ -3741,6 +3742,7 @@ public static class SqlHelper
             INNER JOIN projects.Office AS o
                 ON o.ProjectId = p.Id
                AND o.IsDeleted = 0
+               AND (@Kind IS NULL OR o.Kind = @Kind)
             LEFT JOIN projects.Address AS ad
                 ON ad.Id = o.AddressId
             LEFT JOIN emissions.Activity AS a
@@ -3860,6 +3862,10 @@ public static class SqlHelper
         command.Parameters.Add(new SqlParameter("@PeriodEnd", System.Data.SqlDbType.Date)
         {
             Value = periodEnd.HasValue ? periodEnd.Value.Date : DBNull.Value,
+        });
+        command.Parameters.Add(new SqlParameter("@Kind", System.Data.SqlDbType.Int)
+        {
+            Value = kind.HasValue ? kind.Value : DBNull.Value,
         });
 
         await using var reader = await command.ExecuteReaderAsync();

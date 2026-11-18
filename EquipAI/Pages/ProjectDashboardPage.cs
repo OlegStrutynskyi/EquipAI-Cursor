@@ -31,6 +31,9 @@ public class ProjectDashboardPage : BasePage
     private ILocator OfficesNote => Page.Locator("//p[@class='project-offices__note']");
     private ILocator OfficesEmptyMessage => Page.Locator("//p[@class='project-offices__empty']");
     private ILocator OfficesTable => Page.Locator("//table[contains(@class,'project-offices__table')]");
+    private ILocator JobsiteTrailersNote => OfficesNote.Nth(1);
+    private ILocator JobsiteTrailersEmptyMessage => JobsiteTrailersNote.Locator(
+        "xpath=following::p[contains(@class,'project-offices__empty')][1]");
     private ILocator FuelTab => Page.Locator("//button[normalize-space()='Fuel']");
     private ILocator UtilityTab => Page.Locator("//button[normalize-space()='Utility' and not(contains(@class,'table__sort'))]");
     private ILocator TelemetryTab => Page.Locator("//button[normalize-space()='Telemetry']");
@@ -221,6 +224,12 @@ public class ProjectDashboardPage : BasePage
         return NormalizeText(await OfficesNote.First.InnerTextAsync());
     }
 
+    public async Task<string> GetJobsiteTrailersNoteAsync()
+    {
+        await JobsiteTrailersNote.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return NormalizeText(await JobsiteTrailersNote.InnerTextAsync());
+    }
+
     public async Task<bool> IsOfficesEmptyMessageVisibleAsync()
     {
         if (await OfficesEmptyMessage.CountAsync() == 0)
@@ -235,12 +244,38 @@ public class ProjectDashboardPage : BasePage
         return NormalizeText(await OfficesEmptyMessage.First.InnerTextAsync());
     }
 
-    public async Task<IReadOnlyList<ProjectOfficesCardGridRow>> GetOfficesCardRowsAsync()
+    public async Task<bool> IsJobsiteTrailersEmptyMessageVisibleAsync()
     {
-        if (await OfficesTable.CountAsync() == 0 || !await OfficesTable.First.IsVisibleAsync())
+        if (await JobsiteTrailersEmptyMessage.CountAsync() == 0)
+            return false;
+
+        return await JobsiteTrailersEmptyMessage.IsVisibleAsync();
+    }
+
+    public async Task<string> GetJobsiteTrailersEmptyMessageAsync()
+    {
+        await JobsiteTrailersEmptyMessage.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        return NormalizeText(await JobsiteTrailersEmptyMessage.InnerTextAsync());
+    }
+
+    public Task<IReadOnlyList<ProjectOfficesCardGridRow>> GetOfficesCardRowsAsync() =>
+        ReadOfficesTableRowsAsync(OfficesTable.First);
+
+    public async Task<IReadOnlyList<ProjectOfficesCardGridRow>> GetJobsiteTrailersCardRowsAsync()
+    {
+        if (await OfficesTable.CountAsync() < 2)
             return [];
 
-        var rawRows = await OfficesTable.First.EvaluateAsync<string[][]>(
+        return await ReadOfficesTableRowsAsync(OfficesTable.Nth(1));
+    }
+
+    private async Task<IReadOnlyList<ProjectOfficesCardGridRow>> ReadOfficesTableRowsAsync(ILocator officesTable)
+    {
+        if (await officesTable.CountAsync() == 0 || !await officesTable.First.IsVisibleAsync())
+            return [];
+
+        var table = officesTable.First;
+        var rawRows = await table.EvaluateAsync<string[][]>(
             """
             table => [...table.querySelectorAll('tbody tr')]
               .filter(tr => !tr.querySelector('.table__skeleton-bar'))
@@ -249,7 +284,7 @@ public class ProjectDashboardPage : BasePage
               .filter(cells => cells.some(cell => cell.length > 0))
             """);
 
-        var headers = (await OfficesTable.First.Locator("thead th").AllInnerTextsAsync())
+        var headers = (await table.Locator("thead th").AllInnerTextsAsync())
             .Select(NormalizeOfficesHeader)
             .ToList();
 
@@ -298,7 +333,7 @@ public class ProjectDashboardPage : BasePage
             return "METHOD";
         if (text.Contains("AREA", StringComparison.Ordinal))
             return "AREA";
-        if (text.Contains("OFFICE", StringComparison.Ordinal))
+        if (text.Contains("TRAILER", StringComparison.Ordinal) || text.Contains("OFFICE", StringComparison.Ordinal))
             return "OFFICE";
 
         return text;

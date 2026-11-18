@@ -155,7 +155,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
         var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
         await projectDashboardPage.SelectYearAsync("All");
         (await projectDashboardPage.GetOfficesNoteAsync()).Should().Be(officesNote);
-        await AssertOfficesGridMatchesDbAsync(projectDashboardPage, projectName, null, null);
+        await AssertOfficesGridMatchesDbAsync(projectDashboardPage, projectName, null, null, kind: 0);
 
         var selectedYear = GetYearAfterAll(await projectDashboardPage.GetYearDropdownOptionsAsync());
         if (selectedYear is null)
@@ -167,11 +167,41 @@ public class ProjectDashboardTests_Haskell : BaseTest
             projectDashboardPage,
             projectName,
             new DateTime(year, 1, 1),
-            new DateTime(year, 12, 31));
+            new DateTime(year, 12, 31),
+            kind: 0);
     }
 
     [Test]
-    public async Task T12_HaskellDashboard_Data_Fuel()
+    public async Task T12_HaskellDashboard_JobsiteTrailersGrid()
+    {
+        const string trailersNote =
+            "One row per jobsite trailer for the selected year. The Method column shows whether the figure comes from bills or from floor area.";
+
+        var projectName = Config.DefaultEnterpriseProjectName;
+        if (!await SqlHelper.GetProjectHasOfficesAsync(projectName))
+            Assert.Pass("Project does not have any Jobsite trailers.");
+
+        var projectDashboardPage = await OpenDefaultProjectDashboardAsync();
+        await projectDashboardPage.SelectYearAsync("All");
+        (await projectDashboardPage.GetJobsiteTrailersNoteAsync()).Should().Be(trailersNote);
+        await AssertOfficesGridMatchesDbAsync(projectDashboardPage, projectName, null, null, kind: 1);
+
+        var selectedYear = GetYearAfterAll(await projectDashboardPage.GetYearDropdownOptionsAsync());
+        if (selectedYear is null)
+            return;
+
+        await projectDashboardPage.SelectYearAsync(selectedYear);
+        var year = int.Parse(selectedYear, CultureInfo.InvariantCulture);
+        await AssertOfficesGridMatchesDbAsync(
+            projectDashboardPage,
+            projectName,
+            new DateTime(year, 1, 1),
+            new DateTime(year, 12, 31),
+            kind: 1);
+    }
+
+    [Test]
+    public async Task T13_HaskellDashboard_Data_Fuel()
     {
         var expectedColumns = new[]
         {
@@ -226,7 +256,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
     }
 
     [Test]
-    public async Task T13_HaskellDashboard_Data_Utility()
+    public async Task T14_HaskellDashboard_Data_Utility()
     {
         var expectedColumns = new[]
         {
@@ -290,7 +320,7 @@ public class ProjectDashboardTests_Haskell : BaseTest
     }
 
     [Test]
-    public async Task T14_HaskellDashboard_Data_Telemetry()
+    public async Task T15_HaskellDashboard_Data_Telemetry()
     {
         var expectedColumns = new[]
         {
@@ -572,22 +602,31 @@ public class ProjectDashboardTests_Haskell : BaseTest
         ProjectDashboardPage projectDashboardPage,
         string projectName,
         DateTime? periodStart,
-        DateTime? periodEnd)
+        DateTime? periodEnd,
+        int? kind = null)
     {
-        var dbRows = await SqlHelper.GetProjectOfficesDashboardAsync(projectName, periodStart, periodEnd);
+        var dbRows = await SqlHelper.GetProjectOfficesDashboardAsync(projectName, periodStart, periodEnd, kind);
         if (dbRows.Count == 0)
         {
             var expectedMessage = periodStart.HasValue && await SqlHelper.GetProjectHasOfficesAsync(projectName)
-                ? $"No office was occupied in {periodStart.Value.Year}."
-                : "No offices recorded yet.";
+                ? kind == 1
+                    ? $"No jobsite trailer was occupied in {periodStart.Value.Year}."
+                    : $"No office was occupied in {periodStart.Value.Year}."
+                : kind == 1
+                    ? "No jobsite trailers recorded yet."
+                    : "No offices recorded yet.";
 
             var deadline = DateTime.UtcNow.AddSeconds(15);
             var message = string.Empty;
             while (DateTime.UtcNow < deadline)
             {
-                if (await projectDashboardPage.IsOfficesEmptyMessageVisibleAsync())
+                if (kind == 1
+                        ? await projectDashboardPage.IsJobsiteTrailersEmptyMessageVisibleAsync()
+                        : await projectDashboardPage.IsOfficesEmptyMessageVisibleAsync())
                 {
-                    message = await projectDashboardPage.GetOfficesEmptyMessageAsync();
+                    message = kind == 1
+                        ? await projectDashboardPage.GetJobsiteTrailersEmptyMessageAsync()
+                        : await projectDashboardPage.GetOfficesEmptyMessageAsync();
                     if (message == expectedMessage)
                         break;
                 }
@@ -604,7 +643,9 @@ public class ProjectDashboardTests_Haskell : BaseTest
         var expected = new List<ProjectOfficesCardGridRow>();
         while (DateTime.UtcNow < rowsDeadline)
         {
-            actual = await projectDashboardPage.GetOfficesCardRowsAsync();
+            actual = kind == 1
+                ? await projectDashboardPage.GetJobsiteTrailersCardRowsAsync()
+                : await projectDashboardPage.GetOfficesCardRowsAsync();
             expected = dbRows
                 .Select((row, index) => ToOfficesCardRow(
                     row,
@@ -648,9 +689,28 @@ public class ProjectDashboardTests_Haskell : BaseTest
             return "—";
 
         var decimals = TryGetDisplayedDecimalPlaces(displayed, out var places) ? places : 6;
+        if (DisplayedTonnesPerSqFtMatches(tonnesPerSqFt.Value, displayed, decimals))
+            return displayed!.Trim();
+
         var rounded = Math.Round(tonnesPerSqFt.Value, decimals, MidpointRounding.AwayFromZero);
         var format = decimals == 0 ? "#,##0" : "#,##0." + new string('0', decimals);
         return rounded.ToString(format, CultureInfo.InvariantCulture);
+    }
+
+    private static bool DisplayedTonnesPerSqFtMatches(decimal tonnesPerSqFt, string? displayed, int decimals)
+    {
+        if (string.IsNullOrWhiteSpace(displayed))
+            return false;
+
+        var text = displayed.Trim().Replace(",", "").Replace(" ", "");
+        if (text is "—" or "-" or "–" || !decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var shown))
+            return false;
+
+        var unit = 1m;
+        for (var i = 0; i < decimals; i++)
+            unit /= 10m;
+
+        return Math.Abs(shown - tonnesPerSqFt) <= unit;
     }
 
     private static bool TryGetDisplayedDecimalPlaces(string? displayed, out int places)

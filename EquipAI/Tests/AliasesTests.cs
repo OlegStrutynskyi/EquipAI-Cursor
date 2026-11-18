@@ -259,9 +259,9 @@ public class AliasesTests : BaseTest
         const string dataIngestionOption = "Data Ingestion";
         const string catalogFactorMappingOption = "Catalog Factor Mapping";
         const string expectedDataIngestionMessage =
-            "Maps strings from invoice CSV upload and AI ingestion to emission types.";
+            "Invoices and uploads: text on an invoice or uploaded line that means this type.";
         const string expectedCatalogFactorMappingMessage =
-            "Maps fuel labels from EPA/DEFRA/Custom workbooks to emission types.";
+            "Factor workbooks: the EPA, DEFRA or Custom row whose emission factor this type uses. One per emission type; saving it rebuilds the factors.";
 
         var aliasesPage = new AliasesPage(Fixture.Page);
         await aliasesPage.OpenAsync();
