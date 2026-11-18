@@ -282,6 +282,33 @@ public static class SqlHelper
         return options;
     }
 
+    public static async Task<IReadOnlyList<string>> GetActiveProjectDropdownOptionsAsync()
+    {
+        var options = new List<string>();
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(
+            """
+            SELECT CONCAT_WS(N' — ', Code, Name)
+            FROM [projects].[Project]
+            WHERE IsActive = 1 AND IsDeleted = 0
+            ORDER BY Code
+            """,
+            connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var option = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
+            if (!string.IsNullOrEmpty(option))
+                options.Add(option);
+        }
+
+        return options;
+    }
+
     public static async Task<IReadOnlyList<string>> GetSqftEmissionTypeDisplayNamesAsync()
     {
         var names = new List<string>();
@@ -390,6 +417,61 @@ public static class SqlHelper
         await updateAddress.ExecuteNonQueryAsync();
     }
 
+    public static async Task RestoreSetupJobsiteTrailer1Async(long officeId, long addressId, string countryCode)
+    {
+        var startDate = DateTime.ParseExact(Config.SetupJobsiteTrailerStartDate1, "MM/dd/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var endDate = DateTime.ParseExact(Config.SetupJobsiteTrailerEndDate1, "MM/dd/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var area = decimal.Parse(Config.SetupJobsiteTrailerArea1, System.Globalization.CultureInfo.InvariantCulture);
+
+        await using var connection = new SqlConnection(Config.SqlConnectionString);
+        await connection.OpenAsync();
+
+        await using (var updateOffice = new SqlCommand(
+            """
+            UPDATE [projects].[Office]
+            SET ProjectId = (SELECT Id FROM [projects].[Project] WHERE Name = @projectName),
+                Name = @officeName,
+                AddressId = @addressId,
+                StartDate = @startDate,
+                EndDate = @endDate,
+                AreaSquareFeet = @area,
+                AreaEmissionTypeId = NULL
+            WHERE Id = @officeId
+            """,
+            connection))
+        {
+            updateOffice.Parameters.AddWithValue("@projectName", Config.SetupProjectName1);
+            updateOffice.Parameters.AddWithValue("@officeName", Config.SetupJobsiteTrailerName1);
+            updateOffice.Parameters.AddWithValue("@addressId", addressId);
+            updateOffice.Parameters.AddWithValue("@startDate", startDate);
+            updateOffice.Parameters.AddWithValue("@endDate", endDate);
+            updateOffice.Parameters.AddWithValue("@area", area);
+            updateOffice.Parameters.AddWithValue("@officeId", officeId);
+            await updateOffice.ExecuteNonQueryAsync();
+        }
+
+        await using var updateAddress = new SqlCommand(
+            """
+            UPDATE [projects].[Address]
+            SET AddressLine1 = @addressLine1,
+                AddressLine2 = @addressLine2,
+                City = @city,
+                StateProvince = @state,
+                PostalCode = @postalCode,
+                CountryCode = @countryCode
+            WHERE Id = @addressId
+            """,
+            connection);
+        updateAddress.Parameters.AddWithValue("@addressLine1", Config.SetupAddressLine1);
+        updateAddress.Parameters.AddWithValue("@addressLine2", Config.SetupAddressLine2);
+        updateAddress.Parameters.AddWithValue("@city", Config.SetupCity);
+        updateAddress.Parameters.AddWithValue("@state", Config.SetupState);
+        updateAddress.Parameters.AddWithValue("@postalCode", Config.SetupPostalCode);
+        updateAddress.Parameters.AddWithValue("@countryCode", countryCode);
+        updateAddress.Parameters.AddWithValue("@addressId", addressId);
+        await updateAddress.ExecuteNonQueryAsync();
+    }
+
     public static async Task<IReadOnlyList<OfficeGridDbRow>> GetOfficeGridRowsAsync()
     {
         var rows = new List<OfficeGridDbRow>();
@@ -401,6 +483,11 @@ public static class SqlHelper
             """
             SELECT CONCAT_WS(N' — ', p.Code, p.Name) AS Project,
                    o.Name,
+                   CASE
+                       WHEN o.kind = 0 THEN 'Office'
+                       WHEN o.kind = 1 THEN 'Jobsite trailer'
+                       ELSE NULL
+                   END AS Kind,
                    CONCAT_WS(', ',
                        NULLIF(a.AddressLine1, ''),
                        NULLIF(a.AddressLine2, ''),
@@ -425,12 +512,13 @@ public static class SqlHelper
         {
             var project = reader.IsDBNull(0) ? string.Empty : reader.GetString(0).Trim();
             var name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1).Trim();
-            var address = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
-            var countryCode = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
-            DateTime? startDate = reader.IsDBNull(4) ? null : ReadLocalDateTime(reader.GetValue(4));
-            DateTime? endDate = reader.IsDBNull(5) ? null : ReadLocalDateTime(reader.GetValue(5));
-            decimal? area = reader.IsDBNull(6) ? null : Convert.ToDecimal(reader.GetValue(6));
-            rows.Add(new OfficeGridDbRow(project, name, address, countryCode, startDate, endDate, area));
+            var kind = reader.IsDBNull(2) ? string.Empty : reader.GetString(2).Trim();
+            var address = reader.IsDBNull(3) ? string.Empty : reader.GetString(3).Trim();
+            var countryCode = reader.IsDBNull(4) ? string.Empty : reader.GetString(4).Trim();
+            DateTime? startDate = reader.IsDBNull(5) ? null : ReadLocalDateTime(reader.GetValue(5));
+            DateTime? endDate = reader.IsDBNull(6) ? null : ReadLocalDateTime(reader.GetValue(6));
+            decimal? area = reader.IsDBNull(7) ? null : Convert.ToDecimal(reader.GetValue(7));
+            rows.Add(new OfficeGridDbRow(project, name, kind, address, countryCode, startDate, endDate, area));
         }
 
         return rows;
@@ -473,7 +561,10 @@ public static class SqlHelper
             SELECT o.Name
             FROM [projects].[Office] AS o
             INNER JOIN [projects].[Address] AS a ON a.Id = o.AddressId
-            WHERE o.Name LIKE 'Office[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+            WHERE (
+                    o.Name LIKE 'Office[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+                    OR o.Name LIKE 'Trailer[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+                  )
               AND a.AddressLine1 LIKE 'Address1[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
             """,
             connection))
@@ -4242,6 +4333,7 @@ public sealed record ProjectGridRow(string Code, string Name, string Address, st
 public sealed record OfficeGridDbRow(
     string Project,
     string Name,
+    string Kind,
     string Address,
     string CountryCode,
     DateTime? StartDate,

@@ -48,6 +48,14 @@ public static class Config
     public const string SetupOfficeStartDate2 = "02/02/2024";
     public const string SetupOfficeEndDate1 = "12/31/2029";
     public const string SetupOfficeEndDate2 = "11/30/2025";
+    public const string SetupJobsiteTrailerName1 = "DONT-DELETE-JobsiteTrailer-1";
+    public const string SetupJobsiteTrailerName2 = "DONT-DELETE-JobsiteTrailer-2";
+    public const string SetupJobsiteTrailerArea1 = "1000";
+    public const string SetupJobsiteTrailerArea2 = "2222.22";
+    public const string SetupJobsiteTrailerStartDate1 = "01/01/2025";
+    public const string SetupJobsiteTrailerStartDate2 = "02/02/2024";
+    public const string SetupJobsiteTrailerEndDate1 = "12/31/2029";
+    public const string SetupJobsiteTrailerEndDate2 = "11/30/2025";
     public const string SetupInvoiceAddress1 = "DONT-DELETE-Address-1";
     public const string SetupInvoiceLineDescription1 = "DONT-DELETE-Description-1";
     public const string SetupCode1 = "DONTDELETECODE1";

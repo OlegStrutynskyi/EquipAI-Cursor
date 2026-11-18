@@ -10,7 +10,13 @@ public class OfficesPage : BasePage
     private ILocator Title => Page.Locator("//h1[@id='admin-offices-title']");
     private ILocator Subtitle => Page.Locator("//span[@class='page-header__subtitle']");
     private ILocator Message => Page.Locator("//p[@class='page-header__lead']");
+    private ILocator AddJobsiteTrailerBtn => Page.Locator(
+        "//button[normalize-space()='Add jobsite trailer'] | //a[normalize-space()='Add jobsite trailer']");
     private ILocator AddOfficeBtn => Page.Locator("//button[normalize-space()='Add office']");
+    private ILocator GridTabs => Page.Locator(
+        "//*[contains(@class,'tabs__item') and (self::button or self::a)]");
+    private ILocator SelectedGridTab => Page.Locator(
+        "//*[contains(@class,'tabs__item--active') and (self::button or self::a)]");
     private ILocator SearchInput => Page.Locator("#admin-offices-search");
     private ILocator Grid => Page.Locator("//table[contains(@class,'table')]");
     private ILocator Pager => Page.Locator("nav[aria-label='Offices pagination']");
@@ -57,8 +63,65 @@ public class OfficesPage : BasePage
         return (await Message.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
+    public Task<bool> IsAddJobsiteTrailerBtnVisibleAsync() => AddJobsiteTrailerBtn.IsVisibleAsync();
+
     public Task<bool> IsAddOfficeBtnVisibleAsync() => AddOfficeBtn.IsVisibleAsync();
     public Task<bool> IsGridVisibleAsync() => Grid.IsVisibleAsync();
+
+    public async Task<IReadOnlyList<string>> GetGridTabsAsync()
+    {
+        await GridTabs.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var tabs = await GridTabs.AllInnerTextsAsync();
+        return tabs
+            .Select(tab => System.Text.RegularExpressions.Regex.Replace(tab.Replace('\u00A0', ' '), @"\s+", " ").Trim())
+            .Where(tab => tab.Length > 0)
+            .ToList();
+    }
+
+    public async Task<string> GetSelectedGridTabAsync()
+    {
+        await SelectedGridTab.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var text = await SelectedGridTab.First.InnerTextAsync();
+        return System.Text.RegularExpressions.Regex.Replace((text ?? string.Empty).Replace('\u00A0', ' '), @"\s+", " ").Trim();
+    }
+
+    public async Task SelectGridTabAsync(string tabName)
+    {
+        var tab = Page.Locator(
+            $"//*[contains(@class,'tabs__item') and (self::button or self::a) and normalize-space()='{tabName}']");
+        await tab.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+
+        var selectedBefore = string.Equals(await GetSelectedGridTabAsync(), tabName, StringComparison.Ordinal);
+        Task<IResponse>? responseTask = null;
+        if (!selectedBefore)
+        {
+            responseTask = Page.WaitForResponseAsync(
+                IsOfficesListResponse,
+                new PageWaitForResponseOptions { Timeout = 15_000 });
+        }
+
+        await tab.ClickAsync();
+        if (responseTask is not null)
+            await responseTask;
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var className = await tab.GetAttributeAsync("class") ?? string.Empty;
+            var selected = className.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Contains("tabs__item--active");
+            if (selected && await Grid.Locator("app-table-skeleton, .table__skeleton-bar").CountAsync() == 0)
+            {
+                if (string.Equals(tabName, "All", StringComparison.Ordinal))
+                    await WaitForKindColumnAsync();
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Offices tab '{tabName}' did not become selected.");
+    }
 
     public async Task<bool> IsSearchInputVisibleAsync()
     {
@@ -139,6 +202,22 @@ public class OfficesPage : BasePage
         var editOfficePage = new EditOfficePage(Page);
         await editOfficePage.WaitForLoadedAsync();
         return editOfficePage;
+    }
+
+    public async Task<EditJobsiteTrailerPage> ClickEditJobsiteTrailerBtnAsync(string trailerName)
+    {
+        await SearchAsync(trailerName);
+        var row = Grid.Locator("tbody tr").Filter(new LocatorFilterOptions
+        {
+            Has = Page.Locator("td:nth-child(2)").GetByText(trailerName, new LocatorGetByTextOptions { Exact = true })
+        });
+        if (await row.CountAsync() == 0)
+            throw new InvalidOperationException($"Jobsite trailer '{trailerName}' was not found.");
+
+        await row.First.Locator("a, button").Filter(new LocatorFilterOptions { HasText = "Edit" }).First.ClickAsync();
+        var editJobsiteTrailerPage = new EditJobsiteTrailerPage(Page);
+        await editJobsiteTrailerPage.WaitForLoadedAsync();
+        return editJobsiteTrailerPage;
     }
 
     public async Task<string> GetGridEmptyMessageAsync()
@@ -225,7 +304,7 @@ public class OfficesPage : BasePage
             ? value.GetString()
             : null;
 
-    private const string EmptySearchMessage = "No offices match your search.";
+    private const string EmptySearchMessage = "No offices or jobsite trailers match your search.";
 
     public async Task<IReadOnlyList<string>> GetGridColumnHeadersAsync()
     {
@@ -283,6 +362,14 @@ public class OfficesPage : BasePage
         return await GetGridRecordsOnCurrentPageAsync();
     }
 
+    public async Task<AddJobsiteTrailerPage> ClickAddJobsiteTrailerBtnAsync()
+    {
+        await AddJobsiteTrailerBtn.ClickAsync();
+        var addJobsiteTrailerPage = new AddJobsiteTrailerPage(Page);
+        await addJobsiteTrailerPage.WaitForLoadedAsync();
+        return addJobsiteTrailerPage;
+    }
+
     public async Task<AddOfficePage> ClickAddOfficeBtnAsync()
     {
         await AddOfficeBtn.ClickAsync();
@@ -317,28 +404,75 @@ public class OfficesPage : BasePage
 
     private async Task<IReadOnlyList<OfficeGridRecord>> GetGridRecordsOnCurrentPageAsync()
     {
+        await WaitForGridDataAsync();
         var rows = await Grid.EvaluateAsync<string[][]>(
             """
-            table => [...table.querySelectorAll('tbody tr')]
-              .filter(tr => !tr.querySelector('app-table-skeleton, .table__skeleton-bar'))
-              .map(tr => [...tr.querySelectorAll(':scope > td')].slice(0, 6).map(td => {
-                const rendered = (td.innerText || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-                const title = (td.getAttribute('title') || td.querySelector('[title]')?.getAttribute('title') || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-                const full = (td.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-                return [title, full, rendered].sort((a, b) => b.length - a.length)[0];
-              }))
-              .filter(cells => cells.length > 1 && cells[1])
+            table => {
+              const headers = [...table.querySelectorAll('thead th')]
+                .map(th => (th.innerText || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase());
+              const at = (cells, name) => {
+                const index = headers.indexOf(name);
+                return index >= 0 && index < cells.length ? cells[index] : '';
+              };
+              return [...table.querySelectorAll('tbody tr')]
+                .filter(tr => !tr.querySelector('app-table-skeleton, .table__skeleton-bar'))
+                .map(tr => [...tr.querySelectorAll(':scope > td')].map(td =>
+                  (td.innerText || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()))
+                .filter(cells => cells.length > 1 && cells[1])
+                .map(cells => [
+                  at(cells, 'PROJECT'),
+                  at(cells, 'NAME'),
+                  at(cells, 'KIND'),
+                  at(cells, 'ADDRESS'),
+                  at(cells, 'START DATE'),
+                  at(cells, 'END DATE'),
+                  at(cells, 'AREA (SQ FT)')
+                ]);
+            }
             """);
 
         return rows
             .Select(cells => new OfficeGridRecord(
                 Project: Cell(cells, 0),
                 Name: Cell(cells, 1),
-                Address: Cell(cells, 2),
-                StartDate: Cell(cells, 3),
-                EndDate: Cell(cells, 4),
-                Area: Cell(cells, 5)))
+                Kind: Cell(cells, 2),
+                Address: Cell(cells, 3),
+                StartDate: Cell(cells, 4),
+                EndDate: Cell(cells, 5),
+                Area: Cell(cells, 6)))
             .ToList();
+    }
+
+    public async Task<bool> HasKindColumnAsync()
+    {
+        var headers = await GetGridColumnHeadersAsync();
+        return headers.Any(header => header.Equals("KIND", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task WaitForKindColumnAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var ready = await Grid.EvaluateAsync<bool>(
+                """
+                table => {
+                  const headers = [...table.querySelectorAll('thead th')]
+                    .map(th => (th.innerText || '').replace(/\s+/g, ' ').trim().toUpperCase());
+                  if (!headers.includes('KIND'))
+                    return false;
+                  const row = [...table.querySelectorAll('tbody tr')]
+                    .find(tr => !tr.querySelector('app-table-skeleton, .table__skeleton-bar') && tr.querySelectorAll(':scope > td').length > 1);
+                  if (!row)
+                    return true;
+                  return row.querySelectorAll(':scope > td').length > headers.indexOf('KIND');
+                }
+                """);
+            if (ready)
+                return;
+
+            await Task.Delay(50);
+        }
     }
 
     private static string Cell(string[] cells, int index) =>
@@ -410,6 +544,7 @@ public class OfficesPage : BasePage
 public sealed record OfficeGridRecord(
     string Project,
     string Name,
+    string Kind,
     string Address,
     string StartDate,
     string EndDate,

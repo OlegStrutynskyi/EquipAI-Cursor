@@ -607,6 +607,7 @@ public class _01_Setup_Data : BaseTest
         actual[0].Should().Be(new OfficeGridRecord(
             project,
             name,
+            "Office",
             $"{Config.SetupAddressLine1}, {Config.SetupAddressLine2}, {Config.SetupCity}, {Config.SetupState} {Config.SetupPostalCode}, {Config.SetupCountry}",
             startDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
             endDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
@@ -651,6 +652,7 @@ public class _01_Setup_Data : BaseTest
         actual[0].Should().Be(new OfficeGridRecord(
             project,
             name,
+            "Office",
             $"{Config.SetupAddressLine1}, {Config.SetupAddressLine2}, {Config.SetupCity}, {Config.SetupState} {Config.SetupPostalCode}, {Config.SetupCountry}",
             startDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
             endDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
@@ -659,7 +661,94 @@ public class _01_Setup_Data : BaseTest
 
     [Explicit("Manual setup test. Run before the test suite.")]
     [Test]
-    public async Task T23_Setup_ImportWaste()
+    public async Task T23_Setup_CreateTestJobsiteTrailerBills()
+    {
+        const string name = Config.SetupJobsiteTrailerName1;
+        var startDate = DateTime.ParseExact(Config.SetupJobsiteTrailerStartDate1, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+        var endDate = DateTime.ParseExact(Config.SetupJobsiteTrailerEndDate1, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+        var area = decimal.Parse(Config.SetupJobsiteTrailerArea1, CultureInfo.InvariantCulture);
+
+        var officesPage = new OfficesPage(Fixture.Page);
+        await officesPage.OpenAsync();
+
+        if (await officesPage.IsNameInGridAsync(name))
+            Assert.Pass("TestJobsiteTrailerBills already exists.");
+
+        var addJobsiteTrailerPage = await officesPage.ClickAddJobsiteTrailerBtnAsync();
+        var project = await addJobsiteTrailerPage.SelectProjectAsync(Config.SetupProjectName1);
+        await addJobsiteTrailerPage.FillNameAsync(name);
+        await addJobsiteTrailerPage.FillAddressLine1Async(Config.SetupAddressLine1);
+        await addJobsiteTrailerPage.FillAddressLine2Async(Config.SetupAddressLine2);
+        await addJobsiteTrailerPage.FillCityAsync(Config.SetupCity);
+        await addJobsiteTrailerPage.FillStateAsync(Config.SetupState);
+        await addJobsiteTrailerPage.FillPostalCodeAsync(Config.SetupPostalCode);
+        await addJobsiteTrailerPage.SelectCountryAsync(Config.SetupCountry);
+        await addJobsiteTrailerPage.FillStartDateAsync(startDate);
+        await addJobsiteTrailerPage.FillEndDateAsync(endDate);
+        await addJobsiteTrailerPage.FillAreaAsync(Config.SetupJobsiteTrailerArea1);
+        officesPage = await addJobsiteTrailerPage.CreateJobsiteTrailerAsync();
+
+        await officesPage.SearchAsync(name);
+        var actual = await officesPage.GetAllGridRecordsAsync();
+        actual.Should().ContainSingle();
+        actual[0].Should().Be(new OfficeGridRecord(
+            project,
+            name,
+            "Jobsite trailer",
+            $"{Config.SetupAddressLine1}, {Config.SetupAddressLine2}, {Config.SetupCity}, {Config.SetupState} {Config.SetupPostalCode}, {Config.SetupCountry}",
+            startDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            endDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            decimal.Round(area, 2, MidpointRounding.AwayFromZero).ToString("#,##0.##", CultureInfo.GetCultureInfo("en-US"))));
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T24_Setup_CreateTestJobsiteTrailerSQFT()
+    {
+        const string name = Config.SetupJobsiteTrailerName2;
+        var startDate = DateTime.ParseExact(Config.SetupJobsiteTrailerStartDate2, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+        var endDate = DateTime.ParseExact(Config.SetupJobsiteTrailerEndDate2, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+        var area = decimal.Parse(Config.SetupJobsiteTrailerArea2, CultureInfo.InvariantCulture);
+
+        var officesPage = new OfficesPage(Fixture.Page);
+        await officesPage.OpenAsync();
+
+        if (await officesPage.IsNameInGridAsync(name))
+            Assert.Pass("TestJobsiteTrailerSQFT already exists.");
+
+        var addJobsiteTrailerPage = await officesPage.ClickAddJobsiteTrailerBtnAsync();
+        var project = await addJobsiteTrailerPage.SelectProjectAsync(Config.SetupProjectName1);
+        await addJobsiteTrailerPage.FillNameAsync(name);
+        await addJobsiteTrailerPage.FillAddressLine1Async(Config.SetupAddressLine1);
+        await addJobsiteTrailerPage.FillAddressLine2Async(Config.SetupAddressLine2);
+        await addJobsiteTrailerPage.FillCityAsync(Config.SetupCity);
+        await addJobsiteTrailerPage.FillStateAsync(Config.SetupState);
+        await addJobsiteTrailerPage.FillPostalCodeAsync(Config.SetupPostalCode);
+        await addJobsiteTrailerPage.SelectCountryAsync(Config.SetupCountry);
+        await addJobsiteTrailerPage.FillStartDateAsync(startDate);
+        await addJobsiteTrailerPage.FillEndDateAsync(endDate);
+        await addJobsiteTrailerPage.FillAreaAsync(Config.SetupJobsiteTrailerArea2);
+        await addJobsiteTrailerPage.ClickEmissionsTabAsync();
+        await addJobsiteTrailerPage.TurnCalculateByFootageOnAsync();
+        await addJobsiteTrailerPage.SelectEmissionTypeAsync(Config.SetupCode4, Config.SetupEmissionTypeName4);
+        officesPage = await addJobsiteTrailerPage.CreateJobsiteTrailerAsync();
+
+        await officesPage.SearchAsync(name);
+        var actual = await officesPage.GetAllGridRecordsAsync();
+        actual.Should().ContainSingle();
+        actual[0].Should().Be(new OfficeGridRecord(
+            project,
+            name,
+            "Jobsite trailer",
+            $"{Config.SetupAddressLine1}, {Config.SetupAddressLine2}, {Config.SetupCity}, {Config.SetupState} {Config.SetupPostalCode}, {Config.SetupCountry}",
+            startDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            endDate.ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
+            decimal.Round(area, 2, MidpointRounding.AwayFromZero).ToString("#,##0.##", CultureInfo.GetCultureInfo("en-US"))));
+    }
+
+    [Explicit("Manual setup test. Run before the test suite.")]
+    [Test]
+    public async Task T25_Setup_ImportWaste()
     {
         const string fileName = "Republic_correct_06_2022.xlsx";
         const string monthValue = "2022-06";

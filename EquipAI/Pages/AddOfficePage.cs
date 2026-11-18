@@ -12,6 +12,7 @@ public class AddOfficePage : BasePage
     private ILocator DetailsTab => Page.Locator("//button[normalize-space()='Details']");
     private ILocator EmissionsTab => Page.Locator("//button[contains(text(),'Emissions · ')]");
     private ILocator CreateOfficeBtn => Page.Locator("//button[normalize-space()='Create office']");
+    private ILocator CreateJobsiteTrailerBtn => Page.Locator("//button[normalize-space()='Create jobsite trailer']");
     private ILocator CancelBtn => Page.Locator("//button[normalize-space()='Cancel']");
     private ILocator AlertMessage => Page.Locator("//div[@class='alert__body']");
     private ILocator ProjectDropdown => Page.Locator("//label[normalize-space()='Project']/following-sibling::app-searchable-select");
@@ -72,6 +73,7 @@ public class AddOfficePage : BasePage
     public Task<bool> IsDetailsTabVisibleAsync() => IsVisibleAsync(DetailsTab);
     public Task<bool> IsEmissionsTabVisibleAsync() => IsVisibleAsync(EmissionsTab);
     public Task<bool> IsCreateOfficeBtnVisibleAsync() => IsVisibleAsync(CreateOfficeBtn);
+    public Task<bool> IsCreateJobsiteTrailerBtnVisibleAsync() => IsVisibleAsync(CreateJobsiteTrailerBtn);
     public Task<bool> IsCancelBtnVisibleAsync() => IsVisibleAsync(CancelBtn);
     public Task<bool> IsProjectDropdownVisibleAsync() => IsVisibleAsync(ProjectDropdown);
     public Task<bool> IsNameInputVisibleAsync() => IsVisibleAsync(NameInput);
@@ -95,6 +97,7 @@ public class AddOfficePage : BasePage
     }
 
     public async Task ClickCreateOfficeBtnAsync() => await CreateOfficeBtn.ClickAsync();
+    public async Task ClickCreateJobsiteTrailerBtnAsync() => await CreateJobsiteTrailerBtn.ClickAsync();
 
     public async Task<string> GetAlertMessageAsync()
     {
@@ -230,18 +233,24 @@ public class AddOfficePage : BasePage
         throw new InvalidOperationException($"Country '{country}' was not found.");
     }
 
-    public async Task<OfficesPage> CreateOfficeAsync()
+    public Task<OfficesPage> CreateOfficeAsync() =>
+        SubmitCreateAsync(CreateOfficeBtn, "Create office");
+
+    public Task<OfficesPage> CreateJobsiteTrailerAsync() =>
+        SubmitCreateAsync(CreateJobsiteTrailerBtn, "Create jobsite trailer");
+
+    private async Task<OfficesPage> SubmitCreateAsync(ILocator createButton, string action)
     {
         var responseTask = Page.WaitForResponseAsync(
             response => response.Request.Method is "POST" or "PUT",
             new PageWaitForResponseOptions { Timeout = 30_000 });
-        await CreateOfficeBtn.ClickAsync();
+        await createButton.ClickAsync();
         var response = await responseTask;
         if (!response.Ok)
         {
             var body = await response.TextAsync();
             throw new InvalidOperationException(
-                $"Create office failed with status {(int)response.Status} {response.Url}: {body}");
+                $"{action} failed with status {(int)response.Status} {response.Url}: {body}");
         }
 
         try
@@ -255,7 +264,7 @@ public class AddOfficePage : BasePage
         {
             var errors = await Page.Locator(".error, .alert, [role='alert']").AllInnerTextsAsync();
             throw new TimeoutException(
-                $"Create office stayed on {Page.Url} after {(int)response.Status} {response.Url}. {string.Join(" | ", errors.Select(error => error.Trim()))}");
+                $"{action} stayed on {Page.Url} after {(int)response.Status} {response.Url}. {string.Join(" | ", errors.Select(error => error.Trim()))}");
         }
 
         var officesPage = new OfficesPage(Page);
